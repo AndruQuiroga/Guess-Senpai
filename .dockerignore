@@ -1,0 +1,22 @@
+# node / next
+node_modules
+.next
+out
+dist
+.cache
+coverage
+
+# env & local
+.env
+.env.*
+*.local
+
+# vcs / editor
+.git
+.gitignore
+.vscode
+.idea
+
+# misc
+Dockerfile*
+docker-compose*.yml

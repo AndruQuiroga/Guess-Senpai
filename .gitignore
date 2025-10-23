@@ -1,0 +1,24 @@
+# Node / Next
+node_modules
+.next
+out
+dist
+coverage
+
+# Python
+.venv
+__pycache__/
+*.pyc
+
+# Env / local
+.env
+.env.*
+*.local
+
+# Docker
+docker-compose.override.yml
+
+# OS / editors
+.DS_Store
+.vscode
+.idea
