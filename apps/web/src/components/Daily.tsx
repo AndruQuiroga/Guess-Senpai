@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameKey, usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { DailyPuzzleResponse } from "../types/puzzles";
+import { buildShareText, formatShareDate } from "../utils/shareText";
 import {
   AnidlePage,
   GuessOpeningPage,
@@ -16,27 +17,26 @@ interface Props {
   data: DailyPuzzleResponse | null;
 }
 
-function formatDate(value: string) {
-  const [year, month, day] = value.split("-").map((part) => Number.parseInt(part, 10));
-  const date = new Date(Date.UTC(year, (month ?? 1) - 1, day));
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-}
-
 export default function Daily({ data }: Props) {
   if (!data) {
     return (
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 text-neutral-100 shadow-ambient backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-        Couldn&apos;t load today&apos;s puzzles. Please refresh or try again later.
+        Couldn&apos;t load today&apos;s puzzles. Please refresh or try again
+        later.
       </div>
     );
   }
 
   const { progress, recordGame } = usePuzzleProgress(data.date);
-  const formattedDate = useMemo(() => formatDate(data.date), [data.date]);
+  const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
 
-  const requiredGames: GameKey[] = ["anidle", "poster_zoomed", "redacted_synopsis"];
+  const requiredGames: GameKey[] = [
+    "anidle",
+    "poster_zoomed",
+    "redacted_synopsis",
+  ];
   if (data.games.guess_the_opening) {
     requiredGames.push("guess_the_opening");
   }
@@ -44,34 +44,13 @@ export default function Daily({ data }: Props) {
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
   const streak = useStreak(data.date, allCompleted);
 
-  const shareText = useMemo(() => {
-    const lines: string[] = [];
-    lines.push(`GuessSenpai — ${formattedDate}`);
-
-    const describe = (label: string, key: GameKey, totalRounds: number) => {
-      const game = progress[key];
-      if (!game) {
-        return `${label} — ⏳`;
-      }
-      if (game.completed) {
-        if (key === "anidle") {
-          const attempts = Math.max(1, game.guesses.length);
-          return `${label} — ${attempts} ${attempts === 1 ? "try" : "tries"} ✅`;
-        }
-        return `${label} — ✅ (${Math.min(totalRounds, game.round)}/${totalRounds})`;
-      }
-      return `${label} — ${Math.min(totalRounds, game.round)}/${totalRounds}`;
-    };
-
-    lines.push(describe("Anidle", "anidle", 3));
-    lines.push(describe("Poster Zoomed", "poster_zoomed", 3));
-    lines.push(describe("Redacted Synopsis", "redacted_synopsis", 3));
-    if (data.games.guess_the_opening) {
-      lines.push(describe("Guess the Opening", "guess_the_opening", 3));
-    }
-    lines.push("#GuessSenpai");
-    return lines.join("\n");
-  }, [data.games.guess_the_opening, formattedDate, progress]);
+  const shareText = useMemo(
+    () =>
+      buildShareText(data.date, progress, {
+        includeGuessTheOpening: Boolean(data.games.guess_the_opening),
+      }),
+    [data.date, data.games.guess_the_opening, progress],
+  );
 
   const handleShare = useCallback(async () => {
     try {
