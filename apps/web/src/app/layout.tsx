@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import AccountBadge from "../components/AccountBadge";
+import NavLink from "../components/NavLink";
 import "../styles/globals.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -20,13 +21,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             >
               Guess<span className="text-brand-300">Senpai</span>
             </Link>
-            <nav className="flex items-center gap-5">
-              <Link className="transition hover:text-brand-200" href="/how-to-play">
-                How to Play
-              </Link>
-              <Link className="transition hover:text-brand-200" href={`/archive/${today}`}>
+            <nav className="flex items-center gap-2 text-sm">
+              <NavLink href="/" exact>
+                Home
+              </NavLink>
+              <NavLink href="/games/daily">Daily Challenge</NavLink>
+              <NavLink
+                href="/games"
+                isActive={(pathname) =>
+                  pathname === "/games" ||
+                  (pathname.startsWith("/games/") && !pathname.startsWith("/games/daily"))
+                }
+              >
+                Games
+              </NavLink>
+              <NavLink href="/how-to-play">How to Play</NavLink>
+              <NavLink href={`/archive/${today}`} isActive={(pathname) => pathname.startsWith("/archive")}>
                 Archive
-              </Link>
+              </NavLink>
               <AccountBadge />
             </nav>
           </header>
