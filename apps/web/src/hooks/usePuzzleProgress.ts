@@ -2,15 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type GameKey = "anidle" | "poster_zoomed" | "redacted_synopsis" | "guess_the_opening";
-
-export interface GameProgress {
-  completed: boolean;
-  round: number;
-  guesses: string[];
-}
-
-export type DailyProgress = Partial<Record<GameKey, GameProgress>>;
+import { DailyProgress, GameKey, GameProgress } from "../types/progress";
 
 const STORAGE_KEY = "guesssenpai-progress";
 

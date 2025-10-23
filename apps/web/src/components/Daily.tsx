@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { GameKey, usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { DailyPuzzleResponse } from "../types/puzzles";
-import Anidle from "./Anidle";
-import { GameShell } from "./GameShell";
-import GuessOpening from "./GuessOpening";
-import PosterZoom from "./PosterZoom";
-import SynopsisRedacted from "./SynopsisRedacted";
+import {
+  AnidlePage,
+  GuessOpeningPage,
+  PosterZoomedPage,
+  RedactedSynopsisPage,
+} from "./puzzle-pages";
 
 interface Props {
   data: DailyPuzzleResponse | null;
@@ -34,11 +35,6 @@ export default function Daily({ data }: Props) {
   const { progress, recordGame } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatDate(data.date), [data.date]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
-
-  const anidleController = useRef<((round: number) => void) | null>(null);
-  const posterController = useRef<((round: number) => void) | null>(null);
-  const synopsisController = useRef<((round: number) => void) | null>(null);
-  const openingController = useRef<((round: number) => void) | null>(null);
 
   const requiredGames: GameKey[] = ["anidle", "poster_zoomed", "redacted_synopsis"];
   if (data.games.guess_the_opening) {
@@ -135,70 +131,30 @@ export default function Daily({ data }: Props) {
         )}
       </header>
 
-      <GameShell
-        title="Anidle"
-        round={progress.anidle?.round ?? 1}
-        totalRounds={3}
-        onJumpRound={(target) => anidleController.current?.(target)}
-      >
-        <Anidle
-          payload={data.games.anidle}
-          initialProgress={progress.anidle}
-          onProgressChange={(state) => recordGame("anidle", state)}
-          registerRoundController={(fn) => {
-            anidleController.current = fn;
-          }}
-        />
-      </GameShell>
+      <AnidlePage
+        payload={data.games.anidle}
+        progress={progress.anidle}
+        onProgressChange={(state) => recordGame("anidle", state)}
+      />
 
-      <GameShell
-        title="Poster Zoomed"
-        round={progress.poster_zoomed?.round ?? 1}
-        totalRounds={3}
-        onJumpRound={(target) => posterController.current?.(target)}
-      >
-        <PosterZoom
-          payload={data.games.poster_zoomed}
-          initialProgress={progress.poster_zoomed}
-          onProgressChange={(state) => recordGame("poster_zoomed", state)}
-          registerRoundController={(fn) => {
-            posterController.current = fn;
-          }}
-        />
-      </GameShell>
+      <PosterZoomedPage
+        payload={data.games.poster_zoomed}
+        progress={progress.poster_zoomed}
+        onProgressChange={(state) => recordGame("poster_zoomed", state)}
+      />
 
-      <GameShell
-        title="Redacted Synopsis"
-        round={progress.redacted_synopsis?.round ?? 1}
-        totalRounds={3}
-        onJumpRound={(target) => synopsisController.current?.(target)}
-      >
-        <SynopsisRedacted
-          payload={data.games.redacted_synopsis}
-          initialProgress={progress.redacted_synopsis}
-          onProgressChange={(state) => recordGame("redacted_synopsis", state)}
-          registerRoundController={(fn) => {
-            synopsisController.current = fn;
-          }}
-        />
-      </GameShell>
+      <RedactedSynopsisPage
+        payload={data.games.redacted_synopsis}
+        progress={progress.redacted_synopsis}
+        onProgressChange={(state) => recordGame("redacted_synopsis", state)}
+      />
 
       {data.games.guess_the_opening && (
-        <GameShell
-          title="Guess the Opening"
-          round={progress.guess_the_opening?.round ?? 1}
-          totalRounds={3}
-          onJumpRound={(target) => openingController.current?.(target)}
-        >
-          <GuessOpening
-            payload={data.games.guess_the_opening}
-            initialProgress={progress.guess_the_opening}
-            onProgressChange={(state) => recordGame("guess_the_opening", state)}
-            registerRoundController={(fn) => {
-              openingController.current = fn;
-            }}
-          />
-        </GameShell>
+        <GuessOpeningPage
+          payload={data.games.guess_the_opening}
+          progress={progress.guess_the_opening}
+          onProgressChange={(state) => recordGame("guess_the_opening", state)}
+        />
       )}
     </div>
   );
