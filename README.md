@@ -46,7 +46,8 @@ Services:
 - API → `http://localhost:8000`
 - Web → `http://localhost:3000`
 - Redis → `redis://localhost:6379`
-Make sure `.env` sets `API_BASE_URL=http://api:8000` so the Next.js app can reach the API inside Docker.
+Make sure `.env` sets `API_BASE_URL=http://api:8000` for server-side fetches inside Docker and
+`NEXT_PUBLIC_API_BASE=http://localhost:8000` (or another browser-accessible host) for client-side calls.
 
 ### 3. Local Development
 
