@@ -1,3 +1,4 @@
+import { GameDirectoryEntry, GAMES_DIRECTORY } from "../../../config/games";
 import { GameKey } from "../../../types/progress";
 
 export interface PuzzleSlugDefinition {
@@ -7,32 +8,16 @@ export interface PuzzleSlugDefinition {
   description?: string;
 }
 
-export const PUZZLE_SLUGS: PuzzleSlugDefinition[] = [
-  { slug: "anidle", title: "Anidle", gameKey: "anidle" },
-  { slug: "poster-zoomed", title: "Poster Zoomed", gameKey: "poster_zoomed" },
-  { slug: "redacted-synopsis", title: "Redacted Synopsis", gameKey: "redacted_synopsis" },
-  { slug: "guess-the-opening", title: "Guess the Opening", gameKey: "guess_the_opening" },
-  {
-    slug: "mystery-voice",
-    title: "Mystery Voice",
-    description: "Identify the character from a short voice clip.",
-  },
-  {
-    slug: "emoji-synopsis",
-    title: "Emoji Synopsis",
-    description: "Decode an anime plot told entirely through emojis.",
-  },
-  {
-    slug: "quote-quiz",
-    title: "Quote Quiz",
-    description: "Match iconic quotes to their series.",
-  },
-  {
-    slug: "pixel-portrait",
-    title: "Pixel Portrait",
-    description: "Guess the character from a pixelated portrait.",
-  },
-];
+function mapToPuzzleSlug(game: GameDirectoryEntry): PuzzleSlugDefinition {
+  return {
+    slug: game.slug,
+    title: game.title,
+    gameKey: game.gameKey,
+    description: game.description,
+  };
+}
+
+export const PUZZLE_SLUGS: PuzzleSlugDefinition[] = GAMES_DIRECTORY.filter((game) => game.playable).map(mapToPuzzleSlug);
 
 export function findPuzzleSlug(slug: string): PuzzleSlugDefinition | undefined {
   return PUZZLE_SLUGS.find((entry) => entry.slug === slug);

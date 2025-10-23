@@ -2,26 +2,7 @@
 
 import Link from "next/link";
 
-const games = [
-  {
-    title: "Daily Puzzles",
-    description: "Play all three anime challenges — Anidle, Poster Zoomed, and Redacted Synopsis — refreshed every midnight.",
-    href: "/games/daily",
-    eyebrow: "New every day",
-  },
-  {
-    title: "Archive",
-    description: "Catch up on previous days you missed and see how fast you can solve past lineups of GuessSenpai puzzles.",
-    href: "/archive",
-    eyebrow: "Missed a day?",
-  },
-  {
-    title: "How to Play",
-    description: "Learn strategies and the rules behind each puzzle mode so you can climb the leaderboard and keep your streak alive.",
-    href: "/how-to-play",
-    eyebrow: "Need a refresher?",
-  },
-];
+import { GAMES_DIRECTORY } from "../config/games";
 
 export default function HomePage() {
   return (
@@ -36,8 +17,7 @@ export default function HomePage() {
             Anime guessing games with a glassy twist
           </h1>
           <p className="text-lg leading-relaxed text-neutral-200">
-            Sharpen your encyclopedic knowledge of anime through daily rounds of metadata, posters, synopsis reveals, and a dash
-            of musical nostalgia. Compete with friends, maintain your streak, and share your victories.
+            Sharpen your encyclopedic knowledge of anime through daily rounds of metadata, posters, synopsis reveals, and a dash of musical nostalgia. Compete with friends, maintain your streak, and share your victories.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
@@ -60,36 +40,61 @@ export default function HomePage() {
       <section className="space-y-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-display font-semibold tracking-tight text-white">Choose your game</h2>
-          <p className="text-sm text-neutral-300">Jump into today&apos;s lineup or revisit past challenges.</p>
+          <p className="text-sm text-neutral-300">Jump into today&apos;s lineup or preview what&apos;s coming next.</p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {games.map((game) => (
-            <Link
-              key={game.href}
-              href={game.href}
-              className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition hover:border-brand-400/50 hover:shadow-[0_0_40px_rgba(59,130,246,0.35)]"
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-500/0 via-brand-500/5 to-purple-500/20 opacity-0 transition group-hover:opacity-100" />
-              <div className="relative z-10 flex flex-1 flex-col gap-4">
-                <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
-                  {game.eyebrow}
+          {GAMES_DIRECTORY.map((game) => {
+            const eyebrow = game.playable ? "Available now" : game.comingSoon ? "Coming soon" : "Unavailable";
+            const statusLabel = game.playable ? "Start playing" : "Coming soon";
+            const statusClasses = game.playable
+              ? "text-brand-200 transition group-hover:text-brand-100"
+              : "text-neutral-300";
+            const overlayClasses = game.playable
+              ? "opacity-0 transition group-hover:opacity-100"
+              : "opacity-80 transition";
+            const cardClasses = `group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition ${
+              game.playable
+                ? "hover:border-brand-400/50 hover:shadow-[0_0_40px_rgba(59,130,246,0.35)]"
+                : "cursor-not-allowed opacity-70"
+            }`;
+
+            const content = (
+              <>
+                <div
+                  className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${game.accentColor} ${overlayClasses}`}
+                />
+                <div className="relative z-10 flex flex-1 flex-col gap-4">
+                  <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
+                    {eyebrow}
+                  </span>
+                  <h3 className="text-xl font-display font-semibold tracking-tight">{game.title}</h3>
+                  <p className="text-sm leading-relaxed text-neutral-200">{game.tagline}</p>
+                </div>
+                <span className={`relative z-10 mt-6 inline-flex items-center gap-2 text-sm font-semibold ${statusClasses}`}>
+                  {statusLabel}
+                  {game.playable ? (
+                    <svg aria-hidden className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
+                    </svg>
+                  ) : null}
                 </span>
-                <h3 className="text-xl font-display font-semibold tracking-tight">{game.title}</h3>
-                <p className="text-sm leading-relaxed text-neutral-200">{game.description}</p>
+              </>
+            );
+
+            if (game.playable) {
+              return (
+                <Link key={game.slug} href={`/games/${game.slug}`} className={cardClasses}>
+                  {content}
+                </Link>
+              );
+            }
+
+            return (
+              <div key={game.slug} className={cardClasses} aria-disabled={true}>
+                {content}
               </div>
-              <span className="relative z-10 mt-6 inline-flex items-center gap-2 text-sm font-semibold text-brand-200 transition group-hover:text-brand-100">
-                Start playing
-                <svg
-                  aria-hidden
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
-                </svg>
-              </span>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>
