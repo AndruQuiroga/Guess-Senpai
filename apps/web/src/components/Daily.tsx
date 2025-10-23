@@ -24,7 +24,8 @@ function formatDate(value: string) {
 export default function Daily({ data }: Props) {
   if (!data) {
     return (
-      <div className="rounded-2xl bg-neutral-900 p-6 text-neutral-300">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 text-neutral-100 shadow-ambient backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
         Couldn&apos;t load today&apos;s puzzles. Please refresh or try again later.
       </div>
     );
@@ -102,22 +103,25 @@ export default function Daily({ data }: Props) {
 
   return (
     <div className="space-y-8">
-      <header className="rounded-3xl bg-neutral-900 p-6">
+      <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl">
+        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">GuessSenpai Daily</h1>
-            <p className="text-sm text-neutral-400">{formattedDate}</p>
+            <h1 className="text-2xl font-display font-semibold tracking-tight text-white drop-shadow-[0_0_12px_rgba(59,130,246,0.35)]">
+              GuessSenpai Daily
+            </h1>
+            <p className="text-sm text-neutral-300">{formattedDate}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-2 text-sm text-amber-300 shadow-inner">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
               🔥 Streak {streak}
             </div>
-            <div className="rounded-2xl bg-blue-500/10 px-4 py-2 text-sm text-blue-200">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
               Media #{data.mediaId}
             </div>
             <button
               type="button"
-              className="rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01]"
+              className="rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
               onClick={handleShare}
             >
               Share Progress
@@ -125,7 +129,7 @@ export default function Daily({ data }: Props) {
           </div>
         </div>
         {shareStatus && (
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs text-neutral-200 shadow-inner transition">
+          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs text-white/90 shadow-inner transition">
             {shareStatus}
           </p>
         )}
