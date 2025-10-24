@@ -5,7 +5,7 @@ import { useRef } from "react";
 import PosterZoom from "../PosterZoom";
 import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
-import { GameProgress } from "../../types/progress";
+import type { DailyProgress, GameProgress } from "../../types/progress";
 import { PosterZoomGame } from "../../types/puzzles";
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
   mediaId: number;
   payload: PosterZoomGame;
   progress?: GameProgress;
+  dailyProgress?: DailyProgress;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
@@ -22,6 +23,7 @@ export function PosterZoomedPage({
   mediaId,
   payload,
   progress,
+  dailyProgress,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -33,7 +35,7 @@ export function PosterZoomedPage({
       round={progress?.round ?? 1}
       totalRounds={payload.spec.length || payload.cropStages?.length || 3}
       onJumpRound={(target) => controller.current?.(target)}
-      actions={<GameSwitcher currentSlug={slug} />}
+      actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
     >
       <PosterZoom
         mediaId={mediaId}

@@ -5,7 +5,7 @@ import { useRef } from "react";
 import CharacterSilhouette from "../CharacterSilhouette";
 import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
-import type { GameProgress } from "../../types/progress";
+import type { DailyProgress, GameProgress } from "../../types/progress";
 import type { CharacterSilhouetteGame } from "../../types/puzzles";
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
   mediaId: number;
   payload: CharacterSilhouetteGame;
   progress?: GameProgress;
+  dailyProgress?: DailyProgress;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
@@ -22,6 +23,7 @@ export function CharacterSilhouettePage({
   mediaId,
   payload,
   progress,
+  dailyProgress,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -34,7 +36,7 @@ export function CharacterSilhouettePage({
       round={progress?.round ?? 1}
       totalRounds={totalRounds}
       onJumpRound={(target) => controller.current?.(target)}
-      actions={<GameSwitcher currentSlug={slug} />}
+      actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
     >
       <CharacterSilhouette
         mediaId={mediaId}

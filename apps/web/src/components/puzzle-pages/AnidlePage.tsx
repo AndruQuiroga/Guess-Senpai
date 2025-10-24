@@ -5,7 +5,7 @@ import { useRef } from "react";
 import Anidle from "../Anidle";
 import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
-import { GameProgress } from "../../types/progress";
+import type { DailyProgress, GameProgress } from "../../types/progress";
 import { AnidleGame } from "../../types/puzzles";
 
 interface Props {
@@ -13,6 +13,7 @@ interface Props {
   mediaId: number;
   payload: AnidleGame;
   progress?: GameProgress;
+  dailyProgress?: DailyProgress;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
@@ -22,6 +23,7 @@ export function AnidlePage({
   mediaId,
   payload,
   progress,
+  dailyProgress,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -33,7 +35,7 @@ export function AnidlePage({
       round={progress?.round ?? 1}
       totalRounds={3}
       onJumpRound={(target) => controller.current?.(target)}
-      actions={<GameSwitcher currentSlug={slug} />}
+      actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
     >
       <Anidle
         mediaId={mediaId}
