@@ -121,6 +121,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     accentColor: "from-blue-400 via-indigo-400 to-purple-500",
     playable: false,
     comingSoon: true,
+    gameKey: "guess_the_opening",
     description: "Match a short music clip to the right series before time runs out.",
     preview: {
       summary:
@@ -210,4 +211,36 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
 
 export function findGameConfig(slug: string): GameDirectoryEntry | undefined {
   return GAMES_DIRECTORY.find((entry) => entry.slug === slug);
+}
+
+export interface RuntimeGameAvailability {
+  guessTheOpeningEnabled: boolean;
+}
+
+export function resolveGameAvailability(
+  game: GameDirectoryEntry,
+  availability: RuntimeGameAvailability,
+): GameDirectoryEntry {
+  if (game.slug !== "guess-the-opening") {
+    return game;
+  }
+
+  const playable = availability.guessTheOpeningEnabled;
+  const comingSoon = !playable;
+
+  if (game.playable === playable && game.comingSoon === comingSoon) {
+    return game;
+  }
+
+  return {
+    ...game,
+    playable,
+    comingSoon,
+  };
+}
+
+export function buildRuntimeGamesDirectory(
+  availability: RuntimeGameAvailability,
+): GameDirectoryEntry[] {
+  return GAMES_DIRECTORY.map((game) => resolveGameAvailability(game, availability));
 }

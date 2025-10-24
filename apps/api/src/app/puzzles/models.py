@@ -94,6 +94,7 @@ class DailyPuzzleResponse(BaseModel):
     mediaId: int
     games: GamesPayload
     solution: SolutionPayload
+    guess_the_opening_enabled: bool = False
 
 
 class GameProgressPayload(BaseModel):

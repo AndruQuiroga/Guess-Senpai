@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { GamePreviewModal } from "../components/GamePreviewModal";
 import { GlassSection } from "../components/GlassSection";
-import { GAMES_DIRECTORY, GameDirectoryEntry } from "../config/games";
+import { type GameDirectoryEntry } from "../config/games";
+import { useRuntimeGamesDirectory } from "../hooks/useDailyAvailability";
 import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
@@ -23,8 +24,12 @@ export default function HomePage() {
   const todayIso = useMemo(() => todayIsoDate(), []);
   const formattedDate = useMemo(() => formatShareDate(todayIso), [todayIso]);
   const { progress } = usePuzzleProgress(todayIso);
+  const games = useRuntimeGamesDirectory();
 
-  const includeGuessTheOpening = Boolean(progress.guess_the_opening);
+  const includeGuessTheOpening = useMemo(
+    () => games.some((entry) => entry.slug === "guess-the-opening" && entry.playable),
+    [games],
+  );
   const baseKeys: GameKey[] = ["anidle", "poster_zoomed", "redacted_synopsis"];
   const keysToConsider: GameKey[] = includeGuessTheOpening
     ? [...baseKeys, "guess_the_opening"]
@@ -157,7 +162,7 @@ export default function HomePage() {
           </p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {GAMES_DIRECTORY.map((game) => {
+          {games.map((game) => {
             const eyebrow = game.playable
               ? "Available now"
               : game.comingSoon
