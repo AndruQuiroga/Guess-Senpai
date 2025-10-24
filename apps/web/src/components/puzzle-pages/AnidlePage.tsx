@@ -10,12 +10,19 @@ import { AnidleGame } from "../../types/puzzles";
 
 interface Props {
   slug: string;
+  mediaId: number;
   payload: AnidleGame;
   progress?: GameProgress;
   onProgressChange: (state: GameProgress) => void;
 }
 
-export function AnidlePage({ slug, payload, progress, onProgressChange }: Props) {
+export function AnidlePage({
+  slug,
+  mediaId,
+  payload,
+  progress,
+  onProgressChange,
+}: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
 
   return (
@@ -27,6 +34,7 @@ export function AnidlePage({ slug, payload, progress, onProgressChange }: Props)
       actions={<GameSwitcher currentSlug={slug} />}
     >
       <Anidle
+        mediaId={mediaId}
         payload={payload}
         initialProgress={progress}
         onProgressChange={onProgressChange}

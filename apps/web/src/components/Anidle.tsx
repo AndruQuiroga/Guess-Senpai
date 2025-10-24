@@ -13,8 +13,17 @@ import {
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { useTitleSuggestions } from "../hooks/useTitleSuggestions";
 import { AnidleGame as AnidlePayload } from "../types/puzzles";
+import {
+  evaluateAnidleGuess,
+  type AnidleGuessEvaluation,
+  type ListFeedbackItem,
+  type ListStatus,
+  type ScalarFeedback,
+  type ScalarStatus,
+} from "../utils/evaluateAnidleGuess";
 
 interface Props {
+  mediaId: number;
   payload: AnidlePayload;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
@@ -23,7 +32,36 @@ interface Props {
 
 const TOTAL_ROUNDS = 3;
 
+const SCALAR_TONES: Record<ScalarStatus, { className: string; icon: string; description: string }> = {
+  match: {
+    className: "border-emerald-400/40 bg-emerald-500/10 text-emerald-100",
+    icon: "✓",
+    description: "Exact match",
+  },
+  higher: {
+    className: "border-rose-400/40 bg-rose-500/10 text-rose-100",
+    icon: "↓",
+    description: "Guess is higher than the answer",
+  },
+  lower: {
+    className: "border-amber-400/40 bg-amber-500/10 text-amber-100",
+    icon: "↑",
+    description: "Guess is lower than the answer",
+  },
+  unknown: {
+    className: "border-white/10 bg-white/5 text-neutral-200",
+    icon: "?",
+    description: "Feedback unavailable",
+  },
+} as const;
+
+const LIST_TONES: Record<ListStatus, string> = {
+  match: "border-emerald-400/40 bg-emerald-500/10 text-emerald-50",
+  miss: "border-white/10 bg-white/5 text-neutral-200",
+} as const;
+
 export default function Anidle({
+  mediaId,
   payload,
   initialProgress,
   onProgressChange,
@@ -39,6 +77,11 @@ export default function Anidle({
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [evaluations, setEvaluations] = useState<AnidleGuessEvaluation[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const hydratedGuessesKeyRef = useRef<string | null>(null);
 
   const blurTimeoutRef = useRef<number | null>(null);
   const listboxId = `${useId()}-anidle-suggestions`;
@@ -61,6 +104,9 @@ export default function Anidle({
     setGuess("");
     setIsMenuOpen(false);
     setHighlightedIndex(-1);
+    setEvaluations([]);
+    setErrorMessage(null);
+    hydratedGuessesKeyRef.current = null;
   }, [initialProgress, payload.answer]);
 
   useEffect(() => {
@@ -137,34 +183,140 @@ export default function Anidle({
     onProgressChange({ completed, round, guesses });
   }, [completed, round, guesses, onProgressChange]);
 
+  const createFallbackEvaluation = useCallback(
+    (title: string): AnidleGuessEvaluation => ({
+      title,
+      correct: false,
+      year: { guess: null, target: null, status: "unknown" as ScalarStatus },
+      averageScore: {
+        guess: null,
+        target: null,
+        status: "unknown" as ScalarStatus,
+      },
+      genres: [],
+      tags: [],
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    const storedGuesses = initialProgress?.guesses ?? [];
+    const hydrationKey = storedGuesses.join("||");
+    if (storedGuesses.length === 0) {
+      hydratedGuessesKeyRef.current = "";
+      setEvaluations([]);
+      return;
+    }
+    if (hydratedGuessesKeyRef.current === hydrationKey) {
+      return;
+    }
+
+    let cancelled = false;
+    hydratedGuessesKeyRef.current = hydrationKey;
+
+    async function hydrate() {
+      const results: AnidleGuessEvaluation[] = [];
+      for (const value of storedGuesses) {
+        const guessValue = value.trim();
+        if (!guessValue) {
+          results.push(createFallbackEvaluation(value));
+          continue;
+        }
+        try {
+          const evaluation = await evaluateAnidleGuess({
+            puzzleMediaId: mediaId,
+            guess: guessValue,
+          });
+          if (cancelled) {
+            return;
+          }
+          results.push(evaluation);
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+          console.warn("Failed to rebuild Anidle evaluation", error);
+          results.push(createFallbackEvaluation(value));
+        }
+      }
+      if (!cancelled) {
+        setEvaluations(results);
+      }
+    }
+
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [createFallbackEvaluation, initialProgress, mediaId]);
+
   const advanceRound = useCallback(() => {
     setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
   }, []);
 
   const submitGuess = useCallback(
-    (rawValue: string) => {
+    async (rawValue: string, suggestionId?: number) => {
       const value = rawValue.trim();
-      if (!value) return;
+      if (!value || submitting) return;
+
+      setErrorMessage(null);
+      setSubmitting(true);
+
       const normalizedGuess = value.toLowerCase();
-      setGuesses((prev) => [...prev, value]);
-      if (normalizedGuess === normalizedAnswer) {
-        setCompleted(true);
-      } else {
-        advanceRound();
+
+      try {
+        const evaluation = await evaluateAnidleGuess({
+          puzzleMediaId: mediaId,
+          guess: value,
+          guessMediaId: suggestionId,
+        });
+        const resolvedCorrect =
+          evaluation.correct || normalizedGuess === normalizedAnswer;
+        const evaluationRecord: AnidleGuessEvaluation = resolvedCorrect
+          ? { ...evaluation, correct: true }
+          : evaluation;
+
+        setGuesses((prev) => {
+          const next = [...prev, value];
+          hydratedGuessesKeyRef.current = next.join("||");
+          return next;
+        });
+        setEvaluations((prev) => [...prev, evaluationRecord]);
+
+        if (resolvedCorrect) {
+          setCompleted(true);
+        } else {
+          advanceRound();
+        }
+        setGuess("");
+        setIsMenuOpen(false);
+        setHighlightedIndex(-1);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to evaluate your guess. Please try again.";
+        setErrorMessage(message);
+      } finally {
+        setSubmitting(false);
       }
-      setGuess("");
-      setIsMenuOpen(false);
-      setHighlightedIndex(-1);
     },
-    [advanceRound, normalizedAnswer],
+    [advanceRound, mediaId, normalizedAnswer, submitting],
   );
 
   const handleSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      submitGuess(guess);
+      if (completed || submitting) return;
+      const value = guess.trim();
+      if (!value) return;
+      const match = suggestions.find(
+        (item) => item.title.trim().toLowerCase() === value.toLowerCase(),
+      );
+      await submitGuess(value, match?.id);
     },
-    [guess, submitGuess],
+    [completed, guess, submitGuess, submitting, suggestions],
   );
 
   useEffect(() => {
@@ -233,7 +385,7 @@ export default function Anidle({
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (completed) return;
+      if (completed || submitting) return;
       if (event.key === "ArrowDown") {
         event.preventDefault();
         if (suggestions.length === 0) {
@@ -262,18 +414,71 @@ export default function Anidle({
         suggestions[highlightedIndex]
       ) {
         event.preventDefault();
-        submitGuess(suggestions[highlightedIndex].title);
+        const suggestion = suggestions[highlightedIndex];
+        void submitGuess(suggestion.title, suggestion.id);
       } else if (event.key === "Escape") {
         setIsMenuOpen(false);
         setHighlightedIndex(-1);
       }
     },
-    [completed, highlightedIndex, submitGuess, suggestions],
+    [completed, highlightedIndex, submitGuess, submitting, suggestions],
   );
 
   const trimmedGuess = guess.trim();
   const suggestionsVisible =
-    isMenuOpen && !completed && trimmedGuess.length >= 2;
+    isMenuOpen && !completed && !submitting && trimmedGuess.length >= 2;
+
+  const renderScalar = useCallback(
+    (label: string, value: ScalarFeedback, suffix = "") => {
+      const tone = SCALAR_TONES[value.status];
+      const display =
+        typeof value.guess === "number"
+          ? `${value.guess}${suffix}`
+          : "—";
+      return (
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+            {label}
+          </span>
+          <div
+            className={`mt-1 inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-medium ${tone.className}`}
+          >
+            <span>{display}</span>
+            <span aria-hidden className="text-xs">
+              {tone.icon}
+            </span>
+            <span className="sr-only">{tone.description}</span>
+          </div>
+        </div>
+      );
+    },
+    [],
+  );
+
+  const renderList = useCallback(
+    (label: string, items: ListFeedbackItem[]) => (
+      <div>
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+          {label}
+        </span>
+        <div className="mt-1 flex flex-wrap gap-2">
+          {items.length > 0 ? (
+            items.map((item) => (
+              <span
+                key={`${label}-${item.value}`}
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${LIST_TONES[item.status]}`}
+              >
+                {item.value}
+              </span>
+            ))
+          ) : (
+            <span className="text-xs text-neutral-500">—</span>
+          )}
+        </div>
+      </div>
+    ),
+    [],
+  );
 
   return (
     <div className="space-y-5">
@@ -298,7 +503,7 @@ export default function Anidle({
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleInputKeyDown}
-            disabled={completed}
+            disabled={completed || submitting}
             aria-label="Anidle guess"
             role="combobox"
             aria-autocomplete="list"
@@ -353,7 +558,8 @@ export default function Anidle({
                           }`}
                           onMouseDown={(event: MouseEvent<HTMLButtonElement>) => {
                             event.preventDefault();
-                            submitGuess(suggestion.title);
+                            if (submitting) return;
+                            void submitGuess(suggestion.title, suggestion.id);
                           }}
                           onMouseEnter={() => setHighlightedIndex(index)}
                           onFocus={() => setHighlightedIndex(index)}
@@ -371,23 +577,57 @@ export default function Anidle({
         <button
           type="submit"
           className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={completed}
+          disabled={completed || submitting}
         >
-          Submit Guess
+          {submitting ? "Checking…" : "Submit Guess"}
         </button>
       </form>
-      <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
-        {guesses.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
-            Attempts
-            {guesses.map((value, index) => (
-              <span
-                key={`${value}-${index}`}
-                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
-              >
-                {value}
-              </span>
-            ))}
+      <div className="space-y-4" aria-live="polite">
+        {errorMessage && (
+          <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {errorMessage}
+          </div>
+        )}
+        {evaluations.length > 0 && (
+          <div className="space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+              Guess feedback
+            </div>
+            <div className="space-y-3">
+              {evaluations.map((entry, index) => {
+                const solved = entry.correct;
+                return (
+                  <div
+                    key={`${entry.title}-${index}`}
+                    className={`rounded-2xl border px-4 py-4 transition ${
+                      solved
+                        ? "border-emerald-400/40 bg-emerald-500/10"
+                        : "border-white/10 bg-white/5"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{entry.title}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+                          Guess {index + 1}
+                        </p>
+                      </div>
+                      {solved ? (
+                        <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-50">
+                          Correct
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {renderScalar("Year", entry.year)}
+                      {renderScalar("Score", entry.averageScore, "%")}
+                      {renderList("Genres", entry.genres)}
+                      {renderList("Tags", entry.tags)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
         {completed && (

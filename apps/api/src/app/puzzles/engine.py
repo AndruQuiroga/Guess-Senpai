@@ -116,9 +116,23 @@ def _choose_answer(media: Media) -> str:
     return "Unknown"
 
 
+def _extract_top_tags(media: Media, limit: int = 6) -> List[str]:
+    tags: List[tuple[int, str]] = []
+    for tag in media.tags or []:
+        if not tag or not tag.name:
+            continue
+        if getattr(tag, "isGeneralSpoiler", False):
+            continue
+        rank = tag.rank if tag.rank is not None else 10_000
+        tags.append((rank, tag.name))
+    tags.sort(key=lambda item: item[0])
+    return [name for _, name in tags[:limit]]
+
+
 def _build_anidle(media: Media) -> AnidleGame:
     hints = AnidleHints(
         genres=[g for g in media.genres if g],
+        tags=_extract_top_tags(media),
         year=media.seasonYear or (media.startDate or {}).get("year"),
         episodes=media.episodes,
         duration=media.duration,
