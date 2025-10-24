@@ -15,6 +15,7 @@ class RoundSpec(BaseModel):
 
 class AnidleHints(BaseModel):
     genres: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     year: Optional[int] = None
     episodes: Optional[int] = None
     duration: Optional[int] = None

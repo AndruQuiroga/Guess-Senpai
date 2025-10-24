@@ -76,14 +76,18 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           />
         );
       }
-      return (
-        <AnidlePage
-          slug={slug.slug}
-          payload={(bundle as { puzzle: AnidleGame }).puzzle}
-          progress={progress.anidle}
-          onProgressChange={progressHandlers.anidle}
-        />
-      );
+      {
+        const anidleBundle = bundle as { mediaId: number; puzzle: AnidleGame };
+        return (
+          <AnidlePage
+            slug={slug.slug}
+            mediaId={anidleBundle.mediaId}
+            payload={anidleBundle.puzzle}
+            progress={progress.anidle}
+            onProgressChange={progressHandlers.anidle}
+          />
+        );
+      }
     case "poster_zoomed":
       if (!bundle) {
         return (

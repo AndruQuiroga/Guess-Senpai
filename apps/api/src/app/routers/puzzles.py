@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -75,6 +75,32 @@ class ArchiveIndexResponse(BaseModel):
     dates: list[str]
 
 
+class AnidleScalarFeedback(BaseModel):
+    guess: Optional[int] = None
+    target: Optional[int] = None
+    status: Literal["match", "higher", "lower", "unknown"]
+
+
+class AnidleListFeedbackItem(BaseModel):
+    value: str
+    status: Literal["match", "miss"]
+
+
+class AnidleGuessEvaluationPayload(BaseModel):
+    puzzle_media_id: int
+    guess: str
+    guess_media_id: Optional[int] = None
+
+
+class AnidleGuessEvaluationResponse(BaseModel):
+    title: str
+    correct: bool
+    year: AnidleScalarFeedback
+    average_score: AnidleScalarFeedback
+    genres: List[AnidleListFeedbackItem]
+    tags: List[AnidleListFeedbackItem]
+
+
 class GuessVerificationPayload(BaseModel):
     media_id: int
     guess: str
@@ -92,6 +118,56 @@ def _generate_archive_dates(history_days: int) -> list[str]:
         (today - timedelta(days=offset)).isoformat()
         for offset in range(total_days)
     ]
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(value.split()).casefold()
+
+
+def _dedupe_preserve_order(values: List[str]) -> List[str]:
+    seen: set[str] = set()
+    result: List[str] = []
+    for value in values:
+        if not value:
+            continue
+        normalized = value.strip()
+        if not normalized:
+            continue
+        lowered = normalized.casefold()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        result.append(normalized)
+    return result
+
+
+def _build_scalar_feedback(
+    guess_value: Optional[int],
+    target_value: Optional[int],
+) -> AnidleScalarFeedback:
+    if guess_value is None or target_value is None:
+        status: Literal["match", "higher", "lower", "unknown"] = "unknown"
+    elif guess_value == target_value:
+        status = "match"
+    elif guess_value > target_value:
+        status = "higher"
+    else:
+        status = "lower"
+    return AnidleScalarFeedback(guess=guess_value, target=target_value, status=status)
+
+
+def _build_list_feedback(
+    guess_values: List[str],
+    target_values: List[str],
+) -> List[AnidleListFeedbackItem]:
+    normalized_targets = {value.casefold() for value in target_values if value}
+    feedback: List[AnidleListFeedbackItem] = []
+    for value in _dedupe_preserve_order(guess_values):
+        status: Literal["match", "miss"] = (
+            "match" if value.casefold() in normalized_targets else "miss"
+        )
+        feedback.append(AnidleListFeedbackItem(value=value, status=status))
+    return feedback
 
 
 @router.get(
@@ -203,6 +279,96 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
             break
 
     return GuessVerificationResponse(correct=match is not None, match=match)
+
+
+@router.post("/anidle/evaluate", response_model=AnidleGuessEvaluationResponse)
+async def evaluate_anidle_guess(
+    request: Request, payload: AnidleGuessEvaluationPayload
+) -> AnidleGuessEvaluationResponse:
+    guess_value = payload.guess.strip()
+    if not guess_value:
+        raise HTTPException(status_code=400, detail="Guess cannot be empty")
+
+    cache = await get_cache(settings.redis_url)
+    try:
+        target_media = await puzzle_engine._load_media_details(
+            payload.puzzle_media_id, cache, settings
+        )
+    except Exception as exc:  # pragma: no cover - upstream failures
+        raise HTTPException(status_code=404, detail="Puzzle media not found") from exc
+
+    guess_media = None
+    if payload.guess_media_id:
+        try:
+            guess_media = await puzzle_engine._load_media_details(
+                payload.guess_media_id, cache, settings
+            )
+        except Exception:
+            guess_media = None
+
+    normalized_guess = _normalize_text(guess_value)
+
+    if guess_media is None:
+        user_ctx = await _resolve_user_context(request)
+        token = user_ctx.access_token if user_ctx else None
+        search_results = await search_media(guess_value, limit=5, token=token)
+        best_candidate = None
+        for pair in search_results:
+            try:
+                candidate = await puzzle_engine._load_media_details(
+                    pair.id, cache, settings
+                )
+            except Exception:
+                continue
+            if best_candidate is None:
+                best_candidate = candidate
+            variants = puzzle_engine._title_variants(candidate)
+            if any(
+                variant and _normalize_text(variant) == normalized_guess
+                for variant in variants
+            ):
+                guess_media = candidate
+                break
+        if guess_media is None and best_candidate is not None:
+            guess_media = best_candidate
+
+    target_year = target_media.seasonYear or (target_media.startDate or {}).get("year")
+    target_score = target_media.averageScore
+    target_genres = [genre for genre in target_media.genres if genre]
+    target_tags = puzzle_engine._extract_top_tags(target_media)
+
+    if guess_media is not None:
+        resolved_title = (
+            guess_media.title.userPreferred
+            or guess_media.title.english
+            or guess_media.title.romaji
+            or guess_media.title.native
+            or guess_value
+        )
+        guess_year = guess_media.seasonYear or (guess_media.startDate or {}).get("year")
+        guess_score = guess_media.averageScore
+        guess_genres = [genre for genre in guess_media.genres if genre]
+        guess_tags = puzzle_engine._extract_top_tags(guess_media)
+        correct = guess_media.id == target_media.id
+    else:
+        resolved_title = guess_value
+        guess_year = None
+        guess_score = None
+        guess_genres = []
+        guess_tags = []
+        correct = any(
+            variant and _normalize_text(variant) == normalized_guess
+            for variant in puzzle_engine._title_variants(target_media)
+        )
+
+    return AnidleGuessEvaluationResponse(
+        title=resolved_title,
+        correct=correct,
+        year=_build_scalar_feedback(guess_year, target_year),
+        average_score=_build_scalar_feedback(guess_score, target_score),
+        genres=_build_list_feedback(guess_genres, target_genres),
+        tags=_build_list_feedback(guess_tags, target_tags),
+    )
 
 
 @router.get("/search-titles", response_model=TitleSuggestionResponse)

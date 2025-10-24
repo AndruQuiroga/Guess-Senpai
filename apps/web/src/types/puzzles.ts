@@ -5,6 +5,7 @@ export interface RoundSpec {
 
 export interface AnidleHints {
   genres: string[];
+  tags: string[];
   year?: number | null;
   episodes?: number | null;
   duration?: number | null;
