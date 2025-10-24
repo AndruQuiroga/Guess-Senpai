@@ -32,13 +32,15 @@ export default function Daily({ data }: Props) {
   const { progress, recordGame } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const includeGuessTheOpening = data.guess_the_opening_enabled;
+  const guessOpeningPayload = data.games.guess_the_opening;
 
   const requiredGames: GameKey[] = [
     "anidle",
     "poster_zoomed",
     "redacted_synopsis",
   ];
-  if (data.games.guess_the_opening) {
+  if (includeGuessTheOpening) {
     requiredGames.push("guess_the_opening");
   }
 
@@ -47,13 +49,13 @@ export default function Daily({ data }: Props) {
 
   const shareText = useMemo(() => {
     return buildShareText(data.date, progress, {
-      includeGuessTheOpening: Boolean(data.games.guess_the_opening),
+      includeGuessTheOpening,
       aniListUrl: allCompleted ? data.solution.aniListUrl : undefined,
     });
   }, [
     allCompleted,
     data.date,
-    data.games.guess_the_opening,
+    includeGuessTheOpening,
     data.solution.aniListUrl,
     progress,
   ]);
@@ -137,10 +139,10 @@ export default function Daily({ data }: Props) {
         onProgressChange={(state) => recordGame("redacted_synopsis", state)}
       />
 
-      {data.games.guess_the_opening && (
+      {includeGuessTheOpening && guessOpeningPayload && (
         <GuessOpeningPage
           slug="guess-the-opening"
-          payload={data.games.guess_the_opening}
+          payload={guessOpeningPayload}
           progress={progress.guess_the_opening}
           onProgressChange={(state) => recordGame("guess_the_opening", state)}
         />

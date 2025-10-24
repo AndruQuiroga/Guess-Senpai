@@ -91,4 +91,5 @@ export interface DailyPuzzleResponse {
   mediaId: number;
   games: GamesPayload;
   solution: SolutionPayload;
+  guess_the_opening_enabled: boolean;
 }

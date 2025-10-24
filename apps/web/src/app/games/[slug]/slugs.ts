@@ -17,7 +17,9 @@ function mapToPuzzleSlug(game: GameDirectoryEntry): PuzzleSlugDefinition {
   };
 }
 
-export const PUZZLE_SLUGS: PuzzleSlugDefinition[] = GAMES_DIRECTORY.filter((game) => game.playable).map(mapToPuzzleSlug);
+export const PUZZLE_SLUGS: PuzzleSlugDefinition[] = GAMES_DIRECTORY.filter(
+  (game) => Boolean(game.gameKey),
+).map(mapToPuzzleSlug);
 
 export function findPuzzleSlug(slug: string): PuzzleSlugDefinition | undefined {
   return PUZZLE_SLUGS.find((entry) => entry.slug === slug);

@@ -390,11 +390,14 @@ async def _assemble_daily_puzzle(
     if user:
         await _record_recent_media(cache, user.user_id, media.id)
 
+    guess_opening_enabled = bool(games.guess_the_opening)
+
     return DailyPuzzleResponse(
         date=day,
         mediaId=media.id,
         games=games,
         solution=_build_solution(media),
+        guess_the_opening_enabled=guess_opening_enabled,
     )
 
 

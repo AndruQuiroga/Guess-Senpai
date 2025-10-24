@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { GameDirectoryEntry } from "../config/games";
+import { GameDirectoryEntry, resolveGameAvailability } from "../config/games";
+import { useDailyAvailability } from "../hooks/useDailyAvailability";
 import { GameProgress } from "../types/progress";
 
 interface GamePreviewModalProps {
@@ -22,6 +23,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const { guessTheOpeningEnabled } = useDailyAvailability();
 
   useEffect(() => {
     setMounted(true);
@@ -77,9 +79,16 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
     }
   };
 
+  const runtimeGame = useMemo(() => {
+    if (!game) {
+      return null;
+    }
+    return resolveGameAvailability(game, { guessTheOpeningEnabled });
+  }, [game, guessTheOpeningEnabled]);
+
   const primaryAction = useMemo(() => {
-    if (!game) return null;
-    if (!game.playable) {
+    if (!runtimeGame) return null;
+    if (!runtimeGame.playable) {
       return {
         label: "Coming soon",
         href: null as const,
@@ -87,7 +96,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
       };
     }
 
-    const href = `/games/${game.slug}`;
+    const href = `/games/${runtimeGame.slug}`;
     if (progress?.completed) {
       return { label: "View completed round", href, disabled: false };
     }
@@ -95,16 +104,16 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
       return { label: "Resume game", href, disabled: false };
     }
     return { label: "Start playing", href, disabled: false };
-  }, [game, progress]);
+  }, [progress, runtimeGame]);
 
-  if (!mounted || !open || !game) {
+  if (!mounted || !open || !runtimeGame) {
     return null;
   }
 
-  const titleId = `game-preview-title-${game.slug}`;
-  const descriptionId = `game-preview-description-${game.slug}`;
-  const media = game.preview.media;
-  const placeholder = game.preview.placeholder;
+  const titleId = `game-preview-title-${runtimeGame.slug}`;
+  const descriptionId = `game-preview-description-${runtimeGame.slug}`;
+  const media = runtimeGame.preview.media;
+  const placeholder = runtimeGame.preview.placeholder;
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6">
@@ -139,23 +148,27 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
         <div className="grid gap-6 p-6 sm:grid-cols-[1.1fr_0.9fr] sm:gap-8 sm:p-8">
           <div className="space-y-4">
             <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
-              {game.playable ? "Featured game" : game.comingSoon ? "In development" : "Unavailable"}
+              {runtimeGame.playable
+                ? "Featured game"
+                : runtimeGame.comingSoon
+                  ? "In development"
+                  : "Unavailable"}
             </span>
             <div className="space-y-2">
               <h2 id={titleId} className="text-2xl font-display font-semibold tracking-tight sm:text-3xl">
-                {game.title}
+                {runtimeGame.title}
               </h2>
-              <p className="text-sm uppercase tracking-[0.3em] text-neutral-400">{game.tagline}</p>
+              <p className="text-sm uppercase tracking-[0.3em] text-neutral-400">{runtimeGame.tagline}</p>
             </div>
             <p id={descriptionId} className="text-base leading-relaxed text-neutral-200">
-              {game.preview.summary}
+              {runtimeGame.preview.summary}
             </p>
             <div className="space-y-2">
               <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-300">
                 How to play
               </h3>
               <ul className="space-y-2 text-sm leading-relaxed text-neutral-200">
-                {game.preview.rules.map((rule, index) => (
+                {runtimeGame.preview.rules.map((rule, index) => (
                   <li key={rule} className="flex gap-2">
                     <span className="mt-1 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 text-[0.7rem] font-semibold text-white/80">
                       {index + 1}
@@ -181,7 +194,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
                   </span>
                 )
               ) : null}
-              {!game.playable ? (
+              {!runtimeGame.playable ? (
                 <span className="text-sm text-neutral-300">
                   We&apos;re polishing assets and gameplay details—thanks for your patience!
                 </span>
@@ -210,7 +223,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
               />
             ) : (
               <div
-                className={`relative flex h-full min-h-[220px] flex-col items-center justify-center gap-4 bg-gradient-to-br ${game.accentColor} p-6 text-center`}
+                className={`relative flex h-full min-h-[220px] flex-col items-center justify-center gap-4 bg-gradient-to-br ${runtimeGame.accentColor} p-6 text-center`}
               >
                 <div className="absolute inset-0 bg-black/10" aria-hidden />
                 <div className="relative z-10 space-y-3">

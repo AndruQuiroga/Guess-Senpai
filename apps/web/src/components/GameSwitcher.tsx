@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 
-import { GAMES_DIRECTORY } from "../config/games";
+import { useRuntimeGamesDirectory } from "../hooks/useDailyAvailability";
 
 interface GameSwitcherProps {
   currentSlug?: string;
 }
 
 export function GameSwitcher({ currentSlug }: GameSwitcherProps) {
-  const availableGames = GAMES_DIRECTORY.filter((game) => game.playable);
+  const games = useRuntimeGamesDirectory();
+  const availableGames = games.filter((game) => game.playable);
 
   if (availableGames.length === 0) {
     return null;
