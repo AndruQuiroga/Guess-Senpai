@@ -111,18 +111,21 @@ export default function Daily({ data }: Props) {
       </header>
 
       <AnidlePage
+        slug="anidle"
         payload={data.games.anidle}
         progress={progress.anidle}
         onProgressChange={(state) => recordGame("anidle", state)}
       />
 
       <PosterZoomedPage
+        slug="poster-zoomed"
         payload={data.games.poster_zoomed}
         progress={progress.poster_zoomed}
         onProgressChange={(state) => recordGame("poster_zoomed", state)}
       />
 
       <RedactedSynopsisPage
+        slug="redacted-synopsis"
         payload={data.games.redacted_synopsis}
         progress={progress.redacted_synopsis}
         onProgressChange={(state) => recordGame("redacted_synopsis", state)}
@@ -130,6 +133,7 @@ export default function Daily({ data }: Props) {
 
       {data.games.guess_the_opening && (
         <GuessOpeningPage
+          slug="guess-the-opening"
           payload={data.games.guess_the_opening}
           progress={progress.guess_the_opening}
           onProgressChange={(state) => recordGame("guess_the_opening", state)}
