@@ -1,11 +1,15 @@
 import Link from "next/link";
 
 import SessionRefresher from "../components/SessionRefresher";
-import PrimaryNav from "../components/PrimaryNav";
+import HeaderNavigation from "../components/HeaderNavigation";
 import "../styles/globals.css";
 import { DailyAvailabilityProvider } from "../hooks/useDailyAvailability";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -24,12 +28,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               >
                 Guess<span className="text-brand-300">Senpai</span>
               </Link>
-              <PrimaryNav archiveDate={today} />
+              <HeaderNavigation archiveDate={today} />
             </header>
             <main className="flex-1 pb-16">{children}</main>
             <footer className="mt-auto flex items-center justify-between rounded-3xl border border-white/10 bg-white/5 px-6 py-4 text-xs text-neutral-400 backdrop-blur-xl">
               <span>Built with AniList &amp; AnimeThemes data.</span>
-              <span className="text-neutral-500">Stay curious · Guess wisely.</span>
+              <span className="text-neutral-500">
+                Stay curious · Guess wisely.
+              </span>
             </footer>
           </div>
         </DailyAvailabilityProvider>
