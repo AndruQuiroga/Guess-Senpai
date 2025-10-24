@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { GameDirectoryEntry, resolveGameAvailability } from "../config/games";
@@ -29,7 +29,11 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const { guessTheOpeningEnabled } = useDailyAvailability();
+  const { guessTheOpeningEnabled, error, refresh, loading } = useDailyAvailability();
+  const showAvailabilityError = error;
+  const handleRetry = useCallback(() => {
+    void refresh();
+  }, [refresh]);
 
   useEffect(() => {
     setMounted(true);
@@ -93,7 +97,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
   }, [game, guessTheOpeningEnabled]);
 
   const primaryAction = useMemo<PrimaryAction | null>(() => {
-    if (!runtimeGame) return null;
+    if (!runtimeGame || showAvailabilityError) return null;
     if (!runtimeGame.playable) {
       return {
         label: "Coming soon",
@@ -110,7 +114,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
       return { label: "Resume game", href, disabled: false };
     }
     return { label: "Start playing", href, disabled: false };
-  }, [progress, runtimeGame]);
+  }, [progress, runtimeGame, showAvailabilityError]);
 
   if (!mounted || !open || !runtimeGame) {
     return null;
@@ -185,7 +189,21 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
               </ul>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              {primaryAction ? (
+              {showAvailabilityError ? (
+                <>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-4 py-2 text-sm font-medium text-amber-50">
+                    ⚠️ Unable to load today&apos;s availability
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    disabled={loading}
+                    className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+                  >
+                    Retry
+                  </button>
+                </>
+              ) : primaryAction ? (
                 primaryAction.href ? (
                   <Link
                     href={primaryAction.href}
@@ -200,7 +218,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
                   </span>
                 )
               ) : null}
-              {!runtimeGame.playable ? (
+              {!showAvailabilityError && !runtimeGame.playable ? (
                 <span className="text-sm text-neutral-300">
                   We&apos;re polishing assets and gameplay details—thanks for your patience!
                 </span>
