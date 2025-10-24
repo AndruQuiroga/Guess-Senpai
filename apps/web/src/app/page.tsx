@@ -89,6 +89,17 @@ export default function HomePage() {
     [includeGuessTheOpening, progress, todayIso],
   );
 
+  const progressChipElements = (
+    <>
+      <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
+        🔥 Streak {streak}
+      </div>
+      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
+        {completedCount}/{totalAvailable} completed
+      </div>
+    </>
+  );
+
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [previewGame, setPreviewGame] = useState<GameDirectoryEntry | null>(
     null,
@@ -143,25 +154,30 @@ export default function HomePage() {
             nostalgia. Compete with friends, maintain your streak, and share
             downloadable highlight cards that celebrate each win.
           </p>
-          <div className="flex flex-wrap gap-4">
-            <Link
-              href={
-                hasIncompleteGame && nextIncompleteGame
-                  ? `/games/${nextIncompleteGame.slug}`
-                  : "/games/daily"
-              }
-              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-6 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_28px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-            >
-              {hasIncompleteGame
-                ? "Continue today’s run"
-                : "Play today's puzzles"}
-            </Link>
-            <Link
-              href="/how-to-play"
-              className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-            >
-              Learn the rules
-            </Link>
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+            <div className="flex flex-wrap items-center gap-3 lg:hidden">
+              {progressChipElements}
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <Link
+                href={
+                  hasIncompleteGame && nextIncompleteGame
+                    ? `/games/${nextIncompleteGame.slug}`
+                    : "/games/daily"
+                }
+                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-6 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_28px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              >
+                {hasIncompleteGame
+                  ? "Continue today’s run"
+                  : "Play today's puzzles"}
+              </Link>
+              <Link
+                href="/how-to-play"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              >
+                Learn the rules
+              </Link>
+            </div>
           </div>
           {hasIncompleteGame ? (
             <p className="text-sm text-neutral-200/90">
@@ -183,11 +199,8 @@ export default function HomePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
-            🔥 Streak {streak}
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
-            {completedCount}/{totalAvailable} completed
+          <div className="hidden flex-wrap items-center gap-3 lg:flex">
+            {progressChipElements}
           </div>
           <button
             type="button"
