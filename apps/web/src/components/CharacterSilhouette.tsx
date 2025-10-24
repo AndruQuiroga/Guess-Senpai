@@ -58,6 +58,7 @@ export default function CharacterSilhouette({
   const [guesses, setGuesses] = useState<string[]>(initialProgress?.guesses ?? []);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [solvedAnswer, setSolvedAnswer] = useState(() => payload.answer);
 
   useEffect(() => {
     setRound((prev) => clampRound(prev, totalRounds));
@@ -69,7 +70,9 @@ export default function CharacterSilhouette({
       setCompleted(false);
       setGuesses([]);
       setGuess("");
+      const resolvedAnswer = payload.answer;
       setFeedback(null);
+      setSolvedAnswer(resolvedAnswer);
       return;
     }
 
@@ -77,10 +80,12 @@ export default function CharacterSilhouette({
     setCompleted(initialProgress.completed ?? false);
     setGuesses(initialProgress.guesses ?? []);
     setGuess("");
+    const resolvedAnswer = payload.answer;
+    setSolvedAnswer(resolvedAnswer);
     if (initialProgress.completed) {
       setFeedback({
         type: "success",
-        message: `Silhouette solved! ${payload.answer}`,
+        message: `Silhouette solved! ${resolvedAnswer}`,
       });
     } else {
       setFeedback(null);
@@ -184,9 +189,11 @@ export default function CharacterSilhouette({
           setGuesses((prev) => [...prev, value]);
           setCompleted(true);
           setRound(totalRounds);
+          const resolvedAnswer = payload.answer;
+          setSolvedAnswer(resolvedAnswer);
           setFeedback({
             type: "success",
-            message: `Silhouette solved! ${payload.answer}`,
+            message: `Silhouette solved! ${resolvedAnswer}`,
           });
           setGuess("");
           return;
@@ -197,9 +204,11 @@ export default function CharacterSilhouette({
         if (result.correct) {
           setCompleted(true);
           setRound(totalRounds);
+          const resolvedAnswer = result.match?.trim() || payload.answer;
+          setSolvedAnswer(resolvedAnswer);
           setFeedback({
             type: "success",
-            message: `Silhouette solved! ${payload.answer}`,
+            message: `Silhouette solved! ${resolvedAnswer}`,
           });
         } else {
           setFeedback({
@@ -278,7 +287,7 @@ export default function CharacterSilhouette({
         ) : null}
         {completed ? (
           <span className="rounded-full border border-brand-400/60 bg-brand-500/15 px-3 py-1 font-semibold text-brand-100">
-            Answer: {payload.answer}
+            Answer: {solvedAnswer}
           </span>
         ) : null}
       </div>
@@ -349,7 +358,7 @@ export default function CharacterSilhouette({
             Character: {payload.character.name}
           </p>
           <p className="text-neutral-300">
-            You recognized the series as {payload.answer}. Nicely done!
+            You recognized the series as {solvedAnswer}. Nicely done!
           </p>
           <NextPuzzleButton nextSlug={nextSlug} className="w-full justify-center" />
         </div>
