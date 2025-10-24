@@ -48,11 +48,19 @@ export default function Anidle({
   );
 
   useEffect(() => {
-    if (!initialProgress) return;
-    setRound(initialProgress.round ?? 1);
-    setGuesses(initialProgress.guesses ?? []);
-    setCompleted(initialProgress.completed ?? false);
-  }, [initialProgress]);
+    if (!initialProgress) {
+      setRound(1);
+      setGuesses([]);
+      setCompleted(false);
+    } else {
+      setRound(initialProgress.round ?? 1);
+      setGuesses(initialProgress.guesses ?? []);
+      setCompleted(initialProgress.completed ?? false);
+    }
+    setGuess("");
+    setIsMenuOpen(false);
+    setHighlightedIndex(-1);
+  }, [initialProgress, payload.answer]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -70,7 +78,10 @@ export default function Anidle({
 
   const aggregatedHints = useMemo(() => {
     const hints: { label: string; value: string | number }[] = [];
-    const activeSpecs = payload.spec.filter((spec) => spec.difficulty <= round);
+    const effectiveRound = completed ? TOTAL_ROUNDS : round;
+    const activeSpecs = payload.spec.filter(
+      (spec) => spec.difficulty <= effectiveRound,
+    );
     let genresAdded = false;
     for (const spec of activeSpecs) {
       for (const hint of spec.hints) {
@@ -119,7 +130,7 @@ export default function Anidle({
       }
     }
     return hints;
-  }, [payload, round]);
+  }, [completed, payload, round]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });

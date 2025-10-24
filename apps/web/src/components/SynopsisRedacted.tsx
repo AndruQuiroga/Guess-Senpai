@@ -23,11 +23,17 @@ export default function SynopsisRedacted({ payload, initialProgress, onProgressC
   const normalizedAnswer = useMemo(() => payload.answer.trim().toLowerCase(), [payload.answer]);
 
   useEffect(() => {
-    if (!initialProgress) return;
-    setRound(initialProgress.round ?? 1);
-    setGuesses(initialProgress.guesses ?? []);
-    setCompleted(initialProgress.completed ?? false);
-  }, [initialProgress]);
+    if (!initialProgress) {
+      setRound(1);
+      setGuesses([]);
+      setCompleted(false);
+    } else {
+      setRound(initialProgress.round ?? 1);
+      setGuesses(initialProgress.guesses ?? []);
+      setCompleted(initialProgress.completed ?? false);
+    }
+    setGuess("");
+  }, [initialProgress, payload.answer, payload.text]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -37,6 +43,10 @@ export default function SynopsisRedacted({ payload, initialProgress, onProgressC
   }, [registerRoundController]);
 
   const tokensToReveal = useMemo(() => {
+    if (completed) {
+      return payload.masked_tokens.length;
+    }
+
     const activeSpecs = payload.spec.filter((spec) => spec.difficulty <= round);
     let maxTokens = 0;
     activeSpecs.forEach((spec) => {
@@ -50,7 +60,7 @@ export default function SynopsisRedacted({ payload, initialProgress, onProgressC
       });
     });
     return maxTokens;
-  }, [payload.spec, round]);
+  }, [completed, payload.masked_tokens.length, payload.spec, round]);
 
   const revealedText = useMemo(() => {
     if (tokensToReveal <= 0) return payload.text;
@@ -61,7 +71,7 @@ export default function SynopsisRedacted({ payload, initialProgress, onProgressC
       index += 1;
       return token ?? "[REDACTED]";
     });
-  }, [payload.masked_tokens, payload.text, tokensToReveal]);
+  }, [completed, payload.masked_tokens, payload.text, tokensToReveal]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });
