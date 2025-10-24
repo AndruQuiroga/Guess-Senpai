@@ -16,8 +16,6 @@ interface Props {
   nextSlug?: string | null;
 }
 
-const TOTAL_ROUNDS = 3;
-
 type FeedbackState =
   | { type: "success"; message: string }
   | { type: "error"; message: string }
@@ -41,6 +39,16 @@ export default function PosterZoom({
   );
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const totalRounds = useMemo(() => {
+    if (payload.spec.length > 0) {
+      return payload.spec.length;
+    }
+    if (payload.cropStages && payload.cropStages.length > 0) {
+      return payload.cropStages.length;
+    }
+    return 3;
+  }, [payload.cropStages, payload.spec.length]);
 
   useEffect(() => {
     if (!initialProgress) {
@@ -68,20 +76,49 @@ export default function PosterZoom({
   useEffect(() => {
     if (!registerRoundController) return;
     registerRoundController((targetRound) => {
-      setRound(() => Math.max(1, Math.min(TOTAL_ROUNDS, targetRound)));
+      setRound(() => Math.max(1, Math.min(totalRounds, targetRound)));
     });
-  }, [registerRoundController]);
+  }, [registerRoundController, totalRounds]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });
   }, [completed, round, guesses, onProgressChange]);
 
-  const zoom = useMemo(() => {
+  const cropStages = payload.cropStages ?? [];
+
+  const fallbackZoom = useMemo(() => {
     if (completed) return 1;
     if (round === 1) return 1.35;
     if (round === 2) return 1.15;
     return 1;
   }, [completed, round]);
+
+  const activeCropStage = useMemo(() => {
+    if (!cropStages.length) {
+      return null;
+    }
+    if (completed) {
+      return cropStages[cropStages.length - 1];
+    }
+    const index = Math.max(0, Math.min(cropStages.length - 1, round - 1));
+    return cropStages[index];
+  }, [completed, cropStages, round]);
+
+  const imageTransform = useMemo(() => {
+    if (!activeCropStage) {
+      return {
+        scale: fallbackZoom,
+        objectPosition: undefined as string | undefined,
+        transformOrigin: undefined as string | undefined,
+      };
+    }
+    const position = `${activeCropStage.offset_x}% ${activeCropStage.offset_y}%`;
+    return {
+      scale: activeCropStage.scale,
+      objectPosition: position,
+      transformOrigin: position,
+    };
+  }, [activeCropStage, fallbackZoom]);
 
   const activeHints = useMemo(() => {
     const hints: string[] = [];
@@ -132,7 +169,7 @@ export default function PosterZoom({
           });
         } else {
           setFeedback({ type: "error", message: "Not quite. Keep trying!" });
-          setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+          setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1));
         }
         setGuess("");
       } catch (error) {
@@ -145,7 +182,7 @@ export default function PosterZoom({
         setSubmitting(false);
       }
     },
-    [completed, guess, mediaId, payload.answer, submitting],
+    [completed, guess, mediaId, payload.answer, submitting, totalRounds],
   );
 
   return (
@@ -157,7 +194,11 @@ export default function PosterZoom({
             src={payload.image}
             alt="Anime poster"
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
-            style={{ transform: `scale(${zoom})` }}
+            style={{
+              transform: `scale(${imageTransform.scale})`,
+              transformOrigin: imageTransform.transformOrigin,
+              objectPosition: imageTransform.objectPosition,
+            }}
           />
         ) : (
           <div className="text-neutral-600">Poster unavailable</div>
@@ -179,9 +220,9 @@ export default function PosterZoom({
           type="button"
           className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-brand-400/50 hover:text-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() =>
-            setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1))
+            setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1))
           }
-          disabled={completed || round === TOTAL_ROUNDS}
+          disabled={completed || round === totalRounds}
         >
           Reveal More
         </button>
