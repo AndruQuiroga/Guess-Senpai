@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import List, Optional
+from datetime import date, datetime
+from typing import Dict, List, Optional
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, JSON, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -29,6 +29,15 @@ class User(Base):
     sessions: Mapped[List["Session"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )
+    daily_progress_entries: Mapped[List["DailyProgress"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    streak: Mapped[Optional["Streak"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
 
 
 class Session(Base):
@@ -42,3 +51,35 @@ class Session(Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="sessions")
+
+
+class DailyProgress(Base):
+    __tablename__ = "daily_progress"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
+    )
+    puzzle_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    progress: Mapped[Dict[str, Dict[str, object]]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="daily_progress_entries")
+
+
+class Streak(Base):
+    __tablename__ = "streaks"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
+    )
+    count: Mapped[int] = mapped_column(default=0)
+    last_completed: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="streak")
