@@ -3,12 +3,32 @@
 import Link from "next/link";
 
 import { useRuntimeGamesDirectory } from "../hooks/useDailyAvailability";
+import type { DailyProgress, GameProgress } from "../types/progress";
 
 interface GameSwitcherProps {
   currentSlug?: string;
+  progress?: DailyProgress;
 }
 
-export function GameSwitcher({ currentSlug }: GameSwitcherProps) {
+type GameStatus = "completed" | "in-progress" | null;
+
+function determineStatus(entry?: GameProgress): GameStatus {
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.completed) {
+    return "completed";
+  }
+
+  if (entry.round > 1 || (entry.guesses?.length ?? 0) > 0) {
+    return "in-progress";
+  }
+
+  return null;
+}
+
+export function GameSwitcher({ currentSlug, progress }: GameSwitcherProps) {
   const games = useRuntimeGamesDirectory();
   const availableGames = games.filter((game) => game.playable);
 
@@ -27,6 +47,30 @@ export function GameSwitcher({ currentSlug }: GameSwitcherProps) {
       <div className="flex items-center gap-1">
         {availableGames.map((game) => {
           const isActive = game.slug === currentSlug;
+          const status = determineStatus(
+            game.gameKey ? progress?.[game.gameKey] : undefined,
+          );
+
+          const statusLabel =
+            status === "completed"
+              ? "Completed"
+              : status === "in-progress"
+                ? "In progress"
+                : null;
+
+          const statusDisplay =
+            status === "completed"
+              ? "✓"
+              : status === "in-progress"
+                ? "•"
+                : null;
+
+          const statusClassName =
+            status === "completed"
+              ? "border-emerald-300/50 bg-emerald-400/25 text-emerald-100"
+              : status === "in-progress"
+                ? "border-amber-300/50 bg-amber-400/25 text-amber-100"
+                : "";
 
           return (
             <Link
@@ -42,7 +86,22 @@ export function GameSwitcher({ currentSlug }: GameSwitcherProps) {
                 .join(" ")}
               aria-current={isActive ? "page" : undefined}
             >
-              {game.title}
+              <span className="inline-flex items-center gap-1">
+                <span>{game.title}</span>
+                {statusLabel && statusDisplay ? (
+                  <span
+                    className={[
+                      "inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[0.55rem] font-semibold leading-none shadow-[0_1px_1px_rgba(0,0,0,0.2)]",
+                      statusClassName || "border-white/20 bg-white/15 text-white/90",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-label={statusLabel}
+                  >
+                    <span aria-hidden="true">{statusDisplay}</span>
+                  </span>
+                ) : null}
+              </span>
             </Link>
           );
         })}

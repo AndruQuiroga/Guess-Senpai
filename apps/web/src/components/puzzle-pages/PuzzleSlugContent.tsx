@@ -97,6 +97,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         title={slug.title}
         slug={slug.slug}
         description={slug.description}
+        dailyProgress={progress}
       />
     );
   }
@@ -109,6 +110,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             title={slug.title}
             slug={slug.slug}
             description={slug.description}
+            dailyProgress={progress}
           />
         );
       }
@@ -120,6 +122,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             mediaId={anidleBundle.mediaId}
             payload={anidleBundle.puzzle}
             progress={progress.anidle}
+            dailyProgress={progress}
             onProgressChange={progressHandlers.anidle}
             nextSlug={nextSlug}
           />
@@ -132,6 +135,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             title={slug.title}
             slug={slug.slug}
             description={slug.description}
+            dailyProgress={progress}
           />
         );
       }
@@ -143,6 +147,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             mediaId={posterBundle.mediaId}
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
+            dailyProgress={progress}
             onProgressChange={progressHandlers.poster_zoomed}
             nextSlug={nextSlug}
           />
@@ -155,6 +160,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             title={slug.title}
             slug={slug.slug}
             description={slug.description}
+            dailyProgress={progress}
           />
         );
       }
@@ -169,6 +175,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             mediaId={silhouetteBundle.mediaId}
             payload={silhouetteBundle.puzzle}
             progress={progress.character_silhouette}
+            dailyProgress={progress}
             onProgressChange={progressHandlers.character_silhouette}
             nextSlug={nextSlug}
           />
@@ -181,6 +188,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             title={slug.title}
             slug={slug.slug}
             description={slug.description}
+            dailyProgress={progress}
           />
         );
       }
@@ -195,6 +203,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             mediaId={synopsisBundle.mediaId}
             payload={synopsisBundle.puzzle}
             progress={progress.redacted_synopsis}
+            dailyProgress={progress}
             onProgressChange={progressHandlers.redacted_synopsis}
             nextSlug={nextSlug}
           />
@@ -207,6 +216,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             title={slug.title}
             slug={slug.slug}
             description={slug.description}
+            dailyProgress={progress}
           />
         );
       }
@@ -218,6 +228,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             mediaId={openingBundle.mediaId}
             payload={openingBundle.puzzle}
             progress={progress.guess_the_opening}
+            dailyProgress={progress}
             onProgressChange={progressHandlers.guess_the_opening}
             nextSlug={nextSlug}
           />
@@ -229,6 +240,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           title={slug.title}
           slug={slug.slug}
           description={slug.description}
+          dailyProgress={progress}
         />
       );
   }
