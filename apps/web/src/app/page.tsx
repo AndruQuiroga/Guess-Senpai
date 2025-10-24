@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { GamePreviewModal } from "../components/GamePreviewModal";
 import { GlassSection } from "../components/GlassSection";
-import { GAMES_DIRECTORY } from "../config/games";
+import { GAMES_DIRECTORY, GameDirectoryEntry } from "../config/games";
 import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
@@ -45,6 +46,7 @@ export default function HomePage() {
   );
 
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [previewGame, setPreviewGame] = useState<GameDirectoryEntry | null>(null);
 
   const handleShare = useCallback(async () => {
     try {
@@ -69,6 +71,14 @@ export default function HomePage() {
     const timeout = window.setTimeout(() => setShareStatus(null), 3000);
     return () => window.clearTimeout(timeout);
   }, [shareStatus]);
+
+  const handleOpenPreview = useCallback((game: GameDirectoryEntry) => {
+    setPreviewGame(game);
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    setPreviewGame(null);
+  }, []);
 
   return (
     <div className="space-y-16">
@@ -163,7 +173,7 @@ export default function HomePage() {
             const cardClasses = `group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition ${
               game.playable
                 ? "hover:border-brand-400/50 hover:shadow-[0_0_40px_rgba(59,130,246,0.35)]"
-                : "cursor-not-allowed opacity-70"
+                : "opacity-70"
             }`;
 
             const progressForGame = game.gameKey
@@ -172,6 +182,8 @@ export default function HomePage() {
             const canResume = Boolean(
               progressForGame && !progressForGame.completed,
             );
+
+            const handleCardClick = () => handleOpenPreview(game);
 
             const content = (
               <>
@@ -207,37 +219,36 @@ export default function HomePage() {
               </>
             );
 
-            if (game.playable) {
-              return (
-                <div key={game.slug} className="flex h-full flex-col gap-3">
-                  <Link
-                    href={`/games/${game.slug}`}
-                    className={`${cardClasses} flex-1`}
-                  >
-                    {content}
-                  </Link>
-                  {canResume ? (
-                    <Link
-                      href={`/games/${game.slug}`}
-                      className="inline-flex items-center justify-center rounded-2xl border border-brand-400/40 bg-brand-400/10 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:border-brand-300/60 hover:bg-brand-400/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-                    >
-                      Resume
-                    </Link>
-                  ) : null}
-                </div>
-              );
-            }
-
             return (
               <div key={game.slug} className="flex h-full flex-col gap-3">
-                <div className={cardClasses} aria-disabled={true}>
+                <button
+                  type="button"
+                  onClick={handleCardClick}
+                  className={`${cardClasses} flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80`}
+                >
                   {content}
-                </div>
+                </button>
+                {game.playable && canResume ? (
+                  <Link
+                    href={`/games/${game.slug}`}
+                    className="inline-flex items-center justify-center rounded-2xl border border-brand-400/40 bg-brand-400/10 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:border-brand-300/60 hover:bg-brand-400/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                  >
+                    Resume
+                  </Link>
+                ) : null}
               </div>
             );
           })}
         </div>
       </section>
+      <GamePreviewModal
+        open={Boolean(previewGame)}
+        game={previewGame}
+        onClose={handleClosePreview}
+        progress={
+          previewGame?.gameKey ? progress[previewGame.gameKey] : undefined
+        }
+      />
     </div>
   );
 }
