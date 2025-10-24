@@ -34,6 +34,18 @@ interface Props {
 
 const TOTAL_ROUNDS = 3;
 
+type AggregatedHint =
+  | {
+      type: "text";
+      label: string;
+      value: string;
+    }
+  | {
+      type: "tags";
+      label: string;
+      values: string[];
+    };
+
 const SCALAR_TONES: Record<ScalarStatus, { className: string; icon: string; description: string }> = {
   match: {
     className: "border-emerald-400/40 bg-emerald-500/10 text-emerald-100",
@@ -136,36 +148,57 @@ export default function Anidle({
     },
   );
 
-  const aggregatedHints = useMemo(() => {
-    const hints: { label: string; value: string | number }[] = [];
+  const aggregatedHints = useMemo<AggregatedHint[]>(() => {
+    const hints: AggregatedHint[] = [];
     const effectiveRound = completed ? TOTAL_ROUNDS : round;
     const activeSpecs = payload.spec.filter(
       (spec) => spec.difficulty <= effectiveRound,
     );
     let genresAdded = false;
+    let tagsAdded = false;
     for (const spec of activeSpecs) {
       for (const hint of spec.hints) {
         switch (hint) {
           case "genres":
             if (!genresAdded && payload.hints.genres.length > 0) {
               hints.push({
+                type: "text",
                 label: "Genres",
                 value: payload.hints.genres.slice(0, 3).join(", "),
               });
               genresAdded = true;
             }
             break;
+          case "tags":
+            if (!tagsAdded && payload.hints.tags.length > 0) {
+              hints.push({
+                type: "tags",
+                label: "Tag hints",
+                values: payload.hints.tags.slice(0, 4),
+              });
+              tagsAdded = true;
+            }
+            break;
           case "year":
-            if (payload.hints.year)
-              hints.push({ label: "Year", value: payload.hints.year });
+            if (payload.hints.year != null)
+              hints.push({
+                type: "text",
+                label: "Year",
+                value: String(payload.hints.year),
+              });
             break;
           case "episodes":
-            if (payload.hints.episodes)
-              hints.push({ label: "Episodes", value: payload.hints.episodes });
+            if (payload.hints.episodes != null)
+              hints.push({
+                type: "text",
+                label: "Episodes",
+                value: String(payload.hints.episodes),
+              });
             break;
           case "duration":
             if (payload.hints.duration)
               hints.push({
+                type: "text",
                 label: "Duration",
                 value: `${payload.hints.duration} min`,
               });
@@ -173,13 +206,15 @@ export default function Anidle({
           case "popularity":
             if (payload.hints.popularity)
               hints.push({
+                type: "text",
                 label: "Popularity",
-                value: payload.hints.popularity,
+                value: payload.hints.popularity.toLocaleString(),
               });
             break;
           case "average_score":
             if (payload.hints.average_score)
               hints.push({
+                type: "text",
                 label: "Score",
                 value: `${payload.hints.average_score}%`,
               });
@@ -500,15 +535,37 @@ export default function Anidle({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
-        {aggregatedHints.map((hint) => (
-          <span
-            key={`${hint.label}-${hint.value}`}
-            className="rounded-full border border-brand-400/30 bg-brand-500/10 px-3 py-1 font-semibold text-[0.7rem] backdrop-blur"
-          >
-            <span className="text-brand-200/80">{hint.label}:</span>{" "}
-            <span className="text-white/90">{hint.value}</span>
-          </span>
-        ))}
+        {aggregatedHints.map((hint) => {
+          if (hint.type === "tags") {
+            return (
+              <div
+                key={`${hint.label}-${hint.values.join("|")}`}
+                className="flex flex-wrap items-center gap-2 rounded-2xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-3 py-1 font-semibold text-[0.7rem] text-fuchsia-100 backdrop-blur"
+              >
+                <span className="text-fuchsia-200/80">{hint.label}:</span>
+                <div className="flex flex-wrap gap-1 normal-case text-[0.65rem] text-fuchsia-50">
+                  {hint.values.map((value) => (
+                    <span
+                      key={`${hint.label}-${value}`}
+                      className="rounded-full border border-fuchsia-300/40 bg-fuchsia-400/20 px-2 py-0.5 font-medium"
+                    >
+                      {value}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          return (
+            <span
+              key={`${hint.label}-${hint.value}`}
+              className="rounded-full border border-brand-400/30 bg-brand-500/10 px-3 py-1 font-semibold text-[0.7rem] backdrop-blur"
+            >
+              <span className="text-brand-200/80">{hint.label}:</span>{" "}
+              <span className="text-white/90">{hint.value}</span>
+            </span>
+          );
+        })}
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative w-full">
