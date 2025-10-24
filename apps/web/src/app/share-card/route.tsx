@@ -27,6 +27,7 @@ interface ShareCardPayload {
   progress?: {
     anidle?: SimplifiedProgress | null;
     poster_zoomed?: SimplifiedProgress | null;
+    character_silhouette?: SimplifiedProgress | null;
     redacted_synopsis?: SimplifiedProgress | null;
     guess_the_opening?: SimplifiedProgress | null;
   } | null;
@@ -110,6 +111,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   const stats: string[] = [
     describeAnidle(progress.anidle),
     describeRoundGame("Poster Zoomed", progress.poster_zoomed),
+    describeRoundGame("Character Silhouette", progress.character_silhouette),
     describeRoundGame("Redacted Synopsis", progress.redacted_synopsis),
   ];
   if (includeOpening) {

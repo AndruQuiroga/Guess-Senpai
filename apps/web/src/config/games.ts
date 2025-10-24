@@ -91,6 +91,30 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     },
   },
   {
+    slug: "character-silhouette",
+    title: "Character Silhouette",
+    tagline: "Unmask the protagonist from a dramatic silhouette.",
+    accentColor: "from-purple-400 via-indigo-400 to-sky-500",
+    playable: true,
+    comingSoon: false,
+    gameKey: "character_silhouette",
+    description: "Identify the anime using a lead character as the lighting slowly reveals them.",
+    preview: {
+      summary:
+        "Study the shadowy outline of a main character as the lights brighten across three rounds of reveals.",
+      rules: [
+        "Start with a stark silhouette of a featured character.",
+        "Each miss turns up the lights with softer filters and richer detail.",
+        "Name the originating series before the portrait is fully revealed.",
+      ],
+      placeholder: {
+        headline: "Silhouette spotlight",
+        description: "A character outline emerging from neon rim lighting.",
+        icon: "🌌",
+      },
+    },
+  },
+  {
     slug: "redacted-synopsis",
     title: "Redacted Synopsis",
     tagline: "Fill in the blanks of a censored story summary.",

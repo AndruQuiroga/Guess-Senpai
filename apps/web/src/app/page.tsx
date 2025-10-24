@@ -46,7 +46,12 @@ export default function HomePage() {
       ),
     [games],
   );
-  const baseKeys: GameKey[] = ["anidle", "poster_zoomed", "redacted_synopsis"];
+  const baseKeys: GameKey[] = [
+    "anidle",
+    "poster_zoomed",
+    "character_silhouette",
+    "redacted_synopsis",
+  ];
   const keysToConsider: GameKey[] = includeGuessTheOpening
     ? [...baseKeys, "guess_the_opening"]
     : baseKeys;

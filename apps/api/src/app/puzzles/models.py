@@ -49,6 +49,26 @@ class RedactedSynopsisGame(BaseModel):
     masked_tokens: List[str] = Field(default_factory=list)
 
 
+class CharacterSilhouetteRound(BaseModel):
+    difficulty: int
+    label: str
+    filter: str
+    description: Optional[str] = None
+
+
+class CharacterSilhouetteCharacter(BaseModel):
+    id: int
+    name: str
+    image: str
+    role: Optional[str] = None
+
+
+class CharacterSilhouetteGame(BaseModel):
+    spec: List[CharacterSilhouetteRound]
+    answer: str
+    character: CharacterSilhouetteCharacter
+
+
 class OpeningClip(BaseModel):
     audioUrl: Optional[str] = None
     videoUrl: Optional[str] = None
@@ -88,6 +108,12 @@ class RedactedSynopsisPuzzleBundle(BaseModel):
     solution: SolutionPayload
 
 
+class CharacterSilhouettePuzzleBundle(BaseModel):
+    mediaId: int
+    puzzle: CharacterSilhouetteGame
+    solution: SolutionPayload
+
+
 class GuessOpeningPuzzleBundle(BaseModel):
     mediaId: int
     puzzle: GuessOpeningGame
@@ -98,6 +124,7 @@ class GamesPayload(BaseModel):
     anidle: AnidlePuzzleBundle
     poster_zoomed: PosterZoomPuzzleBundle
     redacted_synopsis: RedactedSynopsisPuzzleBundle
+    character_silhouette: CharacterSilhouettePuzzleBundle
     guess_the_opening: Optional[GuessOpeningPuzzleBundle] = None
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from datetime import date
 from typing import Any
 
 import pytest
@@ -8,6 +9,9 @@ import pytest
 from app.puzzles import engine
 from app.puzzles.engine import UserContext
 from app.puzzles.models import (
+    CharacterSilhouetteCharacter,
+    CharacterSilhouetteGame,
+    CharacterSilhouetteRound,
     GuessOpeningGame,
     GuessOpeningMeta,
     OpeningClip,
@@ -60,6 +64,35 @@ def make_guess_opening(media: Media) -> GuessOpeningGame:
     )
 
 
+def make_character_silhouette(media: Media) -> CharacterSilhouetteGame:
+    return CharacterSilhouetteGame(
+        spec=[
+            CharacterSilhouetteRound(
+                difficulty=1,
+                label="Silhouette",
+                filter="brightness(0)",
+            ),
+            CharacterSilhouetteRound(
+                difficulty=2,
+                label="Spotlight",
+                filter="brightness(0.4)",
+            ),
+            CharacterSilhouetteRound(
+                difficulty=3,
+                label="Reveal",
+                filter="none",
+            ),
+        ],
+        answer=media.title.english or "Unknown",
+        character=CharacterSilhouetteCharacter(
+            id=media.id * 10,
+            name=f"Hero {media.id}",
+            image=f"https://cdn.example.com/character-{media.id}.jpg",
+            role="Main",
+        ),
+    )
+
+
 @pytest.mark.asyncio
 async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPatch) -> None:
     day = date(2024, 1, 5)
@@ -83,6 +116,7 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
     monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
     monkeypatch.setattr(engine, "_build_guess_opening", fake_build_guess_opening)
+    monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
 
     cache = DummyCache()
     result = await engine._assemble_daily_puzzle(
@@ -93,11 +127,13 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
     )
 
     assert result.guess_the_opening_enabled is bool(result.games.guess_the_opening)
+    assert result.games.character_silhouette is not None
 
     bundle_ids = [
         result.games.anidle.mediaId,
         result.games.poster_zoomed.mediaId,
         result.games.redacted_synopsis.mediaId,
+        result.games.character_silhouette.mediaId,
     ]
     if result.games.guess_the_opening:
         bundle_ids.append(result.games.guess_the_opening.mediaId)
@@ -147,6 +183,7 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
     monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
     monkeypatch.setattr(engine, "_build_guess_opening", fake_build_guess_opening)
+    monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
     monkeypatch.setattr(engine, "_record_recent_media", fake_record_recent_media)
     monkeypatch.setattr(engine, "_fetch_user_lists", fake_fetch_user_lists)
     monkeypatch.setattr(engine, "_get_recent_media", fake_get_recent_media)
@@ -164,12 +201,14 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
         result.games.anidle.mediaId,
         result.games.poster_zoomed.mediaId,
         result.games.redacted_synopsis.mediaId,
+        result.games.character_silhouette.mediaId,
     ]
     if result.games.guess_the_opening:
         bundle_ids.append(result.games.guess_the_opening.mediaId)
 
     assert set(recorded) == set(bundle_ids)
     assert len(recorded) == len(bundle_ids)
+    assert result.games.character_silhouette is not None
     assert result.games.guess_the_opening is not None
     assert len(attempts) >= 2
     assert attempts[-1] == result.games.guess_the_opening.mediaId

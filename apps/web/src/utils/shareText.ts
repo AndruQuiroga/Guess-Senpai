@@ -7,6 +7,7 @@ const GAME_DESCRIPTORS: Array<{
 }> = [
   { label: "Anidle", key: "anidle", totalRounds: 3 },
   { label: "Poster Zoomed", key: "poster_zoomed", totalRounds: 3 },
+  { label: "Character Silhouette", key: "character_silhouette", totalRounds: 3 },
   { label: "Redacted Synopsis", key: "redacted_synopsis", totalRounds: 3 },
   { label: "Guess the Opening", key: "guess_the_opening", totalRounds: 3 },
 ];
@@ -43,6 +44,7 @@ export function buildShareText(
   const requiredKeys: GameKey[] = [
     "anidle",
     "poster_zoomed",
+    "character_silhouette",
     "redacted_synopsis",
   ];
   if (includeOpening) {

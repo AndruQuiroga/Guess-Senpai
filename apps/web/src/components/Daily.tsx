@@ -42,6 +42,7 @@ export default function Daily({ data }: Props) {
   const includeGuessTheOpening = data.guess_the_opening_enabled;
   const anidleBundle = data.games.anidle;
   const posterBundle = data.games.poster_zoomed;
+  const silhouetteBundle = data.games.character_silhouette;
   const synopsisBundle = data.games.redacted_synopsis;
   const guessOpeningBundle = data.games.guess_the_opening ?? null;
 
@@ -49,6 +50,7 @@ export default function Daily({ data }: Props) {
     () => ({
       anidle: anidleBundle,
       poster_zoomed: posterBundle,
+      character_silhouette: silhouetteBundle,
       redacted_synopsis: synopsisBundle,
       guess_the_opening:
         includeGuessTheOpening && guessOpeningBundle ? guessOpeningBundle : null,
@@ -56,6 +58,7 @@ export default function Daily({ data }: Props) {
     [
       anidleBundle,
       posterBundle,
+      silhouetteBundle,
       synopsisBundle,
       guessOpeningBundle,
       includeGuessTheOpening,
@@ -74,6 +77,7 @@ export default function Daily({ data }: Props) {
     };
     append(anidleBundle?.solution ?? null);
     append(posterBundle?.solution ?? null);
+    append(silhouetteBundle?.solution ?? null);
     append(synopsisBundle?.solution ?? null);
     if (includeGuessTheOpening) {
       append(guessOpeningBundle?.solution ?? null);
@@ -82,6 +86,7 @@ export default function Daily({ data }: Props) {
   }, [
     anidleBundle,
     posterBundle,
+    silhouetteBundle,
     synopsisBundle,
     includeGuessTheOpening,
     guessOpeningBundle,
@@ -94,6 +99,7 @@ export default function Daily({ data }: Props) {
 
   const primarySolution = useMemo<SolutionPayload | null>(() => {
     if (anidleBundle) return anidleBundle.solution;
+    if (silhouetteBundle) return silhouetteBundle.solution;
     if (posterBundle) return posterBundle.solution;
     if (synopsisBundle) return synopsisBundle.solution;
     if (includeGuessTheOpening && guessOpeningBundle) {
@@ -112,6 +118,7 @@ export default function Daily({ data }: Props) {
     const ids = [
       anidleBundle?.mediaId ?? null,
       posterBundle?.mediaId ?? null,
+      silhouetteBundle?.mediaId ?? null,
       synopsisBundle?.mediaId ?? null,
       includeGuessTheOpening && guessOpeningBundle
         ? guessOpeningBundle.mediaId
@@ -128,6 +135,7 @@ export default function Daily({ data }: Props) {
   }, [
     anidleBundle,
     posterBundle,
+    silhouetteBundle,
     synopsisBundle,
     includeGuessTheOpening,
     guessOpeningBundle,
@@ -195,6 +203,12 @@ export default function Daily({ data }: Props) {
               round: progress.poster_zoomed.round,
             }
           : null,
+        character_silhouette: progress.character_silhouette
+          ? {
+              completed: progress.character_silhouette.completed,
+              round: progress.character_silhouette.round,
+            }
+          : null,
         redacted_synopsis: progress.redacted_synopsis
           ? {
               completed: progress.redacted_synopsis.completed,
@@ -215,6 +229,7 @@ export default function Daily({ data }: Props) {
     includeGuessTheOpening,
     primarySolution,
     progress.anidle,
+    progress.character_silhouette,
     progress.guess_the_opening,
     progress.poster_zoomed,
     progress.redacted_synopsis,
