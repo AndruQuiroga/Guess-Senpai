@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+} from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { GuessOpeningGame as GuessOpeningPayload } from "../types/puzzles";
@@ -42,6 +49,7 @@ export default function GuessOpening({
   const [guesses, setGuesses] = useState<string[]>(
     initialProgress?.guesses ?? [],
   );
+  const [canonicalTitle, setCanonicalTitle] = useState(payload.answer);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,6 +59,7 @@ export default function GuessOpening({
       setCompleted(false);
       setGuesses([]);
       setGuess("");
+      setCanonicalTitle(payload.answer);
       setFeedback(null);
       return;
     }
@@ -58,10 +67,12 @@ export default function GuessOpening({
     setCompleted(initialProgress.completed ?? false);
     setGuesses(initialProgress.guesses ?? []);
     setGuess("");
+    const solvedTitle = payload.answer;
+    setCanonicalTitle(solvedTitle);
     if (initialProgress.completed) {
       setFeedback({
         type: "success",
-        message: `Opening solved! ${payload.answer}`,
+        message: `Opening solved! ${solvedTitle}`,
       });
     } else {
       setFeedback(null);
@@ -103,10 +114,10 @@ export default function GuessOpening({
         });
       });
     if (completed) {
-      badges.push(`Answer: ${payload.answer}`);
+      badges.push(`Answer: ${canonicalTitle}`);
     }
     return Array.from(new Set(badges));
-  }, [payload, round, completed]);
+  }, [payload, round, completed, canonicalTitle]);
 
   const clip = payload.clip;
   const clipMimeType = clip.mimeType ?? undefined;
@@ -114,8 +125,8 @@ export default function GuessOpening({
     clip.audioUrl && (clipMimeType ? clipMimeType.startsWith("audio/") : true),
   );
   const mediaSrc = shouldUseAudio
-    ? clip.audioUrl ?? undefined
-    : clip.videoUrl ?? clip.audioUrl ?? undefined;
+    ? (clip.audioUrl ?? undefined)
+    : (clip.videoUrl ?? clip.audioUrl ?? undefined);
   const hasMedia = Boolean(mediaSrc);
 
   const handleGuessSubmit = useCallback(
@@ -137,10 +148,14 @@ export default function GuessOpening({
         const result = await verifyGuess(mediaId, value);
         setGuesses((prev) => [...prev, value]);
         if (result.correct) {
+          const matchTitle = result.match?.trim()
+            ? result.match
+            : payload.answer;
+          setCanonicalTitle(matchTitle);
           setCompleted(true);
           setFeedback({
             type: "success",
-            message: `Opening solved! ${payload.answer}`,
+            message: `Opening solved! ${matchTitle}`,
           });
         } else {
           setFeedback({
@@ -227,11 +242,19 @@ export default function GuessOpening({
       >
         <input
           className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:opacity-70"
-          placeholder={completed ? "Opening solved!" : "Type your guess…"}
+          placeholder={
+            completed ? `Opening solved! ${canonicalTitle}` : "Type your guess…"
+          }
           value={guess}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => setGuess(event.target.value)}
+          onChange={(event: ChangeEvent<HTMLInputElement>) =>
+            setGuess(event.target.value)
+          }
           disabled={completed || submitting}
-          aria-label="Guess the opening"
+          aria-label={
+            completed
+              ? `Opening solved: ${canonicalTitle}`
+              : "Guess the opening"
+          }
         />
         <button
           type="submit"
