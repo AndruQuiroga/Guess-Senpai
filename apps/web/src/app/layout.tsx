@@ -36,7 +36,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Games
               </NavLink>
               <NavLink href="/how-to-play">How to Play</NavLink>
-              <NavLink href={`/archive/${today}`} isActive={(pathname) => pathname.startsWith("/archive")}>
+              <NavLink
+                href={`/archive?selected=${encodeURIComponent(today)}`}
+                isActive={(pathname) => pathname === "/archive" || pathname.startsWith("/archive/")}
+              >
                 Archive
               </NavLink>
               <AccountBadge />
