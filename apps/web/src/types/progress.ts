@@ -1,4 +1,9 @@
-export type GameKey = "anidle" | "poster_zoomed" | "redacted_synopsis" | "guess_the_opening";
+export type GameKey =
+  | "anidle"
+  | "poster_zoomed"
+  | "redacted_synopsis"
+  | "character_silhouette"
+  | "guess_the_opening";
 
 export interface GameProgress {
   completed: boolean;

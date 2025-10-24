@@ -10,7 +10,7 @@ from typing import List, Optional, Sequence
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
 from ..services import animethemes, anilist
-from ..services.anilist import Media, MediaListCollection
+from ..services.anilist import Media, MediaCharacterEdge, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
 from ..services.history_repository import (
     list_recent_media as repo_list_recent_media,
@@ -20,6 +20,10 @@ from .models import (
     AnidleGame,
     AnidleHints,
     AnidlePuzzleBundle,
+    CharacterSilhouetteCharacter,
+    CharacterSilhouetteGame,
+    CharacterSilhouettePuzzleBundle,
+    CharacterSilhouetteRound,
     DailyPuzzleResponse,
     GamesPayload,
     GuessOpeningGame,
@@ -59,6 +63,27 @@ OPENING_ROUNDS = [
     RoundSpec(difficulty=1, hints=["length", "season"]),
     RoundSpec(difficulty=2, hints=["artist"]),
     RoundSpec(difficulty=3, hints=["song"]),
+]
+
+CHARACTER_SILHOUETTE_ROUNDS = [
+    CharacterSilhouetteRound(
+        difficulty=1,
+        label="Silhouette",
+        filter="brightness(0) saturate(0) contrast(180%) blur(12px)",
+        description="Shadow outline only",
+    ),
+    CharacterSilhouetteRound(
+        difficulty=2,
+        label="Spotlight",
+        filter="brightness(0.45) saturate(120%) blur(6px)",
+        description="Soft lighting begins to reveal features",
+    ),
+    CharacterSilhouetteRound(
+        difficulty=3,
+        label="Full reveal",
+        filter="none",
+        description="Complete character artwork",
+    ),
 ]
 
 STREAMING_SITES = {
@@ -224,6 +249,73 @@ def _build_synopsis(media: Media) -> RedactedSynopsisGame:
         answer=_choose_answer(media),
         text=text,
         masked_tokens=masked_tokens,
+    )
+
+
+def _normalize_role(role: Optional[str]) -> Optional[str]:
+    if not role:
+        return None
+    normalized = role.replace("_", " ").strip()
+    if not normalized:
+        return None
+    return normalized.title()
+
+
+def _available_character_edges(media: Media) -> List[MediaCharacterEdge]:
+    if not media.characters or not media.characters.edges:
+        return []
+    edges: List[MediaCharacterEdge] = []
+    for edge in media.characters.edges:
+        if not edge or not edge.node:
+            continue
+        image = edge.node.image
+        if not image:
+            continue
+        if not (image.large or image.medium):
+            continue
+        edges.append(edge)
+    return edges
+
+
+def _select_character_edge(media: Media) -> Optional[MediaCharacterEdge]:
+    edges = _available_character_edges(media)
+    if not edges:
+        return None
+    main_edges = [edge for edge in edges if (edge.role or "").upper() == "MAIN"]
+    pool = main_edges or edges
+    pool = sorted(pool, key=lambda edge: edge.node.id)
+    digest = hashlib.sha256(f"character:{media.id}".encode("utf-8")).hexdigest()
+    index = int(digest[:8], 16) % max(1, len(pool))
+    return pool[index]
+
+
+def _build_character_silhouette(media: Media) -> Optional[CharacterSilhouetteGame]:
+    edge = _select_character_edge(media)
+    if not edge:
+        return None
+    image = edge.node.image
+    if not image:
+        return None
+    image_url = image.large or image.medium
+    if not image_url:
+        return None
+
+    name = (
+        edge.node.name.full
+        or edge.node.name.userPreferred
+        or edge.node.name.native
+        or "Unknown"
+    )
+
+    return CharacterSilhouetteGame(
+        spec=[round_spec.model_copy(deep=True) for round_spec in CHARACTER_SILHOUETTE_ROUNDS],
+        answer=_choose_answer(media),
+        character=CharacterSilhouetteCharacter(
+            id=edge.node.id,
+            name=name,
+            image=image_url,
+            role=_normalize_role(edge.role),
+        ),
     )
 
 
@@ -466,7 +558,8 @@ async def _assemble_daily_puzzle(
     anidle_candidate = _choose_media_from_pool(base_seed, "anidle", pool, selected_ids)
     anidle_media = await _load_media_details(anidle_candidate.id, cache, settings)
     selected_ids.add(anidle_media.id)
-    recorded_ids.append(anidle_media.id)
+    if anidle_media.id not in recorded_ids:
+        recorded_ids.append(anidle_media.id)
     anidle_bundle = AnidlePuzzleBundle(
         mediaId=anidle_media.id,
         puzzle=_build_anidle(anidle_media),
@@ -478,7 +571,8 @@ async def _assemble_daily_puzzle(
     )
     poster_media = await _load_media_details(poster_candidate.id, cache, settings)
     selected_ids.add(poster_media.id)
-    recorded_ids.append(poster_media.id)
+    if poster_media.id not in recorded_ids:
+        recorded_ids.append(poster_media.id)
     poster_bundle = PosterZoomPuzzleBundle(
         mediaId=poster_media.id,
         puzzle=_build_poster(poster_media),
@@ -490,12 +584,58 @@ async def _assemble_daily_puzzle(
     )
     synopsis_media = await _load_media_details(synopsis_candidate.id, cache, settings)
     selected_ids.add(synopsis_media.id)
-    recorded_ids.append(synopsis_media.id)
+    if synopsis_media.id not in recorded_ids:
+        recorded_ids.append(synopsis_media.id)
     synopsis_bundle = RedactedSynopsisPuzzleBundle(
         mediaId=synopsis_media.id,
         puzzle=_build_synopsis(synopsis_media),
         solution=_build_solution(synopsis_media),
     )
+
+    character_bundle: Optional[CharacterSilhouettePuzzleBundle] = None
+    attempted_character_ids: set[int] = set()
+    max_character_attempts = max(len(pool), 1)
+    for attempt in range(max_character_attempts):
+        candidate = _choose_media_from_pool(
+            base_seed,
+            "character_silhouette",
+            pool,
+            selected_ids,
+            attempt=attempt,
+            attempted_ids=attempted_character_ids,
+        )
+        character_media = await _load_media_details(candidate.id, cache, settings)
+        attempted_character_ids.add(character_media.id)
+        game = _build_character_silhouette(character_media)
+        if not game:
+            continue
+        selected_ids.add(character_media.id)
+        if character_media.id not in recorded_ids:
+            recorded_ids.append(character_media.id)
+        character_bundle = CharacterSilhouettePuzzleBundle(
+            mediaId=character_media.id,
+            puzzle=game,
+            solution=_build_solution(character_media),
+        )
+        break
+
+    if not character_bundle:
+        for fallback_media in (anidle_media, poster_media, synopsis_media):
+            game = _build_character_silhouette(fallback_media)
+            if not game:
+                continue
+            selected_ids.add(fallback_media.id)
+            if fallback_media.id not in recorded_ids:
+                recorded_ids.append(fallback_media.id)
+            character_bundle = CharacterSilhouettePuzzleBundle(
+                mediaId=fallback_media.id,
+                puzzle=game,
+                solution=_build_solution(fallback_media),
+            )
+            break
+
+    if not character_bundle:
+        raise ValueError("Unable to build character silhouette puzzle")
 
     guess_bundle: Optional[GuessOpeningPuzzleBundle] = None
     if include_guess_opening:
@@ -516,7 +656,8 @@ async def _assemble_daily_puzzle(
             if not opening_game:
                 continue
             selected_ids.add(opening_media.id)
-            recorded_ids.append(opening_media.id)
+            if opening_media.id not in recorded_ids:
+                recorded_ids.append(opening_media.id)
             guess_bundle = GuessOpeningPuzzleBundle(
                 mediaId=opening_media.id,
                 puzzle=opening_game,
@@ -528,6 +669,7 @@ async def _assemble_daily_puzzle(
         anidle=anidle_bundle,
         poster_zoomed=poster_bundle,
         redacted_synopsis=synopsis_bundle,
+        character_silhouette=character_bundle,
         guess_the_opening=guess_bundle,
     )
 

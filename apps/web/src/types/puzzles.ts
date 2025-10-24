@@ -46,6 +46,26 @@ export interface RedactedSynopsisGame {
   masked_tokens: string[];
 }
 
+export interface CharacterSilhouetteRound {
+  difficulty: number;
+  label: string;
+  filter: string;
+  description?: string | null;
+}
+
+export interface CharacterSilhouetteCharacter {
+  id: number;
+  name: string;
+  image: string;
+  role?: string | null;
+}
+
+export interface CharacterSilhouetteGame {
+  spec: CharacterSilhouetteRound[];
+  answer: string;
+  character: CharacterSilhouetteCharacter;
+}
+
 export interface OpeningClip {
   audioUrl?: string | null;
   videoUrl?: string | null;
@@ -105,6 +125,12 @@ export interface RedactedSynopsisPuzzleBundle {
   solution: SolutionPayload;
 }
 
+export interface CharacterSilhouettePuzzleBundle {
+  mediaId: number;
+  puzzle: CharacterSilhouetteGame;
+  solution: SolutionPayload;
+}
+
 export interface GuessOpeningPuzzleBundle {
   mediaId: number;
   puzzle: GuessOpeningGame;
@@ -115,6 +141,7 @@ export interface GamesPayload {
   anidle: AnidlePuzzleBundle;
   poster_zoomed: PosterZoomPuzzleBundle;
   redacted_synopsis: RedactedSynopsisPuzzleBundle;
+  character_silhouette: CharacterSilhouettePuzzleBundle;
   guess_the_opening?: GuessOpeningPuzzleBundle | null;
 }
 

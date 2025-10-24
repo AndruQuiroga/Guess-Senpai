@@ -7,12 +7,14 @@ import type { GameKey, GameProgress } from "../../types/progress";
 import { usePuzzleProgress } from "../../hooks/usePuzzleProgress";
 import { PlaceholderPuzzlePage } from "./PlaceholderPuzzlePage";
 import { AnidlePage } from "./AnidlePage";
+import { CharacterSilhouettePage } from "./CharacterSilhouettePage";
 import { PosterZoomedPage } from "./PosterZoomedPage";
 import { RedactedSynopsisPage } from "./RedactedSynopsisPage";
 import { GuessOpeningPage } from "./GuessOpeningPage";
 import { PUZZLE_SLUGS, type PuzzleSlugDefinition } from "../../app/games/[slug]/slugs";
 import type {
   AnidleGame,
+  CharacterSilhouetteGame,
   DailyPuzzleResponse,
   GamesPayload,
   GuessOpeningGame,
@@ -57,6 +59,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       anidle: (state) => recordGame("anidle", state),
       poster_zoomed: (state) => recordGame("poster_zoomed", state),
       redacted_synopsis: (state) => recordGame("redacted_synopsis", state),
+      character_silhouette: (state) => recordGame("character_silhouette", state),
       guess_the_opening: (state) => recordGame("guess_the_opening", state),
     }),
     [recordGame],
@@ -141,6 +144,32 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
             onProgressChange={progressHandlers.poster_zoomed}
+            nextSlug={nextSlug}
+          />
+        );
+      }
+    case "character_silhouette":
+      if (!bundle) {
+        return (
+          <PlaceholderPuzzlePage
+            title={slug.title}
+            slug={slug.slug}
+            description={slug.description}
+          />
+        );
+      }
+      {
+        const silhouetteBundle = bundle as {
+          mediaId: number;
+          puzzle: CharacterSilhouetteGame;
+        };
+        return (
+          <CharacterSilhouettePage
+            slug={slug.slug}
+            mediaId={silhouetteBundle.mediaId}
+            payload={silhouetteBundle.puzzle}
+            progress={progress.character_silhouette}
+            onProgressChange={progressHandlers.character_silhouette}
             nextSlug={nextSlug}
           />
         );

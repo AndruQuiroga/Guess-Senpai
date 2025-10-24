@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
 import httpx
@@ -39,6 +38,32 @@ class Tag(BaseModel):
     isGeneralSpoiler: Optional[bool] = None
 
 
+class CharacterName(BaseModel):
+    full: Optional[str] = None
+    native: Optional[str] = None
+    userPreferred: Optional[str] = None
+
+
+class CharacterImage(BaseModel):
+    large: Optional[str] = None
+    medium: Optional[str] = None
+
+
+class Character(BaseModel):
+    id: int
+    name: CharacterName
+    image: Optional[CharacterImage] = None
+
+
+class MediaCharacterEdge(BaseModel):
+    role: Optional[str] = None
+    node: Character
+
+
+class MediaCharacters(BaseModel):
+    edges: List[MediaCharacterEdge] = Field(default_factory=list)
+
+
 class Media(BaseModel):
     id: int
     title: Title
@@ -62,6 +87,7 @@ class Media(BaseModel):
     rankings: Optional[List[Dict[str, Any]]] = None
     trailer: Optional[Dict[str, Any]] = None
     externalLinks: Optional[List[Dict[str, Any]]] = None
+    characters: Optional[MediaCharacters] = None
 
 
 class MediaListEntry(BaseModel):
@@ -205,6 +231,23 @@ query MediaDetails($id: Int!) {
     externalLinks {
       site
       url
+    }
+    characters(perPage: 10, sort: [ROLE, RELEVANCE]) {
+      edges {
+        role
+        node {
+          id
+          name {
+            full
+            native
+            userPreferred
+          }
+          image {
+            large
+            medium
+          }
+        }
+      }
     }
   }
 }
