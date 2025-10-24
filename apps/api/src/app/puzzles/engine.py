@@ -39,7 +39,7 @@ from .models import (
 ANIDLE_ROUNDS = [
     RoundSpec(difficulty=1, hints=["genres", "year"]),
     RoundSpec(difficulty=2, hints=["episodes", "popularity", "average_score"]),
-    RoundSpec(difficulty=3, hints=["duration"]),
+    RoundSpec(difficulty=3, hints=["duration", "tags"]),
 ]
 
 POSTER_ROUNDS = [
