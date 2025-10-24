@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { RedactedSynopsisGame as SynopsisPayload } from "../types/puzzles";
+import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
 
 interface Props {
+  mediaId: number;
   payload: SynopsisPayload;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
@@ -17,6 +19,7 @@ interface Props {
 const TOTAL_ROUNDS = 3;
 
 export default function SynopsisRedacted({
+  mediaId,
   payload,
   initialProgress,
   onProgressChange,
@@ -85,17 +88,28 @@ export default function SynopsisRedacted({
     onProgressChange({ completed, round, guesses });
   }, [completed, round, guesses, onProgressChange]);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = guess.trim();
     if (!value) return;
-    setGuesses((prev) => [...prev, value]);
-    if (value.toLowerCase() === normalizedAnswer) {
-      setCompleted(true);
-    } else {
-      setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+    try {
+      const result = await verifyGuess(mediaId, value);
+      setGuesses((prev) => [...prev, value]);
+      if (result.correct) {
+        setCompleted(true);
+      } else {
+        setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+      }
+    } catch {
+      setGuesses((prev) => [...prev, value]);
+      if (value.toLowerCase() === normalizedAnswer) {
+        setCompleted(true);
+      } else {
+        setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+      }
+    } finally {
+      setGuess("");
     }
-    setGuess("");
   };
 
   return (

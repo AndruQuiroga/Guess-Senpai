@@ -184,15 +184,22 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           />
         );
       }
-      return (
-        <RedactedSynopsisPage
-          slug={slug.slug}
-          payload={(bundle as { puzzle: RedactedSynopsisGame }).puzzle}
-          progress={progress.redacted_synopsis}
-          onProgressChange={progressHandlers.redacted_synopsis}
-          nextSlug={nextSlug}
-        />
-      );
+      {
+        const synopsisBundle = bundle as {
+          mediaId: number;
+          puzzle: RedactedSynopsisGame;
+        };
+        return (
+          <RedactedSynopsisPage
+            slug={slug.slug}
+            mediaId={synopsisBundle.mediaId}
+            payload={synopsisBundle.puzzle}
+            progress={progress.redacted_synopsis}
+            onProgressChange={progressHandlers.redacted_synopsis}
+            nextSlug={nextSlug}
+          />
+        );
+      }
     case "guess_the_opening":
       if (!bundle) {
         return (

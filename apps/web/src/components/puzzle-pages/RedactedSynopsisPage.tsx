@@ -10,6 +10,7 @@ import { RedactedSynopsisGame } from "../../types/puzzles";
 
 interface Props {
   slug: string;
+  mediaId: number;
   payload: RedactedSynopsisGame;
   progress?: GameProgress;
   onProgressChange: (state: GameProgress) => void;
@@ -18,6 +19,7 @@ interface Props {
 
 export function RedactedSynopsisPage({
   slug,
+  mediaId,
   payload,
   progress,
   onProgressChange,
@@ -34,6 +36,7 @@ export function RedactedSynopsisPage({
       actions={<GameSwitcher currentSlug={slug} />}
     >
       <SynopsisRedacted
+        mediaId={mediaId}
         payload={payload}
         initialProgress={progress}
         onProgressChange={onProgressChange}
