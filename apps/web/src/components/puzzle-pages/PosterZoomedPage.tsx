@@ -10,12 +10,19 @@ import { PosterZoomGame } from "../../types/puzzles";
 
 interface Props {
   slug: string;
+  mediaId: number;
   payload: PosterZoomGame;
   progress?: GameProgress;
   onProgressChange: (state: GameProgress) => void;
 }
 
-export function PosterZoomedPage({ slug, payload, progress, onProgressChange }: Props) {
+export function PosterZoomedPage({
+  slug,
+  mediaId,
+  payload,
+  progress,
+  onProgressChange,
+}: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
 
   return (
@@ -27,6 +34,7 @@ export function PosterZoomedPage({ slug, payload, progress, onProgressChange }: 
       actions={<GameSwitcher currentSlug={slug} />}
     >
       <PosterZoom
+        mediaId={mediaId}
         payload={payload}
         initialProgress={progress}
         onProgressChange={onProgressChange}
