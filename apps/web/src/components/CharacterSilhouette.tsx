@@ -312,6 +312,24 @@ export default function CharacterSilhouette({
         </button>
       </form>
 
+      {!completed ? (
+        <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
+          {guesses.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+              Attempts
+              {guesses.map((value, index) => (
+                <span
+                  key={`${value}-${index}`}
+                  className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
+                >
+                  {value}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {feedback ? (
         <div
           role="status"
