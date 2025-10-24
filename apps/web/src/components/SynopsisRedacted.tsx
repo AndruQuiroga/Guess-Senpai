@@ -18,6 +18,11 @@ interface Props {
 
 const TOTAL_ROUNDS = 3;
 
+type FeedbackState =
+  | { type: "success"; message: string }
+  | { type: "error"; message: string }
+  | null;
+
 export default function SynopsisRedacted({
   mediaId,
   payload,
@@ -30,6 +35,7 @@ export default function SynopsisRedacted({
   const [guess, setGuess] = useState("");
   const [guesses, setGuesses] = useState<string[]>(initialProgress?.guesses ?? []);
   const [completed, setCompleted] = useState(initialProgress?.completed ?? false);
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   const normalizedAnswer = useMemo(() => payload.answer.trim().toLowerCase(), [payload.answer]);
 
@@ -38,10 +44,19 @@ export default function SynopsisRedacted({
       setRound(1);
       setGuesses([]);
       setCompleted(false);
+      setFeedback(null);
     } else {
       setRound(initialProgress.round ?? 1);
       setGuesses(initialProgress.guesses ?? []);
       setCompleted(initialProgress.completed ?? false);
+      if (initialProgress.completed) {
+        setFeedback({
+          type: "success",
+          message: `Correct! The anime is ${payload.answer}`,
+        });
+      } else {
+        setFeedback(null);
+      }
     }
     setGuess("");
   }, [initialProgress, payload.answer, payload.text]);
@@ -90,22 +105,50 @@ export default function SynopsisRedacted({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (completed) return;
     const value = guess.trim();
-    if (!value) return;
+    if (!value) {
+      setFeedback({
+        type: "error",
+        message: "Enter a guess before submitting.",
+      });
+      return;
+    }
+    setFeedback(null);
     try {
       const result = await verifyGuess(mediaId, value);
       setGuesses((prev) => [...prev, value]);
       if (result.correct) {
         setCompleted(true);
+        setFeedback({
+          type: "success",
+          message: `Correct! The anime is ${payload.answer}`,
+        });
       } else {
         setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+        setFeedback({
+          type: "error",
+          message: "Not quite. Keep trying!",
+        });
       }
-    } catch {
+    } catch (error) {
       setGuesses((prev) => [...prev, value]);
       if (value.toLowerCase() === normalizedAnswer) {
         setCompleted(true);
+        setFeedback({
+          type: "success",
+          message: `Correct! The anime is ${payload.answer}`,
+        });
       } else {
         setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to verify your guess. Please try again.";
+        setFeedback({
+          type: "error",
+          message,
+        });
       }
     } finally {
       setGuess("");
@@ -141,15 +184,32 @@ export default function SynopsisRedacted({
           Submit
         </button>
       </form>
-      {completed && (
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            Correct! The anime is {""}
-            <span className="font-semibold text-emerald-100">{payload.answer}</span>.
+      <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
+        {guesses.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+            Attempts
+            {guesses.map((value, index) => (
+              <span
+                key={`${value}-${index}`}
+                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
+              >
+                {value}
+              </span>
+            ))}
           </div>
-          <NextPuzzleButton nextSlug={nextSlug} />
-        </div>
-      )}
+        )}
+        {feedback?.type === "error" && (
+          <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {feedback.message}
+          </div>
+        )}
+        {feedback?.type === "success" && (
+          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {feedback.message}
+          </div>
+        )}
+        {completed && <NextPuzzleButton nextSlug={nextSlug} />}
+      </div>
     </div>
   );
 }
