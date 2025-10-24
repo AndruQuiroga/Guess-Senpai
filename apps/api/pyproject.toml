@@ -16,6 +16,9 @@ dependencies = [
     "pydantic-settings==2.5.2",
     "redis==5.1.0",
     "itsdangerous==2.2.0",
+    "SQLAlchemy[asyncio]==2.0.36",
+    "asyncpg==0.29.0",
+    "alembic==1.13.3",
 ]
 
 [project.optional-dependencies]

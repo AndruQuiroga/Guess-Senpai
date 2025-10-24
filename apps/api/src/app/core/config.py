@@ -27,6 +27,13 @@ class Settings(BaseSettings):
 
     redis_url: Optional[str] = Field(default=None, alias="REDIS_URL")
 
+    database_url: str = Field(
+        default="postgresql+asyncpg://guesssenpai:guesssenpai@postgres:5432/guesssenpai",
+        alias="DATABASE_URL",
+    )
+    alembic_ini_path: str = Field(default="alembic.ini", alias="ALEMBIC_INI_PATH")
+    alembic_migrations_path: str = Field(default="alembic", alias="ALEMBIC_MIGRATIONS_PATH")
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
