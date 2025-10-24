@@ -35,11 +35,18 @@ class PosterZoomMeta(BaseModel):
     format: Optional[str] = None
 
 
+class PosterCropStage(BaseModel):
+    scale: float = 1.0
+    offset_x: float = 50.0
+    offset_y: float = 50.0
+
+
 class PosterZoomGame(BaseModel):
     spec: List[RoundSpec]
     answer: str
     image: Optional[str] = None
     meta: PosterZoomMeta
+    cropStages: List[PosterCropStage] = Field(default_factory=list)
 
 
 class RedactedSynopsisGame(BaseModel):

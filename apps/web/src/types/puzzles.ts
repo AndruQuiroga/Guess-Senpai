@@ -25,11 +25,18 @@ export interface PosterZoomMeta {
   format?: string | null;
 }
 
+export interface PosterCropStage {
+  scale: number;
+  offset_x: number;
+  offset_y: number;
+}
+
 export interface PosterZoomGame {
   spec: RoundSpec[];
   answer: string;
   image?: string | null;
   meta: PosterZoomMeta;
+  cropStages?: PosterCropStage[];
 }
 
 export interface RedactedSynopsisGame {

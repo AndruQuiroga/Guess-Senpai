@@ -31,7 +31,7 @@ export function PosterZoomedPage({
     <GameShell
       title="Poster Zoomed"
       round={progress?.round ?? 1}
-      totalRounds={3}
+      totalRounds={payload.spec.length || payload.cropStages?.length || 3}
       onJumpRound={(target) => controller.current?.(target)}
       actions={<GameSwitcher currentSlug={slug} />}
     >

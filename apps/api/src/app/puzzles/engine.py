@@ -26,6 +26,7 @@ from .models import (
     GuessOpeningMeta,
     GuessOpeningPuzzleBundle,
     OpeningClip,
+    PosterCropStage,
     PosterZoomGame,
     PosterZoomMeta,
     PosterZoomPuzzleBundle,
@@ -142,6 +143,45 @@ def _build_anidle(media: Media) -> AnidleGame:
     return AnidleGame(spec=ANIDLE_ROUNDS, answer=_choose_answer(media), hints=hints)
 
 
+def _offset_from_digest(digest: bytes, index: int, margin: float) -> tuple[float, float]:
+    start = (index * 4) % len(digest)
+    chunk = digest[start : start + 4]
+    if len(chunk) < 4:
+        chunk = (chunk + digest)[:4]
+    raw_x = int.from_bytes(chunk[:2], "big") / 65535
+    raw_y = int.from_bytes(chunk[2:], "big") / 65535
+    lower = margin * 100.0
+    upper = 100.0 - lower
+    span = max(upper - lower, 0.0)
+    offset_x = lower + raw_x * span
+    offset_y = lower + raw_y * span
+    return offset_x, offset_y
+
+
+def _build_poster_crop_stages(media: Media) -> List[PosterCropStage]:
+    cover = media.coverImage
+    image_ref = ""
+    if cover:
+        image_ref = (
+            getattr(cover, "extraLarge", None)
+            or getattr(cover, "large", None)
+            or getattr(cover, "medium", None)
+            or ""
+        )
+    seed = f"poster:{media.id}:{image_ref}"
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    scales = [1.65, 1.25, 1.0]
+    stages: List[PosterCropStage] = []
+    for index, scale in enumerate(scales):
+        if index == len(scales) - 1:
+            stages.append(PosterCropStage(scale=1.0, offset_x=50.0, offset_y=50.0))
+            continue
+        margin = 0.22 if index == 0 else 0.12
+        offset_x, offset_y = _offset_from_digest(digest, index, margin)
+        stages.append(PosterCropStage(scale=scale, offset_x=offset_x, offset_y=offset_y))
+    return stages
+
+
 def _build_poster(media: Media) -> PosterZoomGame:
     cover = media.coverImage or {}
     image = cover.extraLarge or cover.large or cover.medium
@@ -155,6 +195,7 @@ def _build_poster(media: Media) -> PosterZoomGame:
         answer=_choose_answer(media),
         image=image,
         meta=meta,
+        cropStages=_build_poster_crop_stages(media),
     )
 
 
