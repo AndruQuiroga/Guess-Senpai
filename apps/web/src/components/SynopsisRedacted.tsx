@@ -107,7 +107,7 @@ export default function SynopsisRedacted({ payload, initialProgress, onProgressC
           className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/25 disabled:cursor-not-allowed disabled:opacity-60"
           placeholder={completed ? payload.answer : "Guess the anime…"}
           value={guess}
-          onChange={(event) => setGuess(event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setGuess(event.target.value)}
           disabled={completed}
           aria-label="Synopsis guess"
         />
