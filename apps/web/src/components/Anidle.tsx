@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent,
 } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
@@ -350,7 +351,7 @@ export default function Anidle({
                               ? "bg-brand-500/20 text-white"
                               : "text-neutral-200 hover:bg-white/5"
                           }`}
-                          onMouseDown={(event) => {
+                          onMouseDown={(event: MouseEvent<HTMLButtonElement>) => {
                             event.preventDefault();
                             submitGuess(suggestion.title);
                           }}

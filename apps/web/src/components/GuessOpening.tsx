@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { GuessOpeningGame as GuessOpeningPayload } from "../types/puzzles";
@@ -194,7 +194,7 @@ export default function GuessOpening({
           className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:opacity-70"
           placeholder={completed ? "Opening solved!" : "Type your guess…"}
           value={guess}
-          onChange={(event) => setGuess(event.target.value)}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => setGuess(event.target.value)}
           disabled={completed || submitting}
           aria-label="Guess the opening"
         />

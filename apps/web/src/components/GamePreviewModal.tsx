@@ -9,6 +9,12 @@ import { GameDirectoryEntry, resolveGameAvailability } from "../config/games";
 import { useDailyAvailability } from "../hooks/useDailyAvailability";
 import { GameProgress } from "../types/progress";
 
+type PrimaryAction = {
+  label: string;
+  href: string | null;
+  disabled: boolean;
+};
+
 interface GamePreviewModalProps {
   open: boolean;
   game: GameDirectoryEntry | null;
@@ -86,12 +92,12 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
     return resolveGameAvailability(game, { guessTheOpeningEnabled });
   }, [game, guessTheOpeningEnabled]);
 
-  const primaryAction = useMemo(() => {
+  const primaryAction = useMemo<PrimaryAction | null>(() => {
     if (!runtimeGame) return null;
     if (!runtimeGame.playable) {
       return {
         label: "Coming soon",
-        href: null as const,
+        href: null,
         disabled: true,
       };
     }
