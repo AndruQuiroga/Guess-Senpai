@@ -23,6 +23,8 @@ from .models import (
     PosterZoomMeta,
     RedactedSynopsisGame,
     RoundSpec,
+    SolutionPayload,
+    SolutionStreamingLink,
 )
 
 ANIDLE_ROUNDS = [
@@ -48,6 +50,18 @@ OPENING_ROUNDS = [
     RoundSpec(difficulty=2, hints=["artist"]),
     RoundSpec(difficulty=3, hints=["song"]),
 ]
+
+STREAMING_SITES = {
+    "Amazon Prime Video",
+    "Bilibili",
+    "Crunchyroll",
+    "Disney+",
+    "Funimation",
+    "HIDIVE",
+    "Hulu",
+    "Netflix",
+    "YouTube",
+}
 
 PUZZLE_CACHE_PREFIX = "guesssenpai:puzzle"
 USER_HISTORY_KEY_TEMPLATE = "guesssenpai:user-history:{user_id}"
@@ -146,6 +160,40 @@ def _build_synopsis(media: Media) -> RedactedSynopsisGame:
         answer=_choose_answer(media),
         text=text,
         masked_tokens=masked_tokens,
+    )
+
+
+def _build_solution(media: Media) -> SolutionPayload:
+    cover = media.coverImage
+    cover_image = None
+    if cover:
+        cover_image = cover.extraLarge or cover.large or cover.medium
+    synopsis: Optional[str] = None
+    if media.description:
+        clean = _strip_html(media.description).strip()
+        if clean:
+            max_length = 280
+            if len(clean) > max_length:
+                cutoff = clean.rfind(" ", 0, max_length)
+                if cutoff <= 0:
+                    cutoff = max_length
+                synopsis = clean[:cutoff].rstrip() + "…"
+            else:
+                synopsis = clean
+
+    streaming_links: List[SolutionStreamingLink] = []
+    for link in media.externalLinks or []:
+        site = link.get("site")
+        url = link.get("url")
+        if site and url and site in STREAMING_SITES:
+            streaming_links.append(SolutionStreamingLink(site=site, url=url))
+
+    return SolutionPayload(
+        titles=media.title,
+        coverImage=cover_image,
+        synopsis=synopsis,
+        aniListUrl=f"https://anilist.co/anime/{media.id}",
+        streamingLinks=streaming_links,
     )
 
 
@@ -320,6 +368,7 @@ async def _assemble_daily_puzzle(
         date=day,
         mediaId=media.id,
         games=games,
+        solution=_build_solution(media),
     )
 
 

@@ -66,8 +66,29 @@ export interface GamesPayload {
   guess_the_opening?: GuessOpeningGame | null;
 }
 
+export interface SolutionTitles {
+  romaji?: string | null;
+  english?: string | null;
+  native?: string | null;
+  userPreferred?: string | null;
+}
+
+export interface SolutionStreamingLink {
+  site: string;
+  url: string;
+}
+
+export interface SolutionPayload {
+  titles: SolutionTitles;
+  coverImage?: string | null;
+  synopsis?: string | null;
+  aniListUrl: string;
+  streamingLinks: SolutionStreamingLink[];
+}
+
 export interface DailyPuzzleResponse {
   date: string;
   mediaId: number;
   games: GamesPayload;
+  solution: SolutionPayload;
 }
