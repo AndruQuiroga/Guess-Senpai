@@ -102,7 +102,15 @@ export default function GuessOpening({
     return Array.from(new Set(badges));
   }, [payload, round, completed]);
 
-  const audioSrc = payload.clip.audioUrl ?? payload.clip.videoUrl ?? "";
+  const clip = payload.clip;
+  const clipMimeType = clip.mimeType ?? undefined;
+  const shouldUseAudio = Boolean(
+    clip.audioUrl && (clipMimeType ? clipMimeType.startsWith("audio/") : true),
+  );
+  const mediaSrc = shouldUseAudio
+    ? clip.audioUrl ?? undefined
+    : clip.videoUrl ?? clip.audioUrl ?? undefined;
+  const hasMedia = Boolean(mediaSrc);
 
   const handleGuessSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -151,17 +159,35 @@ export default function GuessOpening({
 
   return (
     <div className="space-y-5">
-      {audioSrc ? (
-        <div className="rounded-[1.8rem] border border-white/10 bg-gradient-to-br from-white/8 via-white/5 to-transparent p-5 backdrop-blur-xl">
-          <audio
-            controls
-            preload="none"
-            src={audioSrc}
-            className="w-full rounded-2xl bg-black/40 px-4 py-3 text-sm text-neutral-200 shadow-inner shadow-brand-500/20"
-          >
-            Your browser does not support the audio element.
-          </audio>
-        </div>
+      {hasMedia ? (
+        shouldUseAudio ? (
+          <div className="rounded-[1.8rem] border border-white/10 bg-gradient-to-br from-white/8 via-white/5 to-transparent p-5 backdrop-blur-xl">
+            <audio
+              controls
+              preload="none"
+              className="w-full rounded-2xl bg-black/40 px-4 py-3 text-sm text-neutral-200 shadow-inner shadow-brand-500/20"
+            >
+              <source src={mediaSrc} type={clipMimeType} />
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        ) : (
+          <div className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-gradient-to-br from-white/8 via-white/5 to-transparent p-5 backdrop-blur-xl">
+            <div
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_65%)] opacity-80"
+              aria-hidden="true"
+            />
+            <video
+              controls
+              preload="none"
+              playsInline
+              className="relative z-[1] w-full rounded-2xl bg-black/40 text-sm text-neutral-200 shadow-inner shadow-brand-500/20"
+            >
+              <source src={mediaSrc} type={clipMimeType} />
+              Your browser does not support the video element.
+            </video>
+          </div>
+        )
       ) : (
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
           No clip available for this title today.
