@@ -78,10 +78,12 @@ export default function Anidle({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [evaluations, setEvaluations] = useState<AnidleGuessEvaluation[]>([]);
+  const [hydrating, setHydrating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const hydratedGuessesKeyRef = useRef<string | null>(null);
+  const previousMediaIdRef = useRef<number | null>(null);
 
   const blurTimeoutRef = useRef<number | null>(null);
   const listboxId = `${useId()}-anidle-suggestions`;
@@ -92,6 +94,10 @@ export default function Anidle({
   );
 
   useEffect(() => {
+    const puzzleChanged = previousMediaIdRef.current !== mediaId;
+    const noStoredGuesses =
+      !initialProgress?.guesses || initialProgress.guesses.length === 0;
+
     if (!initialProgress) {
       setRound(1);
       setGuesses([]);
@@ -104,10 +110,14 @@ export default function Anidle({
     setGuess("");
     setIsMenuOpen(false);
     setHighlightedIndex(-1);
-    setEvaluations([]);
+    if (puzzleChanged || noStoredGuesses) {
+      setEvaluations([]);
+    }
     setErrorMessage(null);
+    setHydrating(false);
     hydratedGuessesKeyRef.current = null;
-  }, [initialProgress, payload.answer]);
+    previousMediaIdRef.current = mediaId;
+  }, [initialProgress, mediaId, payload.answer]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -205,6 +215,7 @@ export default function Anidle({
     if (storedGuesses.length === 0) {
       hydratedGuessesKeyRef.current = "";
       setEvaluations([]);
+      setHydrating(false);
       return;
     }
     if (hydratedGuessesKeyRef.current === hydrationKey) {
@@ -213,6 +224,7 @@ export default function Anidle({
 
     let cancelled = false;
     hydratedGuessesKeyRef.current = hydrationKey;
+    setHydrating(true);
 
     async function hydrate() {
       const results: AnidleGuessEvaluation[] = [];
@@ -241,6 +253,7 @@ export default function Anidle({
       }
       if (!cancelled) {
         setEvaluations(results);
+        setHydrating(false);
       }
     }
 
@@ -248,6 +261,7 @@ export default function Anidle({
 
     return () => {
       cancelled = true;
+      setHydrating(false);
     };
   }, [createFallbackEvaluation, initialProgress, mediaId]);
 
@@ -588,45 +602,62 @@ export default function Anidle({
             {errorMessage}
           </div>
         )}
-        {evaluations.length > 0 && (
+        {(evaluations.length > 0 || hydrating) && (
           <div className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
               Guess feedback
             </div>
-            <div className="space-y-3">
-              {evaluations.map((entry, index) => {
-                const solved = entry.correct;
-                return (
-                  <div
-                    key={`${entry.title}-${index}`}
-                    className={`rounded-2xl border px-4 py-4 transition ${
-                      solved
-                        ? "border-emerald-400/40 bg-emerald-500/10"
-                        : "border-white/10 bg-white/5"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-white">{entry.title}</p>
-                        <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
-                          Guess {index + 1}
-                        </p>
+            <div className="relative min-h-[5rem]">
+              <div className="space-y-3">
+                {evaluations.map((entry, index) => {
+                  const solved = entry.correct;
+                  return (
+                    <div
+                      key={`${entry.title}-${index}`}
+                      className={`rounded-2xl border px-4 py-4 transition ${
+                        solved
+                          ? "border-emerald-400/40 bg-emerald-500/10"
+                          : "border-white/10 bg-white/5"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-white">{entry.title}</p>
+                          <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+                            Guess {index + 1}
+                          </p>
+                        </div>
+                        {solved ? (
+                          <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-50">
+                            Correct
+                          </span>
+                        ) : null}
                       </div>
-                      {solved ? (
-                        <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-50">
-                          Correct
-                        </span>
-                      ) : null}
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {renderScalar("Year", entry.year)}
+                        {renderScalar("Score", entry.averageScore, "%")}
+                        {renderList("Genres", entry.genres)}
+                        {renderList("Tags", entry.tags)}
+                      </div>
                     </div>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {renderScalar("Year", entry.year)}
-                      {renderScalar("Score", entry.averageScore, "%")}
-                      {renderList("Genres", entry.genres)}
-                      {renderList("Tags", entry.tags)}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              {hydrating && (
+                <div
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-neutral-950/70 px-6 py-6 text-center backdrop-blur-sm"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div
+                    className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                    aria-hidden
+                  />
+                  <span className="text-sm font-medium text-white">
+                    Replaying your guesses…
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
