@@ -265,33 +265,38 @@ export default function Anidle({
     setHydrating(true);
 
     async function hydrate() {
-      const results: AnidleGuessEvaluation[] = [];
-      for (const value of storedGuesses) {
-        const guessValue = value.trim();
-        if (!guessValue) {
-          results.push(createFallbackEvaluation(value));
-          continue;
+      try {
+        const results = await Promise.all(
+          storedGuesses.map(async (value): Promise<AnidleGuessEvaluation> => {
+            const guessValue = value.trim();
+            if (!guessValue) {
+              return createFallbackEvaluation(value);
+            }
+            try {
+              const evaluation = await evaluateAnidleGuess({
+                puzzleMediaId: mediaId,
+                guess: guessValue,
+              });
+              if (cancelled) {
+                return createFallbackEvaluation(value);
+              }
+              return evaluation;
+            } catch (error) {
+              if (!cancelled) {
+                console.warn("Failed to rebuild Anidle evaluation", error);
+              }
+              return createFallbackEvaluation(value);
+            }
+          }),
+        );
+
+        if (!cancelled) {
+          setEvaluations(results);
         }
-        try {
-          const evaluation = await evaluateAnidleGuess({
-            puzzleMediaId: mediaId,
-            guess: guessValue,
-          });
-          if (cancelled) {
-            return;
-          }
-          results.push(evaluation);
-        } catch (error) {
-          if (cancelled) {
-            return;
-          }
-          console.warn("Failed to rebuild Anidle evaluation", error);
-          results.push(createFallbackEvaluation(value));
+      } finally {
+        if (!cancelled) {
+          setHydrating(false);
         }
-      }
-      if (!cancelled) {
-        setEvaluations(results);
-        setHydrating(false);
       }
     }
 
