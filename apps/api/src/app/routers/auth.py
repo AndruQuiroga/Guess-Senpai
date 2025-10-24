@@ -69,6 +69,7 @@ async def callback(code: str, state: str) -> RedirectResponse:
         access_token=token_response.access_token,
         expires_at=expires_at,
         created_at=now,
+        refresh_token=token_response.refresh_token,
     )
     signed_session = await manager.issue_session(session_data)
 
