@@ -5,6 +5,7 @@ import { Buffer } from "node:buffer";
 import { formatShareDate } from "../../../utils/shareText";
 
 export const runtime = "nodejs";
+export const alt = "GuessSenpai daily share card";
 export const size = {
   width: 1200,
   height: 630,
