@@ -13,6 +13,7 @@ const GAME_DESCRIPTORS: Array<{
 
 export interface ShareTextOptions {
   includeGuessTheOpening?: boolean;
+  aniListUrl?: string;
 }
 
 export function formatShareDate(value: string): string {
@@ -37,6 +38,14 @@ export function buildShareText(
   lines.push(`GuessSenpai — ${formattedDate}`);
 
   const includeOpening = options?.includeGuessTheOpening ?? false;
+  const requiredKeys: GameKey[] = [
+    "anidle",
+    "poster_zoomed",
+    "redacted_synopsis",
+  ];
+  if (includeOpening) {
+    requiredKeys.push("guess_the_opening");
+  }
 
   const describe = (label: string, key: GameKey, totalRounds: number) => {
     const game = progress[key];
@@ -61,5 +70,11 @@ export function buildShareText(
   });
 
   lines.push("#GuessSenpai");
+
+  const allCompleted = requiredKeys.every((key) => progress[key]?.completed);
+  if (allCompleted && options?.aniListUrl) {
+    lines.push("", options.aniListUrl);
+  }
+
   return lines.join("\n");
 }

@@ -12,6 +12,7 @@ import {
   PosterZoomedPage,
   RedactedSynopsisPage,
 } from "./puzzle-pages";
+import SolutionReveal from "./SolutionReveal";
 
 interface Props {
   data: DailyPuzzleResponse | null;
@@ -44,13 +45,18 @@ export default function Daily({ data }: Props) {
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
   const streak = useStreak(data.date, allCompleted);
 
-  const shareText = useMemo(
-    () =>
-      buildShareText(data.date, progress, {
-        includeGuessTheOpening: Boolean(data.games.guess_the_opening),
-      }),
-    [data.date, data.games.guess_the_opening, progress],
-  );
+  const shareText = useMemo(() => {
+    return buildShareText(data.date, progress, {
+      includeGuessTheOpening: Boolean(data.games.guess_the_opening),
+      aniListUrl: allCompleted ? data.solution.aniListUrl : undefined,
+    });
+  }, [
+    allCompleted,
+    data.date,
+    data.games.guess_the_opening,
+    data.solution.aniListUrl,
+    progress,
+  ]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -139,6 +145,8 @@ export default function Daily({ data }: Props) {
           onProgressChange={(state) => recordGame("guess_the_opening", state)}
         />
       )}
+
+      {allCompleted && data.solution && <SolutionReveal solution={data.solution} />}
     </div>
   );
 }

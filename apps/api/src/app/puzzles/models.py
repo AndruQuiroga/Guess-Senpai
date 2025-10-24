@@ -5,6 +5,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from ..services.anilist import Title
+
 
 class RoundSpec(BaseModel):
     difficulty: int
@@ -74,10 +76,24 @@ class GamesPayload(BaseModel):
     guess_the_opening: Optional[GuessOpeningGame] = None
 
 
+class SolutionStreamingLink(BaseModel):
+    site: str
+    url: str
+
+
+class SolutionPayload(BaseModel):
+    titles: Title
+    coverImage: Optional[str] = None
+    synopsis: Optional[str] = None
+    aniListUrl: str
+    streamingLinks: List[SolutionStreamingLink] = Field(default_factory=list)
+
+
 class DailyPuzzleResponse(BaseModel):
     date: date
     mediaId: int
     games: GamesPayload
+    solution: SolutionPayload
 
 
 class GameProgressPayload(BaseModel):
