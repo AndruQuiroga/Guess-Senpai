@@ -21,6 +21,11 @@ class Title(BaseModel):
     userPreferred: Optional[str] = None
 
 
+class MediaTitlePair(BaseModel):
+    id: int
+    title: Title
+
+
 class CoverImage(BaseModel):
     extraLarge: Optional[str] = None
     large: Optional[str] = None
@@ -128,6 +133,27 @@ query PopularPool($page: Int!, $perPage: Int!) {
 }
 """
 
+SEARCH_MEDIA_QUERY = """
+query SearchMedia($search: String!, $perPage: Int!) {
+  Page(page: 1, perPage: $perPage) {
+    media(
+      search: $search
+      type: ANIME
+      isAdult: false
+      sort: [SEARCH_MATCH, POPULARITY_DESC]
+    ) {
+      id
+      title {
+        romaji
+        english
+        native
+        userPreferred
+      }
+    }
+  }
+}
+"""
+
 MEDIA_DETAILS_QUERY = """
 query MediaDetails($id: Int!) {
   Media(id: $id, type: ANIME) {
@@ -226,6 +252,20 @@ async def gql_request(query: str, variables: Dict[str, Any], token: str | None =
         if "errors" in payload:
             raise AniListError(payload["errors"])
         return payload["data"]
+
+
+async def search_media(query: str, *, limit: int = 10, token: str | None = None) -> List[MediaTitlePair]:
+    search_term = query.strip()
+    if not search_term:
+        return []
+    per_page = max(1, min(limit, 20))
+    data = await gql_request(
+        SEARCH_MEDIA_QUERY,
+        {"search": search_term, "perPage": per_page},
+        token=token,
+    )
+    media = data.get("Page", {}).get("media", [])
+    return [MediaTitlePair.model_validate(item) for item in media]
 
 
 async def fetch_popular_page(page: int, per_page: int) -> Dict[str, Any]:

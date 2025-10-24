@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from ..core.config import settings
 from ..puzzles.engine import UserContext, get_daily_puzzle
@@ -15,6 +16,7 @@ from ..services.progress import (
     store_streak,
 )
 from ..services.session import SessionData, get_session_manager
+from ..services.anilist import MediaTitlePair, search_media
 
 router = APIRouter()
 
@@ -48,6 +50,15 @@ async def _require_session(request: Request) -> SessionData:
     if not session:
         raise HTTPException(status_code=401, detail="Authentication required")
     return session
+
+
+class TitleSuggestion(BaseModel):
+    id: int
+    title: str
+
+
+class TitleSuggestionResponse(BaseModel):
+    results: list[TitleSuggestion]
 
 
 @router.get(
@@ -92,3 +103,34 @@ async def get_streak(request: Request) -> StreakPayload:
 async def put_streak(request: Request, payload: StreakPayload) -> StreakPayload:
     session = await _require_session(request)
     return await store_streak(session.user_id, payload)
+
+
+@router.get("/search-titles", response_model=TitleSuggestionResponse)
+async def search_titles(
+    request: Request,
+    q: str = Query(..., description="Search term for an anime title"),
+    limit: int = Query(default=8, ge=1, le=20),
+) -> TitleSuggestionResponse:
+    search_term = q.strip()
+    if not search_term:
+        return TitleSuggestionResponse(results=[])
+    user_ctx = await _resolve_user_context(request)
+    token = user_ctx.access_token if user_ctx else None
+    media = await search_media(search_term, limit=limit, token=token)
+
+    def _resolve_title(pair: MediaTitlePair) -> str:
+        title = pair.title
+        return (
+            title.userPreferred
+            or title.english
+            or title.romaji
+            or title.native
+            or ""
+        )
+
+    results: list[TitleSuggestion] = []
+    for item in media:
+        resolved = _resolve_title(item)
+        if resolved:
+            results.append(TitleSuggestion(id=item.id, title=resolved))
+    return TitleSuggestionResponse(results=results)
