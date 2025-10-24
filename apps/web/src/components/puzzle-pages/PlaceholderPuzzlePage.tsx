@@ -2,16 +2,24 @@
 
 import { ReactNode } from "react";
 
+import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 
 interface Props {
   title: string;
+  slug?: string;
   description?: ReactNode;
 }
 
-export function PlaceholderPuzzlePage({ title, description }: Props) {
+export function PlaceholderPuzzlePage({ title, slug, description }: Props) {
   return (
-    <GameShell title={title} round={1} totalRounds={1} onJumpRound={() => undefined}>
+    <GameShell
+      title={title}
+      round={1}
+      totalRounds={1}
+      onJumpRound={() => undefined}
+      actions={<GameSwitcher currentSlug={slug} />}
+    >
       <div className="flex flex-col items-center justify-center gap-4 py-10 text-center text-neutral-200">
         <p className="text-lg font-semibold">{title} is coming soon!</p>
         <p className="max-w-md text-sm text-neutral-300">

@@ -43,16 +43,17 @@ export function PuzzleSlugContent({ data, slug }: Props) {
   }
 
   if (!gameKey) {
-    return <PlaceholderPuzzlePage title={slug.title} description={slug.description} />;
+    return <PlaceholderPuzzlePage title={slug.title} slug={slug.slug} description={slug.description} />;
   }
 
   switch (gameKey) {
     case "anidle":
       if (!payload) {
-        return <PlaceholderPuzzlePage title={slug.title} description={slug.description} />;
+        return <PlaceholderPuzzlePage title={slug.title} slug={slug.slug} description={slug.description} />;
       }
       return (
         <AnidlePage
+          slug={slug.slug}
           payload={payload as AnidleGame}
           progress={progress.anidle}
           onProgressChange={(state) => recordGame("anidle", state)}
@@ -60,10 +61,11 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       );
     case "poster_zoomed":
       if (!payload) {
-        return <PlaceholderPuzzlePage title={slug.title} description={slug.description} />;
+        return <PlaceholderPuzzlePage title={slug.title} slug={slug.slug} description={slug.description} />;
       }
       return (
         <PosterZoomedPage
+          slug={slug.slug}
           payload={payload as PosterZoomGame}
           progress={progress.poster_zoomed}
           onProgressChange={(state) => recordGame("poster_zoomed", state)}
@@ -71,10 +73,11 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       );
     case "redacted_synopsis":
       if (!payload) {
-        return <PlaceholderPuzzlePage title={slug.title} description={slug.description} />;
+        return <PlaceholderPuzzlePage title={slug.title} slug={slug.slug} description={slug.description} />;
       }
       return (
         <RedactedSynopsisPage
+          slug={slug.slug}
           payload={payload as RedactedSynopsisGame}
           progress={progress.redacted_synopsis}
           onProgressChange={(state) => recordGame("redacted_synopsis", state)}
@@ -82,16 +85,17 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       );
     case "guess_the_opening":
       if (!payload) {
-        return <PlaceholderPuzzlePage title={slug.title} description={slug.description} />;
+        return <PlaceholderPuzzlePage title={slug.title} slug={slug.slug} description={slug.description} />;
       }
       return (
         <GuessOpeningPage
+          slug={slug.slug}
           payload={payload as GuessOpeningGame}
           progress={progress.guess_the_opening}
           onProgressChange={(state) => recordGame("guess_the_opening", state)}
         />
       );
     default:
-      return <PlaceholderPuzzlePage title={slug.title} description={slug.description} />;
+      return <PlaceholderPuzzlePage title={slug.title} slug={slug.slug} description={slug.description} />;
   }
 }
