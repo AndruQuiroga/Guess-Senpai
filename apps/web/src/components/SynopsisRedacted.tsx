@@ -4,17 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { RedactedSynopsisGame as SynopsisPayload } from "../types/puzzles";
+import NextPuzzleButton from "./NextPuzzleButton";
 
 interface Props {
   payload: SynopsisPayload;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
+  nextSlug?: string | null;
 }
 
 const TOTAL_ROUNDS = 3;
 
-export default function SynopsisRedacted({ payload, initialProgress, onProgressChange, registerRoundController }: Props) {
+export default function SynopsisRedacted({
+  payload,
+  initialProgress,
+  onProgressChange,
+  registerRoundController,
+  nextSlug,
+}: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [guess, setGuess] = useState("");
   const [guesses, setGuesses] = useState<string[]>(initialProgress?.guesses ?? []);
@@ -120,8 +128,12 @@ export default function SynopsisRedacted({ payload, initialProgress, onProgressC
         </button>
       </form>
       {completed && (
-        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          Correct! The anime is <span className="font-semibold text-emerald-100">{payload.answer}</span>.
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            Correct! The anime is {""}
+            <span className="font-semibold text-emerald-100">{payload.answer}</span>.
+          </div>
+          <NextPuzzleButton nextSlug={nextSlug} />
         </div>
       )}
     </div>

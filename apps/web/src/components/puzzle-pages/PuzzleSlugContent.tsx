@@ -10,7 +10,7 @@ import { AnidlePage } from "./AnidlePage";
 import { PosterZoomedPage } from "./PosterZoomedPage";
 import { RedactedSynopsisPage } from "./RedactedSynopsisPage";
 import { GuessOpeningPage } from "./GuessOpeningPage";
-import type { PuzzleSlugDefinition } from "../../app/games/[slug]/slugs";
+import { PUZZLE_SLUGS, type PuzzleSlugDefinition } from "../../app/games/[slug]/slugs";
 import type {
   AnidleGame,
   DailyPuzzleResponse,
@@ -35,6 +35,23 @@ export function PuzzleSlugContent({ data, slug }: Props) {
 
   const { progress, recordGame } = usePuzzleProgress(data?.date ?? "");
 
+  const availablePuzzles = useMemo(() => {
+    if (!data) return [];
+    return PUZZLE_SLUGS.filter((entry) => {
+      if (!entry.gameKey) {
+        return false;
+      }
+      if (
+        entry.gameKey === "guess_the_opening" &&
+        !data.guess_the_opening_enabled
+      ) {
+        return false;
+      }
+      const payload = data.games[entry.gameKey];
+      return Boolean(payload);
+    });
+  }, [data]);
+
   const progressHandlers = useMemo<Record<GameKey, (state: GameProgress) => void>>(
     () => ({
       anidle: (state) => recordGame("anidle", state),
@@ -44,6 +61,22 @@ export function PuzzleSlugContent({ data, slug }: Props) {
     }),
     [recordGame],
   );
+
+  const nextSlug = useMemo(() => {
+    for (const entry of availablePuzzles) {
+      if (entry.slug === slug.slug) {
+        continue;
+      }
+      const key = entry.gameKey;
+      if (!key) {
+        continue;
+      }
+      if (!progress[key]?.completed) {
+        return entry.slug;
+      }
+    }
+    return null;
+  }, [availablePuzzles, progress, slug.slug]);
 
   if (!data) {
     return (
@@ -85,6 +118,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={anidleBundle.puzzle}
             progress={progress.anidle}
             onProgressChange={progressHandlers.anidle}
+            nextSlug={nextSlug}
           />
         );
       }
@@ -100,15 +134,16 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
       {
         const posterBundle = bundle as { mediaId: number; puzzle: PosterZoomGame };
-      return (
-        <PosterZoomedPage
-          slug={slug.slug}
-          mediaId={posterBundle.mediaId}
-          payload={posterBundle.puzzle}
-          progress={progress.poster_zoomed}
-          onProgressChange={progressHandlers.poster_zoomed}
-        />
-      );
+        return (
+          <PosterZoomedPage
+            slug={slug.slug}
+            mediaId={posterBundle.mediaId}
+            payload={posterBundle.puzzle}
+            progress={progress.poster_zoomed}
+            onProgressChange={progressHandlers.poster_zoomed}
+            nextSlug={nextSlug}
+          />
+        );
       }
     case "redacted_synopsis":
       if (!bundle) {
@@ -126,6 +161,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           payload={(bundle as { puzzle: RedactedSynopsisGame }).puzzle}
           progress={progress.redacted_synopsis}
           onProgressChange={progressHandlers.redacted_synopsis}
+          nextSlug={nextSlug}
         />
       );
     case "guess_the_opening":
@@ -140,15 +176,16 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
       {
         const openingBundle = bundle as { mediaId: number; puzzle: GuessOpeningGame };
-      return (
-        <GuessOpeningPage
-          slug={slug.slug}
-          mediaId={openingBundle.mediaId}
-          payload={openingBundle.puzzle}
-          progress={progress.guess_the_opening}
-          onProgressChange={progressHandlers.guess_the_opening}
-        />
-      );
+        return (
+          <GuessOpeningPage
+            slug={slug.slug}
+            mediaId={openingBundle.mediaId}
+            payload={openingBundle.puzzle}
+            progress={progress.guess_the_opening}
+            onProgressChange={progressHandlers.guess_the_opening}
+            nextSlug={nextSlug}
+          />
+        );
       }
     default:
       return (

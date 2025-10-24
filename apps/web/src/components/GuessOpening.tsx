@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState, type ChangeEvent 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { GuessOpeningGame as GuessOpeningPayload } from "../types/puzzles";
 import { verifyGuess } from "../utils/verifyGuess";
+import NextPuzzleButton from "./NextPuzzleButton";
 
 interface Props {
   mediaId: number;
@@ -12,6 +13,7 @@ interface Props {
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
+  nextSlug?: string | null;
 }
 
 const TOTAL_ROUNDS = 3;
@@ -27,6 +29,7 @@ export default function GuessOpening({
   initialProgress,
   onProgressChange,
   registerRoundController,
+  nextSlug,
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [completed, setCompleted] = useState(
@@ -230,6 +233,7 @@ export default function GuessOpening({
             {feedback.message}
           </div>
         )}
+        {completed && <NextPuzzleButton nextSlug={nextSlug} />}
       </div>
     </div>
   );
