@@ -16,8 +16,6 @@ interface Props {
   nextSlug?: string | null;
 }
 
-const TOTAL_ROUNDS = 3;
-
 type FeedbackState =
   | { type: "success"; message: string }
   | { type: "error"; message: string }
@@ -31,6 +29,11 @@ export default function GuessOpening({
   registerRoundController,
   nextSlug,
 }: Props) {
+  const totalRounds = useMemo(() => {
+    const specLength = payload.spec.length;
+    return specLength > 0 ? specLength : 3;
+  }, [payload.spec]);
+
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [completed, setCompleted] = useState(
     initialProgress?.completed ?? false,
@@ -68,9 +71,9 @@ export default function GuessOpening({
   useEffect(() => {
     if (!registerRoundController) return;
     registerRoundController((targetRound) => {
-      setRound(() => Math.max(1, Math.min(TOTAL_ROUNDS, targetRound)));
+      setRound(() => Math.max(1, Math.min(totalRounds, targetRound)));
     });
-  }, [registerRoundController]);
+  }, [registerRoundController, totalRounds]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });
@@ -141,7 +144,7 @@ export default function GuessOpening({
             type: "error",
             message: "No match yet. Try another guess!",
           });
-          setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+          setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1));
         }
         setGuess("");
       } catch (error) {
@@ -154,7 +157,7 @@ export default function GuessOpening({
         setSubmitting(false);
       }
     },
-    [completed, guess, mediaId, payload.answer, submitting],
+    [completed, guess, mediaId, payload.answer, submitting, totalRounds],
   );
 
   return (
@@ -208,9 +211,9 @@ export default function GuessOpening({
           type="button"
           className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-brand-400/50 hover:text-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() =>
-            setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1))
+            setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1))
           }
-          disabled={completed || round === TOTAL_ROUNDS}
+          disabled={completed || round === totalRounds}
         >
           Reveal More
         </button>
