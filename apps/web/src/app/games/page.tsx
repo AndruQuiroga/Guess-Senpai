@@ -1,4 +1,4 @@
-import GamesDirectory from "../../components/GamesDirectory";
+import GamesDirectorySection from "./GamesDirectorySection";
 
 export const metadata = {
   title: "Games — GuessSenpai",
@@ -18,7 +18,7 @@ export default function GamesHubPage() {
         </p>
       </header>
 
-      <GamesDirectory />
+      <GamesDirectorySection />
     </div>
   );
 }

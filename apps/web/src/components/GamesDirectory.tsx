@@ -1,9 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 
 import { GlassSection } from "./GlassSection";
+import type { GameDirectoryEntry } from "../config/games";
 import { useRuntimeGamesDirectory } from "../hooks/useDailyAvailability";
+
+type GameFilter = "all" | "available" | "coming-soon";
 
 function GameStatusTag({ playable, comingSoon }: { playable: boolean; comingSoon: boolean }) {
   const baseClassName =
@@ -26,12 +30,32 @@ function GameStatusTag({ playable, comingSoon }: { playable: boolean; comingSoon
   );
 }
 
-export default function GamesDirectory() {
+interface GamesDirectoryProps {
+  filter: GameFilter;
+}
+
+function matchesFilter(game: GameDirectoryEntry, filter: GameFilter): boolean {
+  if (filter === "available") {
+    return game.playable;
+  }
+
+  if (filter === "coming-soon") {
+    return game.comingSoon;
+  }
+
+  return true;
+}
+
+export default function GamesDirectory({ filter }: GamesDirectoryProps) {
   const games = useRuntimeGamesDirectory();
+  const filteredGames = useMemo(
+    () => games.filter((game) => matchesFilter(game, filter)),
+    [games, filter],
+  );
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      {games.map((game) => {
+      {filteredGames.map((game) => {
         const placeholder = game.preview.placeholder;
 
         return (
