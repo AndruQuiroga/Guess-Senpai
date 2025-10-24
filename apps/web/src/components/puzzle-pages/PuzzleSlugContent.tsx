@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 
+import type { GameKey, GameProgress } from "../../types/progress";
+
 import { usePuzzleProgress } from "../../hooks/usePuzzleProgress";
 import { PlaceholderPuzzlePage } from "./PlaceholderPuzzlePage";
 import { AnidlePage } from "./AnidlePage";
@@ -32,6 +34,16 @@ export function PuzzleSlugContent({ data, slug }: Props) {
   }, [data, gameKey]);
 
   const { progress, recordGame } = usePuzzleProgress(data?.date ?? "");
+
+  const progressHandlers = useMemo<Record<GameKey, (state: GameProgress) => void>>(
+    () => ({
+      anidle: (state) => recordGame("anidle", state),
+      poster_zoomed: (state) => recordGame("poster_zoomed", state),
+      redacted_synopsis: (state) => recordGame("redacted_synopsis", state),
+      guess_the_opening: (state) => recordGame("guess_the_opening", state),
+    }),
+    [recordGame],
+  );
 
   if (!data) {
     return (
@@ -69,7 +81,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           slug={slug.slug}
           payload={payload as AnidleGame}
           progress={progress.anidle}
-          onProgressChange={(state) => recordGame("anidle", state)}
+          onProgressChange={progressHandlers.anidle}
         />
       );
     case "poster_zoomed":
@@ -88,7 +100,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           mediaId={data.mediaId}
           payload={payload as PosterZoomGame}
           progress={progress.poster_zoomed}
-          onProgressChange={(state) => recordGame("poster_zoomed", state)}
+          onProgressChange={progressHandlers.poster_zoomed}
         />
       );
     case "redacted_synopsis":
@@ -106,7 +118,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           slug={slug.slug}
           payload={payload as RedactedSynopsisGame}
           progress={progress.redacted_synopsis}
-          onProgressChange={(state) => recordGame("redacted_synopsis", state)}
+          onProgressChange={progressHandlers.redacted_synopsis}
         />
       );
     case "guess_the_opening":
@@ -125,7 +137,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           mediaId={data.mediaId}
           payload={payload as GuessOpeningGame}
           progress={progress.guess_the_opening}
-          onProgressChange={(state) => recordGame("guess_the_opening", state)}
+          onProgressChange={progressHandlers.guess_the_opening}
         />
       );
     default:
