@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
@@ -88,15 +89,52 @@ export default function SynopsisRedacted({
     return maxTokens;
   }, [completed, payload.masked_tokens.length, payload.spec, round]);
 
-  const revealedText = useMemo(() => {
+  const revealedText = useMemo<ReactNode>(() => {
     if (tokensToReveal <= 0) return payload.text;
+
+    const parts = payload.text.split("[REDACTED]");
+    if (parts.length === 1) return payload.text;
+
     const replacements = payload.masked_tokens.slice(0, tokensToReveal);
-    let index = 0;
-    return payload.text.replace(/\[REDACTED\]/g, () => {
-      const token = replacements[index];
-      index += 1;
-      return token ?? "[REDACTED]";
+    const content: ReactNode[] = [];
+    let replacementIndex = 0;
+
+    parts.forEach((part, partIndex) => {
+      content.push(
+        <span key={`text-${partIndex}`} className="whitespace-pre-wrap">
+          {part}
+        </span>
+      );
+
+      if (partIndex === parts.length - 1) {
+        return;
+      }
+
+      const replacement =
+        replacementIndex < replacements.length
+          ? replacements[replacementIndex]
+          : undefined;
+
+      if (replacement !== undefined && replacement !== null) {
+        content.push(
+          <span
+            key={`token-${partIndex}`}
+            className="inline-flex items-baseline rounded-sm border border-yellow-600/60 bg-yellow-200/90 px-1 font-semibold text-neutral-900 underline decoration-yellow-700 shadow-sm"
+          >
+            <span className="whitespace-pre-wrap">{replacement}</span>
+          </span>
+        );
+        replacementIndex += 1;
+      } else {
+        content.push(
+          <span key={`placeholder-${partIndex}`} className="whitespace-pre-wrap">
+            [REDACTED]
+          </span>
+        );
+      }
     });
+
+    return content;
   }, [completed, payload.masked_tokens, payload.text, tokensToReveal]);
 
   useEffect(() => {
