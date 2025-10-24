@@ -110,3 +110,32 @@ class DailyProgressPayload(BaseModel):
 class StreakPayload(BaseModel):
     count: int = 0
     last_completed: Optional[date] = None
+
+
+class ProgressHistoryEntry(BaseModel):
+    date: date
+    completed: int = 0
+    total: int = 0
+
+
+class ProgressAggregate(BaseModel):
+    total_games: int = 0
+    completed_games: int = 0
+    active_days: int = 0
+
+
+class RecentMediaSummary(BaseModel):
+    id: int
+    title: Title
+    coverImage: Optional[str] = None
+
+
+class PuzzleStatsPayload(BaseModel):
+    streak: StreakPayload
+    completion_rate: float = 0.0
+    total_games: int = 0
+    completed_games: int = 0
+    active_days: int = 0
+    history: List[ProgressHistoryEntry] = Field(default_factory=list)
+    recent_media_ids: List[int] = Field(default_factory=list)
+    recent_media: List[RecentMediaSummary] = Field(default_factory=list)

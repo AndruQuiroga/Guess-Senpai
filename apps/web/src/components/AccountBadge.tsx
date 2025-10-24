@@ -17,6 +17,7 @@ interface AccountState {
 export default function AccountBadge() {
   const [account, setAccount] = useState<AccountState>({ authenticated: false });
   const [loading, setLoading] = useState(true);
+  const [streakCount, setStreakCount] = useState<number | null>(null);
 
   const fetchAccount = useCallback(async () => {
     try {
@@ -26,9 +27,23 @@ export default function AccountBadge() {
       });
       const data = (await response.json()) as AccountState;
       setAccount(data);
+      if (data.authenticated) {
+        const streakResponse = await fetch(`${API_BASE}/puzzles/streak`, {
+          credentials: "include",
+        });
+        if (streakResponse.ok) {
+          const streakData = (await streakResponse.json()) as { count?: number };
+          setStreakCount(typeof streakData.count === "number" ? streakData.count : null);
+        } else {
+          setStreakCount(null);
+        }
+      } else {
+        setStreakCount(null);
+      }
     } catch (error) {
       console.warn("Unable to fetch account info", error);
       setAccount({ authenticated: false });
+      setStreakCount(null);
     } finally {
       setLoading(false);
     }
@@ -45,6 +60,7 @@ export default function AccountBadge() {
         credentials: "include",
       });
       setAccount({ authenticated: false });
+      setStreakCount(null);
     } catch (error) {
       console.warn("Logout failed", error);
     }
@@ -71,21 +87,29 @@ export default function AccountBadge() {
 
   return (
     <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur-lg">
-      {account.user?.avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={account.user.avatar}
-          alt={account.user?.username ?? "AniList user"}
-          className="h-8 w-8 rounded-full border border-white/20 object-cover shadow-inner shadow-black/40"
-        />
-      ) : (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-brand-500/30 font-semibold uppercase">
-          {(account.user?.username ?? "GS").slice(0, 2)}
-        </div>
-      )}
-      <span className="max-w-[120px] truncate font-semibold text-white/90">
-        {account.user?.username ?? "AniList user"}
-      </span>
+      <Link
+        href="/account"
+        className="group flex items-center gap-3"
+        title={
+          typeof streakCount === "number" ? `Current streak: ${streakCount} day${streakCount === 1 ? "" : "s"}` : undefined
+        }
+      >
+        {account.user?.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={account.user.avatar}
+            alt={account.user?.username ?? "AniList user"}
+            className="h-8 w-8 rounded-full border border-white/20 object-cover shadow-inner shadow-black/40 transition group-hover:border-brand-300"
+          />
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-brand-500/30 font-semibold uppercase transition group-hover:border-brand-300 group-hover:text-white">
+            {(account.user?.username ?? "GS").slice(0, 2)}
+          </div>
+        )}
+        <span className="max-w-[120px] truncate font-semibold text-white/90 group-hover:text-white">
+          {account.user?.username ?? "AniList user"}
+        </span>
+      </Link>
       <button
         type="button"
         onClick={handleLogout}

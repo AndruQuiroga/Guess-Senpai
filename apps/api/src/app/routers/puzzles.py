@@ -7,10 +7,20 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from ..core.config import settings
+from ..puzzles import engine as puzzle_engine
 from ..puzzles.engine import UserContext, get_daily_puzzle
-from ..puzzles.models import DailyProgressPayload, DailyPuzzleResponse, StreakPayload
+from ..puzzles.models import (
+    DailyProgressPayload,
+    DailyPuzzleResponse,
+    PuzzleStatsPayload,
+    RecentMediaSummary,
+    StreakPayload,
+)
+from ..services.cache import get_cache
 from ..services.progress import (
     load_daily_progress,
+    load_progress_aggregate,
+    load_progress_history,
     load_streak,
     merge_daily_progress,
     store_streak,
@@ -116,6 +126,47 @@ async def get_streak(request: Request) -> StreakPayload:
 async def put_streak(request: Request, payload: StreakPayload) -> StreakPayload:
     session = await _require_session(request)
     return await store_streak(session.user_id, payload)
+
+
+@router.get("/stats", response_model=PuzzleStatsPayload)
+async def get_stats(request: Request) -> PuzzleStatsPayload:
+    session = await _require_session(request)
+    cache = await get_cache(settings.redis_url)
+    streak = await load_streak(session.user_id)
+    recent_ids = await puzzle_engine._get_recent_media(cache, session.user_id)
+    history = await load_progress_history(session.user_id)
+    aggregate = await load_progress_aggregate(session.user_id)
+    completion_rate = (
+        aggregate.completed_games / aggregate.total_games if aggregate.total_games else 0.0
+    )
+
+    recent_media: list[RecentMediaSummary] = []
+    for media_id in recent_ids:
+        try:
+            media = await puzzle_engine._load_media_details(media_id, cache, settings)
+        except Exception:
+            continue
+        cover_image = None
+        if media.coverImage:
+            cover_image = (
+                media.coverImage.extraLarge
+                or media.coverImage.large
+                or media.coverImage.medium
+            )
+        recent_media.append(
+            RecentMediaSummary(id=media.id, title=media.title, coverImage=cover_image)
+        )
+
+    return PuzzleStatsPayload(
+        streak=streak,
+        completion_rate=completion_rate,
+        total_games=aggregate.total_games,
+        completed_games=aggregate.completed_games,
+        active_days=aggregate.active_days,
+        history=history,
+        recent_media_ids=recent_ids,
+        recent_media=recent_media,
+    )
 
 
 @router.get("/search-titles", response_model=TitleSuggestionResponse)
