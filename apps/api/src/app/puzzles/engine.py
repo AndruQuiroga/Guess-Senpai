@@ -8,9 +8,14 @@ from datetime import date
 from typing import List, Optional, Sequence
 
 from ..core.config import Settings, settings
+from ..core.database import get_session_factory
 from ..services import animethemes, anilist
 from ..services.anilist import Media, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
+from ..services.history_repository import (
+    list_recent_media as repo_list_recent_media,
+    record_recent_media as repo_record_recent_media,
+)
 from .models import (
     AnidleGame,
     AnidleHints,
@@ -269,7 +274,21 @@ async def _get_recent_media(cache: CacheBackend, user_id: int) -> List[int]:
     key = USER_HISTORY_KEY_TEMPLATE.format(user_id=user_id)
     payload = await cache.get(key)
     if not payload:
-        return []
+        window = max(settings.puzzle_history_days, 0)
+        if window <= 0:
+            await cache.set(key, {"ids": []}, settings.puzzle_cache_ttl_seconds)
+            return []
+
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            try:
+                recent_ids = await repo_list_recent_media(session, user_id, window)
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+        await cache.set(key, {"ids": recent_ids}, settings.puzzle_cache_ttl_seconds)
+        return recent_ids
     if isinstance(payload, dict):
         return [int(mid) for mid in payload.get("ids", [])]
     if isinstance(payload, list):
@@ -279,11 +298,18 @@ async def _get_recent_media(cache: CacheBackend, user_id: int) -> List[int]:
 
 async def _record_recent_media(cache: CacheBackend, user_id: int, media_id: int) -> None:
     key = USER_HISTORY_KEY_TEMPLATE.format(user_id=user_id)
-    recent = await _get_recent_media(cache, user_id)
-    recent = [mid for mid in recent if mid != media_id]
-    recent.insert(0, media_id)
-    window = settings.puzzle_history_days
-    await cache.set(key, {"ids": recent[:window]}, settings.puzzle_cache_ttl_seconds)
+    window = max(settings.puzzle_history_days, 0)
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        try:
+            recent_ids = await repo_record_recent_media(session, user_id, media_id, window)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+    await cache.set(key, {"ids": recent_ids}, settings.puzzle_cache_ttl_seconds)
 
 
 def _build_candidate_pool(

@@ -38,6 +38,9 @@ class User(Base):
         passive_deletes=True,
         uselist=False,
     )
+    recent_media_entries: Mapped[List["UserRecentMedia"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Session(Base):
@@ -83,3 +86,17 @@ class Streak(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="streak")
+
+
+class UserRecentMedia(Base):
+    __tablename__ = "user_recent_media"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
+    )
+    media_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="recent_media_entries")
