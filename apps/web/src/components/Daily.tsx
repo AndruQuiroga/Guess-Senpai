@@ -34,7 +34,7 @@ export default function Daily({ data }: Props) {
     );
   }
 
-  const { progress } = usePuzzleProgress(data.date);
+  const { progress, refresh, isRefreshing } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
@@ -225,6 +225,29 @@ export default function Daily({ data }: Props) {
     ? "Share Progress"
     : "Download card";
 
+  const syncButtonLabel = isRefreshing ? "Syncing…" : "Sync progress";
+
+  const [syncToast, setSyncToast] = useState<
+    | {
+        tone: "success" | "error";
+        message: string;
+      }
+    | null
+  >(null);
+
+  const handleSync = useCallback(async () => {
+    const result = await refresh();
+    if (result.success) {
+      setSyncToast({ tone: "success", message: "Progress synced" });
+      return;
+    }
+    const errorMessage =
+      result.error?.status === 401
+        ? "Sign in to sync progress"
+        : result.error?.message?.trim() || "Failed to sync progress";
+    setSyncToast({ tone: "error", message: errorMessage });
+  }, [refresh]);
+
   const handleShare = useCallback(async () => {
     try {
       setIsGeneratingCard(true);
@@ -282,6 +305,12 @@ export default function Daily({ data }: Props) {
   }, [shareStatus]);
 
   useEffect(() => {
+    if (!syncToast) return;
+    const timeout = window.setTimeout(() => setSyncToast(null), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [syncToast]);
+
+  useEffect(() => {
     if (typeof navigator === "undefined") {
       return;
     }
@@ -323,6 +352,14 @@ export default function Daily({ data }: Props) {
             )}
             <button
               type="button"
+              className="rounded-2xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleSync}
+              disabled={isRefreshing}
+            >
+              {syncButtonLabel}
+            </button>
+            <button
+              type="button"
               className="rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={handleShare}
               disabled={isGeneratingCard}
@@ -337,6 +374,19 @@ export default function Daily({ data }: Props) {
           </p>
         )}
       </header>
+
+      {syncToast && (
+        <div
+          aria-live="polite"
+          className={`fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium shadow-glow backdrop-blur ${
+            syncToast.tone === "success"
+              ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-100"
+              : "border-rose-400/40 bg-rose-500/20 text-rose-100"
+          }`}
+        >
+          {syncToast.message}
+        </div>
+      )}
 
       <section className="space-y-4">
         <div className="space-y-1">

@@ -18,6 +18,14 @@ interface ProgressResponse {
   progress: DailyProgress;
 }
 
+type ProgressFetchError = Error & { status?: number };
+
+export interface RefreshResult {
+  success: boolean;
+  progress?: DailyProgress;
+  error?: ProgressFetchError;
+}
+
 function readStoredProgress(date: string): DailyProgress {
   if (typeof window === "undefined" || !date) return {};
   try {
@@ -46,6 +54,44 @@ function writeStoredProgress(date: string, value: DailyProgress) {
 
 export function usePuzzleProgress(date: string) {
   const [progress, setProgress] = useState<DailyProgress>(() => readStoredProgress(date));
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<ProgressFetchError | null>(null);
+
+  const fetchProgressFromServer = useCallback(
+    async (signal?: AbortSignal): Promise<DailyProgress | null> => {
+      if (!date) {
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE}/puzzles/progress?d=${date}`, {
+        credentials: "include",
+        signal,
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          const authError = new Error("Unauthorized") as ProgressFetchError;
+          authError.status = response.status;
+          throw authError;
+        }
+        const statusError = new Error(
+          `Request failed with status ${response.status}`,
+        ) as ProgressFetchError;
+        statusError.status = response.status;
+        throw statusError;
+      }
+
+      const payload = (await response.json()) as ProgressResponse;
+      if (!payload || typeof payload !== "object") {
+        return {};
+      }
+
+      const serverProgress = payload.progress ?? {};
+      writeStoredProgress(date, serverProgress);
+      return serverProgress;
+    },
+    [date],
+  );
 
   useEffect(() => {
     setProgress(readStoredProgress(date));
@@ -54,39 +100,31 @@ export function usePuzzleProgress(date: string) {
   useEffect(() => {
     if (!date) return;
 
+    const abortController = new AbortController();
     let cancelled = false;
 
-    async function hydrateFromServer() {
-      try {
-        const response = await fetch(`${API_BASE}/puzzles/progress?d=${date}`, {
-          credentials: "include",
-        });
-        if (!response.ok) {
-          if (response.status === 401) {
-            return;
-          }
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const payload = (await response.json()) as ProgressResponse;
-        if (!payload || typeof payload !== "object") {
+    fetchProgressFromServer(abortController.signal)
+      .then((serverProgress) => {
+        if (cancelled || !serverProgress) {
           return;
         }
-        const serverProgress = payload.progress ?? {};
-        if (!cancelled) {
-          setProgress(serverProgress);
-          writeStoredProgress(date, serverProgress);
+        setProgress(serverProgress);
+      })
+      .catch((error: ProgressFetchError) => {
+        if (error?.name === "AbortError") {
+          return;
         }
-      } catch (error) {
+        if (error?.status === 401) {
+          return;
+        }
         console.warn("Failed to hydrate puzzle progress from server", error);
-      }
-    }
-
-    void hydrateFromServer();
+      });
 
     return () => {
       cancelled = true;
+      abortController.abort();
     };
-  }, [date]);
+  }, [date, fetchProgressFromServer]);
 
   const persist = useCallback(
     (updater: (previous: DailyProgress) => DailyProgress) => {
@@ -135,5 +173,36 @@ export function usePuzzleProgress(date: string) {
     [persist, pushUpdate]
   );
 
-  return { progress, recordGame };
+  const refresh = useCallback(async (): Promise<RefreshResult> => {
+    if (!date) {
+      const error = new Error("No date available to refresh progress") as ProgressFetchError;
+      setRefreshError(error);
+      return { success: false, error };
+    }
+
+    setIsRefreshing(true);
+    setRefreshError(null);
+
+    try {
+      const serverProgress = await fetchProgressFromServer();
+      if (!serverProgress) {
+        const error = new Error("No remote progress available") as ProgressFetchError;
+        setRefreshError(error);
+        return { success: false, error };
+      }
+      setProgress(serverProgress);
+      return { success: true, progress: serverProgress };
+    } catch (error) {
+      const normalized =
+        error instanceof Error
+          ? (error as ProgressFetchError)
+          : (new Error(String(error)) as ProgressFetchError);
+      setRefreshError(normalized);
+      return { success: false, error: normalized };
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [date, fetchProgressFromServer]);
+
+  return { progress, recordGame, refresh, isRefreshing, refreshError };
 }
