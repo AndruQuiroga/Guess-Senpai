@@ -14,6 +14,7 @@ interface Props {
   payload: PosterZoomGame;
   progress?: GameProgress;
   onProgressChange: (state: GameProgress) => void;
+  nextSlug?: string | null;
 }
 
 export function PosterZoomedPage({
@@ -22,6 +23,7 @@ export function PosterZoomedPage({
   payload,
   progress,
   onProgressChange,
+  nextSlug,
 }: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
 
@@ -41,6 +43,7 @@ export function PosterZoomedPage({
         registerRoundController={(fn) => {
           controller.current = fn;
         }}
+        nextSlug={nextSlug}
       />
     </GameShell>
   );

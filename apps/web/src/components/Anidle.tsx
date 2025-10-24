@@ -21,6 +21,7 @@ import {
   type ScalarFeedback,
   type ScalarStatus,
 } from "../utils/evaluateAnidleGuess";
+import NextPuzzleButton from "./NextPuzzleButton";
 
 interface Props {
   mediaId: number;
@@ -28,6 +29,7 @@ interface Props {
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
+  nextSlug?: string | null;
 }
 
 const TOTAL_ROUNDS = 3;
@@ -66,6 +68,7 @@ export default function Anidle({
   initialProgress,
   onProgressChange,
   registerRoundController,
+  nextSlug,
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [guess, setGuess] = useState("");
@@ -631,12 +634,15 @@ export default function Anidle({
           </div>
         )}
         {completed && (
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            Nailed it! The answer was{" "}
-            <span className="font-semibold text-emerald-100">
-              {payload.answer}
-            </span>
-            .
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              Nailed it! The answer was{" "}
+              <span className="font-semibold text-emerald-100">
+                {payload.answer}
+              </span>
+              .
+            </div>
+            <NextPuzzleButton nextSlug={nextSlug} />
           </div>
         )}
       </div>

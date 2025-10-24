@@ -13,9 +13,16 @@ interface Props {
   payload: RedactedSynopsisGame;
   progress?: GameProgress;
   onProgressChange: (state: GameProgress) => void;
+  nextSlug?: string | null;
 }
 
-export function RedactedSynopsisPage({ slug, payload, progress, onProgressChange }: Props) {
+export function RedactedSynopsisPage({
+  slug,
+  payload,
+  progress,
+  onProgressChange,
+  nextSlug,
+}: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
 
   return (
@@ -33,6 +40,7 @@ export function RedactedSynopsisPage({ slug, payload, progress, onProgressChange
         registerRoundController={(fn) => {
           controller.current = fn;
         }}
+        nextSlug={nextSlug}
       />
     </GameShell>
   );
