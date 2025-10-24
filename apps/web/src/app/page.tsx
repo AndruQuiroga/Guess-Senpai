@@ -100,7 +100,7 @@ export default function HomePage() {
             Sharpen your encyclopedic knowledge of anime through daily rounds of
             metadata, posters, synopsis reveals, and a dash of musical
             nostalgia. Compete with friends, maintain your streak, and share
-            your victories.
+            downloadable highlight cards that celebrate each win.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
@@ -126,8 +126,8 @@ export default function HomePage() {
             Today&apos;s progress
           </h2>
           <p className="text-sm text-neutral-300">
-            Track your streak and completed games for {formattedDate}. Share
-            your results once you&apos;re done.
+            Track your streak and completed games for {formattedDate}. Share or
+            download a glossy recap card once you&apos;re done.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

@@ -13,7 +13,7 @@ GuessSenpai is a glassy, modern web experience for daily anime guessing challeng
   - **Redacted Synopsis** – masked descriptions that uncloak over rounds.
   - **Guess the Opening** – optional OP/ED audio clips fetched from AnimeThemes.
 - **AniList account management** – secure OAuth login, Redis-backed sessions, and logout/me endpoints.
-- **Streak tracking & sharing** – local streak persistence, Web Share API support, and gradient share banners.
+- **Streak tracking & sharing** – local streak persistence, Web Share API support, and downloadable OG share cards.
 - **Responsive glassmorphism UI** – Tailwind-driven design with aurora backdrops, rounded surfaces, and keyboard shortcuts.
 
 ---
