@@ -131,13 +131,26 @@ export default function PosterZoom({
       .forEach((spec) => {
         spec.hints.forEach((hint) => {
           if (hint === "genres" && payload.meta.genres.length) {
-            hints.push(`Genres: ${payload.meta.genres.join(", ")}`);
+            const cappedGenres = payload.meta.genres.slice(0, 3);
+            cappedGenres.forEach((genre) => {
+              hints.push(`Genre: ${genre}`);
+            });
+            if (payload.meta.genres.length > cappedGenres.length) {
+              hints.push(`Genres: +${payload.meta.genres.length - cappedGenres.length} more`);
+            }
           }
           if (hint === "year" && payload.meta.year) {
             hints.push(`Year: ${payload.meta.year}`);
           }
           if (hint === "format" && payload.meta.format) {
-            hints.push(`Format: ${payload.meta.format}`);
+            const formattedLabel = payload.meta.format
+              .split(/[_\s]+/)
+              .filter(Boolean)
+              .map((segment) =>
+                segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase(),
+              )
+              .join(" ");
+            hints.push(`Format: ${formattedLabel}`);
           }
         });
       });
