@@ -6,7 +6,10 @@ import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { GamePreviewModal } from "../components/GamePreviewModal";
 import { GlassSection } from "../components/GlassSection";
 import { type GameDirectoryEntry } from "../config/games";
-import { useRuntimeGamesDirectory } from "../hooks/useDailyAvailability";
+import {
+  useDailyAvailability,
+  useRuntimeGamesDirectory,
+} from "../hooks/useDailyAvailability";
 import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
@@ -25,6 +28,16 @@ export default function HomePage() {
   const formattedDate = useMemo(() => formatShareDate(todayIso), [todayIso]);
   const { progress } = usePuzzleProgress(todayIso);
   const games = useRuntimeGamesDirectory();
+  const {
+    error: availabilityError,
+    refresh: refreshAvailability,
+    loading: availabilityLoading,
+  } = useDailyAvailability();
+  const showAvailabilityError = availabilityError;
+
+  const handleAvailabilityRetry = useCallback(() => {
+    void refreshAvailability();
+  }, [refreshAvailability]);
 
   const includeGuessTheOpening = useMemo(
     () =>
@@ -168,11 +181,13 @@ export default function HomePage() {
         </div>
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
           {games.map((game) => {
-            const eyebrow = game.playable
-              ? "Available now"
-              : game.comingSoon
-                ? "Coming soon"
-                : "Unavailable";
+            const eyebrow = showAvailabilityError
+              ? "Status unavailable"
+              : game.playable
+                ? "Available now"
+                : game.comingSoon
+                  ? "Coming soon"
+                  : "Unavailable";
             const statusLabel = game.playable ? "Start playing" : "Coming soon";
             const statusClasses = game.playable
               ? "text-brand-200 transition group-hover:text-brand-100 group-focus-visible:text-brand-50"
@@ -225,11 +240,37 @@ export default function HomePage() {
                       className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
                       viewBox="0 0 20 20"
                       fill="currentColor"
+                {showAvailabilityError ? (
+                  <div className="relative z-10 mt-6 flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
+                      ⚠️ Unable to load today&apos;s availability
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAvailabilityRetry}
+                      disabled={availabilityLoading}
+                      className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
                     >
-                      <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
-                    </svg>
-                  ) : null}
-                </span>
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    className={`relative z-10 mt-6 inline-flex items-center gap-2 text-sm font-semibold ${statusClasses}`}
+                  >
+                    {statusLabel}
+                    {game.playable ? (
+                      <svg
+                        aria-hidden
+                        className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
+                      </svg>
+                    ) : null}
+                  </span>
+                )}
               </>
             );
 
