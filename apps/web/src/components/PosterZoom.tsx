@@ -88,10 +88,14 @@ export default function PosterZoom({
 
   const fallbackZoom = useMemo(() => {
     if (completed) return 1;
-    if (round === 1) return 1.35;
-    if (round === 2) return 1.15;
-    return 1;
-  }, [completed, round]);
+    const initialScale = 1.35;
+    if (totalRounds <= 1) {
+      return 1;
+    }
+    const clampedRound = Math.max(1, Math.min(totalRounds, round));
+    const progress = (clampedRound - 1) / (totalRounds - 1);
+    return initialScale + (1 - initialScale) * progress;
+  }, [completed, round, totalRounds]);
 
   const activeCropStage = useMemo(() => {
     if (!cropStages.length) {
