@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -59,6 +59,19 @@ class TitleSuggestion(BaseModel):
 
 class TitleSuggestionResponse(BaseModel):
     results: list[TitleSuggestion]
+
+
+class ArchiveIndexResponse(BaseModel):
+    dates: list[str]
+
+
+def _generate_archive_dates(history_days: int) -> list[str]:
+    today = date.today()
+    total_days = max(history_days, 0)
+    return [
+        (today - timedelta(days=offset)).isoformat()
+        for offset in range(total_days)
+    ]
 
 
 @router.get(
@@ -134,3 +147,9 @@ async def search_titles(
         if resolved:
             results.append(TitleSuggestion(id=item.id, title=resolved))
     return TitleSuggestionResponse(results=results)
+
+
+@router.get("/archive", response_model=ArchiveIndexResponse)
+async def get_archive_dates() -> ArchiveIndexResponse:
+    dates = _generate_archive_dates(settings.puzzle_history_days)
+    return ArchiveIndexResponse(dates=dates)
