@@ -78,3 +78,19 @@ class DailyPuzzleResponse(BaseModel):
     date: date
     mediaId: int
     games: GamesPayload
+
+
+class GameProgressPayload(BaseModel):
+    completed: bool = False
+    round: int = 1
+    guesses: List[str] = Field(default_factory=list)
+
+
+class DailyProgressPayload(BaseModel):
+    date: date
+    progress: Dict[str, GameProgressPayload] = Field(default_factory=dict)
+
+
+class StreakPayload(BaseModel):
+    count: int = 0
+    last_completed: Optional[date] = None

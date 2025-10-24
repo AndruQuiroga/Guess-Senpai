@@ -3,12 +3,18 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..core.config import settings
 from ..puzzles.engine import UserContext, get_daily_puzzle
-from ..puzzles.models import DailyPuzzleResponse
-from ..services.session import get_session_manager
+from ..puzzles.models import DailyProgressPayload, DailyPuzzleResponse, StreakPayload
+from ..services.progress import (
+    load_daily_progress,
+    load_streak,
+    merge_daily_progress,
+    store_streak,
+)
+from ..services.session import SessionData, get_session_manager
 
 router = APIRouter()
 
@@ -33,6 +39,17 @@ async def _resolve_user_context(request: Request) -> Optional[UserContext]:
     return UserContext(user_id=session.user_id, username=session.username, access_token=session.access_token)
 
 
+async def _require_session(request: Request) -> SessionData:
+    session_token = request.cookies.get("guesssenpai_session")
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    manager = await get_session_manager()
+    session = await manager.get_session(session_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return session
+
+
 @router.get(
     "/today",
     response_model=DailyPuzzleResponse,
@@ -50,3 +67,28 @@ async def get_today_puzzles(
         include_guess_opening=settings.animethemes_enabled,
     )
     return puzzles
+
+
+@router.get("/progress", response_model=DailyProgressPayload)
+async def get_progress(request: Request, d: Optional[str] = Query(default=None)) -> DailyProgressPayload:
+    session = await _require_session(request)
+    day = _parse_date(d)
+    return await load_daily_progress(session.user_id, day)
+
+
+@router.put("/progress", response_model=DailyProgressPayload)
+async def put_progress(request: Request, payload: DailyProgressPayload) -> DailyProgressPayload:
+    session = await _require_session(request)
+    return await merge_daily_progress(session.user_id, payload)
+
+
+@router.get("/streak", response_model=StreakPayload)
+async def get_streak(request: Request) -> StreakPayload:
+    session = await _require_session(request)
+    return await load_streak(session.user_id)
+
+
+@router.put("/streak", response_model=StreakPayload)
+async def put_streak(request: Request, payload: StreakPayload) -> StreakPayload:
+    session = await _require_session(request)
+    return await store_streak(session.user_id, payload)
