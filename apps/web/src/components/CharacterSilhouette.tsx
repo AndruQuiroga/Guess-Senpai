@@ -136,6 +136,27 @@ export default function CharacterSilhouette({
     setRound((prev) => clampRound(prev + 1, totalRounds));
   }, [totalRounds]);
 
+  const normalizeText = useCallback((input: string) => {
+    const trimmed = input.trim().toLowerCase();
+    const withoutDiacritics = trimmed.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return {
+      base: trimmed,
+      stripped: withoutDiacritics,
+    };
+  }, []);
+
+  const normalizedCharacterNames = useMemo(() => {
+    const variants = new Set<string>();
+    const { base, stripped } = normalizeText(payload.character.name);
+    if (base) {
+      variants.add(base);
+    }
+    if (stripped) {
+      variants.add(stripped);
+    }
+    return Array.from(variants);
+  }, [normalizeText, payload.character.name]);
+
   const handleGuessSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -154,6 +175,23 @@ export default function CharacterSilhouette({
       setFeedback(null);
 
       try {
+        const normalizedGuess = normalizeText(value);
+        const directMatch =
+          normalizedCharacterNames.includes(normalizedGuess.base) ||
+          normalizedCharacterNames.includes(normalizedGuess.stripped);
+
+        if (directMatch) {
+          setGuesses((prev) => [...prev, value]);
+          setCompleted(true);
+          setRound(totalRounds);
+          setFeedback({
+            type: "success",
+            message: `Silhouette solved! ${payload.answer}`,
+          });
+          setGuess("");
+          return;
+        }
+
         const result = await verifyGuess(mediaId, value);
         setGuesses((prev) => [...prev, value]);
         if (result.correct) {
@@ -181,7 +219,16 @@ export default function CharacterSilhouette({
         setSubmitting(false);
       }
     },
-    [completed, submitting, guess, mediaId, payload.answer, totalRounds],
+    [
+      completed,
+      submitting,
+      guess,
+      mediaId,
+      normalizedCharacterNames,
+      normalizeText,
+      payload.answer,
+      totalRounds,
+    ],
   );
 
   const revealLabel = completed
