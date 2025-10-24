@@ -1,22 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { GAMES_DIRECTORY } from "../config/games";
 import { GameKey, usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
-import { DailyPuzzleResponse } from "../types/puzzles";
+import { DailyPuzzleResponse, GamesPayload } from "../types/puzzles";
 import { buildShareText, formatShareDate } from "../utils/shareText";
-import {
-  AnidlePage,
-  GuessOpeningPage,
-  PosterZoomedPage,
-  RedactedSynopsisPage,
-} from "./puzzle-pages";
+import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
 
 interface Props {
   data: DailyPuzzleResponse | null;
 }
+
+type GamePayloadRecord = Partial<
+  Record<GameKey, GamesPayload[keyof GamesPayload] | null>
+>;
 
 export default function Daily({ data }: Props) {
   if (!data) {
@@ -29,7 +30,7 @@ export default function Daily({ data }: Props) {
     );
   }
 
-  const { progress, recordGame } = usePuzzleProgress(data.date);
+  const { progress } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
@@ -37,14 +38,42 @@ export default function Daily({ data }: Props) {
   const includeGuessTheOpening = data.guess_the_opening_enabled;
   const guessOpeningPayload = data.games.guess_the_opening;
 
-  const requiredGames: GameKey[] = [
-    "anidle",
-    "poster_zoomed",
-    "redacted_synopsis",
-  ];
-  if (includeGuessTheOpening) {
-    requiredGames.push("guess_the_opening");
-  }
+  const payloadByKey = useMemo<GamePayloadRecord>(
+    () => ({
+      anidle: data.games.anidle,
+      poster_zoomed: data.games.poster_zoomed,
+      redacted_synopsis: data.games.redacted_synopsis,
+      guess_the_opening:
+        includeGuessTheOpening && guessOpeningPayload
+          ? guessOpeningPayload
+          : null,
+    }),
+    [
+      data.games.anidle,
+      data.games.poster_zoomed,
+      data.games.redacted_synopsis,
+      guessOpeningPayload,
+      includeGuessTheOpening,
+    ],
+  );
+
+  const availableGames = useMemo(
+    () =>
+      GAMES_DIRECTORY.filter((entry) => {
+        if (!entry.gameKey) {
+          return false;
+        }
+        if (entry.gameKey === "guess_the_opening" && !includeGuessTheOpening) {
+          return false;
+        }
+        return Boolean(payloadByKey[entry.gameKey]);
+      }),
+    [includeGuessTheOpening, payloadByKey],
+  );
+
+  const requiredGames: GameKey[] = availableGames
+    .map((entry) => entry.gameKey)
+    .filter((key): key is GameKey => Boolean(key));
 
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
   const streak = useStreak(data.date, allCompleted);
@@ -234,37 +263,109 @@ export default function Daily({ data }: Props) {
         )}
       </header>
 
-      <AnidlePage
-        slug="anidle"
-        payload={data.games.anidle}
-        progress={progress.anidle}
-        onProgressChange={(state) => recordGame("anidle", state)}
-      />
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-xl font-display font-semibold tracking-tight text-white">
+            Today&apos;s puzzles
+          </h2>
+          <p className="text-sm text-neutral-300/90">
+            Work through each challenge below. You can play, pause, and resume
+            puzzles individually from their dedicated pages.
+          </p>
+        </div>
 
-      <PosterZoomedPage
-        slug="poster-zoomed"
-        mediaId={data.mediaId}
-        payload={data.games.poster_zoomed}
-        progress={progress.poster_zoomed}
-        onProgressChange={(state) => recordGame("poster_zoomed", state)}
-      />
+        {availableGames.length > 0 ? (
+          <div className="grid gap-5 lg:grid-cols-2">
+            {availableGames.map((game) => {
+              const key = game.gameKey;
+              const progressForGame = key ? progress[key] : undefined;
+              const completed = Boolean(progressForGame?.completed);
+              const inProgress = Boolean(
+                progressForGame &&
+                  !progressForGame.completed &&
+                  progressForGame.round > 0,
+              );
+              const statusLabel = completed
+                ? "Completed"
+                : inProgress
+                  ? "In progress"
+                  : "Not started";
+              const statusTone = completed
+                ? "text-emerald-200"
+                : inProgress
+                  ? "text-amber-200"
+                  : "text-neutral-300";
+              const ctaLabel = completed
+                ? "Replay"
+                : inProgress
+                  ? "Resume"
+                  : "Play now";
 
-      <RedactedSynopsisPage
-        slug="redacted-synopsis"
-        payload={data.games.redacted_synopsis}
-        progress={progress.redacted_synopsis}
-        onProgressChange={(state) => recordGame("redacted_synopsis", state)}
-      />
+              return (
+                <GlassSection
+                  key={game.slug}
+                  className="group relative overflow-hidden border-white/10 bg-surface-raised/80"
+                  innerClassName="relative flex h-full flex-col gap-5"
+                >
+                  <div
+                    aria-hidden
+                    className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${game.accentColor} opacity-10 transition duration-500 group-hover:opacity-25`}
+                  />
 
-      {includeGuessTheOpening && guessOpeningPayload && (
-        <GuessOpeningPage
-          slug="guess-the-opening"
-          mediaId={data.mediaId}
-          payload={guessOpeningPayload}
-          progress={progress.guess_the_opening}
-          onProgressChange={(state) => recordGame("guess_the_opening", state)}
-        />
-      )}
+                  <div className="relative z-10 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.28em] text-neutral-300">
+                      <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[0.6rem] text-neutral-200/90">
+                        Daily puzzle
+                      </span>
+                      <span className={statusTone}>{statusLabel}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+                        {game.title}
+                      </h2>
+                      {game.description ? (
+                        <p className="text-sm leading-relaxed text-neutral-200/90">
+                          {game.description}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 mt-auto flex flex-wrap items-center justify-between gap-3 pt-2 text-sm">
+                    <div className="text-xs uppercase tracking-[0.3em] text-neutral-400">
+                      {completed
+                        ? "Great job!"
+                        : inProgress
+                          ? "Progress saved"
+                          : "Ready when you are"}
+                    </div>
+
+                    <Link
+                      href={`/games/${game.slug}`}
+                      className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    >
+                      {ctaLabel}
+                    </Link>
+                  </div>
+                </GlassSection>
+              );
+            })}
+          </div>
+        ) : (
+          <GlassSection
+            className="border-dashed border-white/10 bg-surface-raised/50"
+            innerClassName="space-y-2 text-center"
+          >
+            <p className="text-sm font-medium text-white/90">
+              No daily puzzles are available right now.
+            </p>
+            <p className="text-xs text-neutral-300/80">
+              Check back soon for fresh challenges.
+            </p>
+          </GlassSection>
+        )}
+      </section>
 
       {allCompleted && data.solution && (
         <SolutionReveal solution={data.solution} />
