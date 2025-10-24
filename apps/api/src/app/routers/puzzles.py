@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from ..core.config import settings
 from ..puzzles import engine as puzzle_engine
-from ..puzzles.engine import UserContext, get_daily_puzzle
+from ..puzzles.engine import UserContext, _title_variants, get_daily_puzzle
 from ..puzzles.models import (
     DailyProgressPayload,
     DailyPuzzleResponse,
@@ -73,6 +73,16 @@ class TitleSuggestionResponse(BaseModel):
 
 class ArchiveIndexResponse(BaseModel):
     dates: list[str]
+
+
+class GuessVerificationPayload(BaseModel):
+    media_id: int
+    guess: str
+
+
+class GuessVerificationResponse(BaseModel):
+    correct: bool
+    match: Optional[str] = None
 
 
 def _generate_archive_dates(history_days: int) -> list[str]:
@@ -167,6 +177,32 @@ async def get_stats(request: Request) -> PuzzleStatsPayload:
         recent_media_ids=recent_ids,
         recent_media=recent_media,
     )
+
+
+@router.post("/verify", response_model=GuessVerificationResponse)
+async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationResponse:
+    guess = payload.guess.strip()
+    if not guess:
+        raise HTTPException(status_code=400, detail="Guess cannot be empty")
+
+    cache = await get_cache(settings.redis_url)
+    try:
+        media = await puzzle_engine._load_media_details(payload.media_id, cache, settings)
+    except Exception as exc:  # pragma: no cover - defensive catch for upstream failures
+        raise HTTPException(status_code=404, detail="Media not found") from exc
+
+    def _normalize(value: str) -> str:
+        return " ".join(value.split()).casefold()
+
+    variants = _title_variants(media)
+    normalized_guess = _normalize(guess)
+    match = None
+    for variant in variants:
+        if variant and _normalize(variant) == normalized_guess:
+            match = variant
+            break
+
+    return GuessVerificationResponse(correct=match is not None, match=match)
 
 
 @router.get("/search-titles", response_model=TitleSuggestionResponse)

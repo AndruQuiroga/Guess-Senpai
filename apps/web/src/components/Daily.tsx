@@ -119,7 +119,9 @@ export default function Daily({ data }: Props) {
     streak,
   ]);
 
-  const shareButtonLabel = supportsFileShare ? "Share Progress" : "Download card";
+  const shareButtonLabel = supportsFileShare
+    ? "Share Progress"
+    : "Download card";
 
   const handleShare = useCallback(async () => {
     try {
@@ -138,7 +140,9 @@ export default function Daily({ data }: Props) {
       const fileName = `guesssenpai-${data.date}-share.png`;
 
       if (supportsFileShare && navigator.share) {
-        const file = new File([blob], fileName, { type: blob.type || "image/png" });
+        const file = new File([blob], fileName, {
+          type: blob.type || "image/png",
+        });
         const shareData: ShareData = {
           files: [file],
           text: shareText,
@@ -167,12 +171,7 @@ export default function Daily({ data }: Props) {
     } finally {
       setIsGeneratingCard(false);
     }
-  }, [
-    data.date,
-    shareCardPayload,
-    shareText,
-    supportsFileShare,
-  ]);
+  }, [data.date, shareCardPayload, shareText, supportsFileShare]);
 
   useEffect(() => {
     if (!shareStatus) return;
@@ -244,6 +243,7 @@ export default function Daily({ data }: Props) {
 
       <PosterZoomedPage
         slug="poster-zoomed"
+        mediaId={data.mediaId}
         payload={data.games.poster_zoomed}
         progress={progress.poster_zoomed}
         onProgressChange={(state) => recordGame("poster_zoomed", state)}
@@ -259,13 +259,16 @@ export default function Daily({ data }: Props) {
       {includeGuessTheOpening && guessOpeningPayload && (
         <GuessOpeningPage
           slug="guess-the-opening"
+          mediaId={data.mediaId}
           payload={guessOpeningPayload}
           progress={progress.guess_the_opening}
           onProgressChange={(state) => recordGame("guess_the_opening", state)}
         />
       )}
 
-      {allCompleted && data.solution && <SolutionReveal solution={data.solution} />}
+      {allCompleted && data.solution && (
+        <SolutionReveal solution={data.solution} />
+      )}
     </div>
   );
 }
