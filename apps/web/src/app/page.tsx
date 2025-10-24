@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { GamePreviewModal } from "../components/GamePreviewModal";
 import { GlassSection } from "../components/GlassSection";
@@ -40,7 +40,10 @@ export default function HomePage() {
   }, [refreshAvailability]);
 
   const includeGuessTheOpening = useMemo(
-    () => games.some((entry) => entry.slug === "guess-the-opening" && entry.playable),
+    () =>
+      games.some(
+        (entry) => entry.slug === "guess-the-opening" && entry.playable,
+      ),
     [games],
   );
   const baseKeys: GameKey[] = ["anidle", "poster_zoomed", "redacted_synopsis"];
@@ -64,7 +67,9 @@ export default function HomePage() {
   );
 
   const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const [previewGame, setPreviewGame] = useState<GameDirectoryEntry | null>(null);
+  const [previewGame, setPreviewGame] = useState<GameDirectoryEntry | null>(
+    null,
+  );
 
   const handleShare = useCallback(async () => {
     try {
@@ -185,15 +190,15 @@ export default function HomePage() {
                   : "Unavailable";
             const statusLabel = game.playable ? "Start playing" : "Coming soon";
             const statusClasses = game.playable
-              ? "text-brand-200 transition group-hover:text-brand-100"
+              ? "text-brand-200 transition group-hover:text-brand-100 group-focus-visible:text-brand-50"
               : "text-neutral-300";
             const overlayClasses = game.playable
-              ? "opacity-0 transition group-hover:opacity-100"
+              ? "opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100"
               : "opacity-80 transition";
-            const cardClasses = `group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition ${
+            const cardClasses = `group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
               game.playable
-                ? "hover:border-brand-400/50 hover:shadow-[0_0_40px_rgba(59,130,246,0.35)]"
-                : "opacity-70"
+                ? "hover:border-brand-400/50 hover:shadow-[0_0_40px_rgba(59,130,246,0.35)] focus-visible:outline-white/80"
+                : "opacity-70 focus-visible:outline-white/60"
             }`;
 
             const progressForGame = game.gameKey
@@ -203,7 +208,11 @@ export default function HomePage() {
               progressForGame && !progressForGame.completed,
             );
 
-            const handleCardClick = () => handleOpenPreview(game);
+            const handlePreviewClick = (event?: MouseEvent<HTMLElement>) => {
+              event?.preventDefault();
+              event?.stopPropagation();
+              handleOpenPreview(game);
+            };
 
             const content = (
               <>
@@ -221,6 +230,16 @@ export default function HomePage() {
                     {game.tagline}
                   </p>
                 </div>
+                <span
+                  className={`relative z-10 mt-6 inline-flex items-center gap-2 text-sm font-semibold ${statusClasses}`}
+                >
+                  {statusLabel}
+                  {game.playable ? (
+                    <svg
+                      aria-hidden
+                      className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
                 {showAvailabilityError ? (
                   <div className="relative z-10 mt-6 flex flex-wrap items-center gap-3">
                     <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
@@ -257,13 +276,44 @@ export default function HomePage() {
 
             return (
               <div key={game.slug} className="flex h-full flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={handleCardClick}
-                  className={`${cardClasses} flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80`}
-                >
-                  {content}
-                </button>
+                <div className="relative">
+                  {game.playable ? (
+                    <Link
+                      href={`/games/${game.slug}`}
+                      className={`${cardClasses} flex-1 text-left`}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handlePreviewClick}
+                      className={`${cardClasses} flex-1 text-left`}
+                    >
+                      {content}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handlePreviewClick}
+                    aria-label={`Preview ${game.title}`}
+                    className="absolute right-4 top-4 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/40 p-2 text-white transition hover:border-white/40 hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                  >
+                    <svg
+                      aria-hidden
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
                 {game.playable && canResume ? (
                   <Link
                     href={`/games/${game.slug}`}
