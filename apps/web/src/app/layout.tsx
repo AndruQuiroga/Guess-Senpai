@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import AccountBadge from "../components/AccountBadge";
+import SessionRefresher from "../components/SessionRefresher";
 import NavLink from "../components/NavLink";
 import "../styles/globals.css";
 
@@ -10,6 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body className="relative min-h-screen text-neutral-100 antialiased selection:bg-brand-500/40 selection:text-white">
+        <SessionRefresher />
         <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_-10%,rgba(59,130,246,0.25),transparent_60%),radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.18),transparent_60%),radial-gradient(circle_at_50%_100%,rgba(236,72,153,0.12),transparent_70%)] opacity-70 blur-[140px]" />
         </div>

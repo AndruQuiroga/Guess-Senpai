@@ -95,6 +95,65 @@ async def logout(request: Request) -> JSONResponse:
     response = JSONResponse({"ok": True})
     response.delete_cookie("guesssenpai_session")
     return response
+
+
+REFRESH_THRESHOLD_SECONDS = 5 * 60
+
+
+@router.post("/refresh")
+async def refresh(request: Request) -> JSONResponse:
+    _require_oauth_config()
+    session_cookie = request.cookies.get("guesssenpai_session")
+    if not session_cookie:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    manager = await get_session_manager()
+    session = await manager.get_session(session_cookie)
+    if not session or not session.session_id:
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    now = time.time()
+    if session.refresh_expires_at and session.refresh_expires_at <= now:
+        await manager.revoke_session(session_cookie)
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+
+    time_remaining = session.expires_at - now
+    if time_remaining > REFRESH_THRESHOLD_SECONDS:
+        return JSONResponse({"refreshed": False, "expiresAt": session.expires_at})
+
+    if not session.refresh_token:
+        raise HTTPException(status_code=400, detail="Session cannot be refreshed")
+
+    token_response = await anilist.refresh_access_token(
+        refresh_token=session.refresh_token,
+        client_id=settings.anilist_client_id,
+        client_secret=settings.anilist_client_secret,
+    )
+
+    new_expires_at = now + token_response.expires_in
+    refresh_token_value = token_response.refresh_token or session.refresh_token
+
+    updated_session = await manager.update_session_tokens(
+        session.session_id,
+        access_token=token_response.access_token,
+        expires_at=new_expires_at,
+        refresh_token=refresh_token_value,
+        refresh_expires_at=session.refresh_expires_at,
+    )
+    if not updated_session:
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    response = JSONResponse({"refreshed": True, "expiresAt": updated_session.expires_at})
+    max_age = int(max(updated_session.expires_at - time.time(), 1))
+    response.set_cookie(
+        "guesssenpai_session",
+        session_cookie,
+        secure=False,
+        httponly=True,
+        samesite="lax",
+        max_age=max_age,
+    )
+    return response
 @router.get("/me")
 async def current_user(request: Request) -> JSONResponse:
     session_cookie = request.cookies.get("guesssenpai_session")

@@ -5,9 +5,9 @@ import hashlib
 import secrets
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from itsdangerous import BadSignature, URLSafeSerializer
 from sqlalchemy import select
@@ -19,6 +19,7 @@ from ..db import models
 from .cache import CacheBackend, get_cache
 
 STATE_PREFIX = "guesssenpai:auth:state:"
+SESSION_PREFIX = "guesssenpai:auth:session:"
 
 
 @dataclass
@@ -54,6 +55,50 @@ class SessionManager:
         self.cache = cache
         self.session_factory = get_session_factory()
         self._hash_secret = secret
+
+    def _session_cache_key(self, session_id: str) -> str:
+        return f"{SESSION_PREFIX}{session_id}"
+
+    def _serialize_session(self, session: SessionData) -> Dict[str, Any]:
+        payload = asdict(session)
+        # Cache entries shouldn't include internal fields that can change shape unexpectedly.
+        return {
+            "user_id": payload["user_id"],
+            "username": payload["username"],
+            "avatar": payload["avatar"],
+            "access_token": payload["access_token"],
+            "expires_at": payload["expires_at"],
+            "created_at": payload["created_at"],
+            "refresh_token": payload.get("refresh_token"),
+            "refresh_expires_at": payload.get("refresh_expires_at"),
+            "session_id": payload.get("session_id"),
+        }
+
+    def _deserialize_session(self, payload: Dict[str, Any]) -> Optional[SessionData]:
+        try:
+            return SessionData(
+                user_id=int(payload["user_id"]),
+                username=payload.get("username"),
+                avatar=payload.get("avatar"),
+                access_token=str(payload["access_token"]),
+                expires_at=float(payload["expires_at"]),
+                created_at=float(payload["created_at"]),
+                refresh_token=payload.get("refresh_token"),
+                refresh_expires_at=(
+                    float(payload["refresh_expires_at"])
+                    if payload.get("refresh_expires_at") is not None
+                    else None
+                ),
+                session_id=str(payload.get("session_id")) if payload.get("session_id") else None,
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    async def _cache_session(self, session: SessionData) -> None:
+        if not session.session_id:
+            return
+        ttl = int(max(session.expires_at - time.time(), 1))
+        await self.cache.set(self._session_cache_key(session.session_id), self._serialize_session(session), ttl=ttl)
 
     async def issue_state(self, redirect_to: Optional[str]) -> str:
         state_id = secrets.token_urlsafe(16)
@@ -132,6 +177,7 @@ class SessionManager:
                 await db_session.rollback()
                 raise
         session.session_id = session_id
+        await self._cache_session(session)
         return signed
 
     async def get_session(self, signed_session_id: str) -> Optional[SessionData]:
@@ -144,6 +190,14 @@ class SessionManager:
         return await self.get_session_by_id(session_id)
 
     async def get_session_by_id(self, session_id: str) -> Optional[SessionData]:
+        cache_key = self._session_cache_key(session_id)
+        cached_payload = await self.cache.get(cache_key)
+        if isinstance(cached_payload, dict):
+            cached_session = self._deserialize_session(cached_payload)
+            if cached_session and cached_session.expires_at > time.time():
+                return cached_session
+            await self.cache.set(cache_key, None)
+
         session_factory = self.session_factory
         async with session_factory() as db_session:
             try:
@@ -188,7 +242,67 @@ class SessionManager:
                     ),
                 )
                 await db_session.commit()
+                await self._cache_session(data)
                 return data
+            except Exception:
+                await db_session.rollback()
+                raise
+
+    async def update_session_tokens(
+        self,
+        session_id: str,
+        *,
+        access_token: str,
+        expires_at: float,
+        refresh_token: Optional[str],
+        refresh_expires_at: Optional[float] = None,
+    ) -> Optional[SessionData]:
+        session_factory = self.session_factory
+        async with session_factory() as db_session:
+            try:
+                result = await db_session.execute(
+                    select(models.Session)
+                    .options(selectinload(models.Session.user))
+                    .where(models.Session.id == session_id)
+                )
+                stored_session = result.scalar_one_or_none()
+                if stored_session is None or stored_session.revoked_at is not None:
+                    await db_session.commit()
+                    return None
+
+                user = stored_session.user
+                if user is None:
+                    await db_session.commit()
+                    return None
+
+                access_expires_at = datetime.fromtimestamp(expires_at, tz=timezone.utc)
+                refresh_expires_dt = (
+                    datetime.fromtimestamp(refresh_expires_at, tz=timezone.utc)
+                    if refresh_expires_at
+                    else None
+                )
+
+                stored_session.expires_at = access_expires_at
+                user.access_token = access_token
+                user.access_token_expires_at = access_expires_at
+                user.refresh_token = refresh_token
+                user.refresh_token_expires_at = refresh_expires_dt
+
+                await db_session.commit()
+
+                updated = SessionData(
+                    session_id=session_id,
+                    user_id=user.id,
+                    username=user.username,
+                    avatar=user.avatar,
+                    access_token=access_token,
+                    expires_at=expires_at,
+                    created_at=stored_session.issued_at.timestamp(),
+                    refresh_token=refresh_token,
+                    refresh_expires_at=refresh_expires_at,
+                )
+                await self._cache_session(updated)
+                return updated
             except Exception:
                 await db_session.rollback()
                 raise
@@ -215,6 +329,7 @@ class SessionManager:
                     return
                 stored_session.revoked_at = datetime.now(timezone.utc)
                 await db_session.commit()
+                await self.cache.set(self._session_cache_key(session_id), None)
             except Exception:
                 await db_session.rollback()
                 raise

@@ -317,3 +317,21 @@ async def exchange_code_for_token(
         response = await client.post(f"{ANILIST_AUTH_BASE}/token", json=payload)
         response.raise_for_status()
         return TokenResponse.model_validate(response.json())
+
+
+async def refresh_access_token(
+    *,
+    refresh_token: str,
+    client_id: str,
+    client_secret: str,
+) -> TokenResponse:
+    payload = {
+        "grant_type": "refresh_token",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token,
+    }
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.post(f"{ANILIST_AUTH_BASE}/token", json=payload)
+        response.raise_for_status()
+        return TokenResponse.model_validate(response.json())
