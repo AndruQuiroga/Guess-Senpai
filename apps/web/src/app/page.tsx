@@ -35,6 +35,24 @@ export default function HomePage() {
   } = useDailyAvailability();
   const showAvailabilityError = availabilityError;
 
+  const nextIncompleteGame = useMemo(() => {
+    for (const game of games) {
+      if (!game.playable || !game.gameKey) {
+        continue;
+      }
+
+      const gameProgress = progress[game.gameKey];
+
+      if (!gameProgress?.completed) {
+        return { slug: game.slug, title: game.title };
+      }
+    }
+
+    return null;
+  }, [games, progress]);
+
+  const hasIncompleteGame = Boolean(nextIncompleteGame);
+
   const handleAvailabilityRetry = useCallback(() => {
     void refreshAvailability();
   }, [refreshAvailability]);
@@ -127,10 +145,16 @@ export default function HomePage() {
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
-              href="/games/daily"
+              href={
+                hasIncompleteGame && nextIncompleteGame
+                  ? `/games/${nextIncompleteGame.slug}`
+                  : "/games/daily"
+              }
               className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-6 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_28px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
             >
-              Play today&apos;s puzzles
+              {hasIncompleteGame
+                ? "Continue today’s run"
+                : "Play today's puzzles"}
             </Link>
             <Link
               href="/how-to-play"
@@ -139,6 +163,11 @@ export default function HomePage() {
               Learn the rules
             </Link>
           </div>
+          {hasIncompleteGame ? (
+            <p className="text-sm text-neutral-200/90">
+              You left off on {nextIncompleteGame?.title}
+            </p>
+          ) : null}
         </div>
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-brand-500/40 via-purple-500/20 to-transparent blur-3xl sm:block" />
       </section>
@@ -245,6 +274,11 @@ export default function HomePage() {
                       className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
                       viewBox="0 0 20 20"
                       fill="currentColor"
+                    >
+                      <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
+                    </svg>
+                  ) : null}
+                </span>
                 {showAvailabilityError ? (
                   <div className="relative z-10 mt-6 flex flex-wrap items-center gap-3">
                     <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
