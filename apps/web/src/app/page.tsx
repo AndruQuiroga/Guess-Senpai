@@ -301,8 +301,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={handlePreviewClick}
-                    aria-label={`Preview ${game.title}`}
-                    className="absolute right-4 top-4 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/40 p-2 text-white transition hover:border-white/40 hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    className="absolute right-4 top-4 inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-black/40 px-4 text-sm font-semibold text-white/90 shadow-ambient backdrop-blur transition hover:border-white/40 hover:bg-black/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                   >
                     <svg
                       aria-hidden
@@ -317,6 +316,7 @@ export default function HomePage() {
                       <path d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
+                    Preview game
                   </button>
                 </div>
                 {game.playable && canResume ? (
