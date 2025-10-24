@@ -6,7 +6,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GAMES_DIRECTORY } from "../config/games";
 import { GameKey, usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
-import { DailyPuzzleResponse, GamesPayload } from "../types/puzzles";
+import {
+  DailyPuzzleResponse,
+  GamesPayload,
+  SolutionPayload,
+} from "../types/puzzles";
 import { buildShareText, formatShareDate } from "../utils/shareText";
 import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
@@ -36,26 +40,98 @@ export default function Daily({ data }: Props) {
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   const [supportsFileShare, setSupportsFileShare] = useState(false);
   const includeGuessTheOpening = data.guess_the_opening_enabled;
-  const guessOpeningPayload = data.games.guess_the_opening;
+  const anidleBundle = data.games.anidle;
+  const posterBundle = data.games.poster_zoomed;
+  const synopsisBundle = data.games.redacted_synopsis;
+  const guessOpeningBundle = data.games.guess_the_opening ?? null;
 
-  const payloadByKey = useMemo<GamePayloadRecord>(
+  const bundleByKey = useMemo<GamePayloadRecord>(
     () => ({
-      anidle: data.games.anidle,
-      poster_zoomed: data.games.poster_zoomed,
-      redacted_synopsis: data.games.redacted_synopsis,
+      anidle: anidleBundle,
+      poster_zoomed: posterBundle,
+      redacted_synopsis: synopsisBundle,
       guess_the_opening:
-        includeGuessTheOpening && guessOpeningPayload
-          ? guessOpeningPayload
-          : null,
+        includeGuessTheOpening && guessOpeningBundle ? guessOpeningBundle : null,
     }),
     [
-      data.games.anidle,
-      data.games.poster_zoomed,
-      data.games.redacted_synopsis,
-      guessOpeningPayload,
+      anidleBundle,
+      posterBundle,
+      synopsisBundle,
+      guessOpeningBundle,
       includeGuessTheOpening,
     ],
   );
+
+  const solutions = useMemo<SolutionPayload[]>(() => {
+    const entries: SolutionPayload[] = [];
+    const seen = new Set<string>();
+    const append = (solution: SolutionPayload | null | undefined) => {
+      if (!solution) return;
+      const key = solution.aniListUrl ?? "";
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push(solution);
+    };
+    append(anidleBundle?.solution ?? null);
+    append(posterBundle?.solution ?? null);
+    append(synopsisBundle?.solution ?? null);
+    if (includeGuessTheOpening) {
+      append(guessOpeningBundle?.solution ?? null);
+    }
+    return entries;
+  }, [
+    anidleBundle,
+    posterBundle,
+    synopsisBundle,
+    includeGuessTheOpening,
+    guessOpeningBundle,
+  ]);
+
+  const solutionUrls = useMemo(
+    () => solutions.map((solution) => solution.aniListUrl),
+    [solutions],
+  );
+
+  const primarySolution = useMemo<SolutionPayload | null>(() => {
+    if (anidleBundle) return anidleBundle.solution;
+    if (posterBundle) return posterBundle.solution;
+    if (synopsisBundle) return synopsisBundle.solution;
+    if (includeGuessTheOpening && guessOpeningBundle) {
+      return guessOpeningBundle.solution;
+    }
+    return null;
+  }, [
+    anidleBundle,
+    posterBundle,
+    synopsisBundle,
+    includeGuessTheOpening,
+    guessOpeningBundle,
+  ]);
+
+  const mediaIdLabel = useMemo(() => {
+    const ids = [
+      anidleBundle?.mediaId ?? null,
+      posterBundle?.mediaId ?? null,
+      synopsisBundle?.mediaId ?? null,
+      includeGuessTheOpening && guessOpeningBundle
+        ? guessOpeningBundle.mediaId
+        : null,
+    ].filter((value): value is number => typeof value === "number");
+    if (ids.length === 0) {
+      return null;
+    }
+    const uniqueIds = Array.from(new Set(ids));
+    if (uniqueIds.length === 1) {
+      return `Media #${uniqueIds[0]}`;
+    }
+    return `Media IDs: ${uniqueIds.map((id) => `#${id}`).join(" · ")}`;
+  }, [
+    anidleBundle,
+    posterBundle,
+    synopsisBundle,
+    includeGuessTheOpening,
+    guessOpeningBundle,
+  ]);
 
   const availableGames = useMemo(
     () =>
@@ -66,9 +142,9 @@ export default function Daily({ data }: Props) {
         if (entry.gameKey === "guess_the_opening" && !includeGuessTheOpening) {
           return false;
         }
-        return Boolean(payloadByKey[entry.gameKey]);
+        return Boolean(bundleByKey[entry.gameKey]);
       }),
-    [includeGuessTheOpening, payloadByKey],
+    [includeGuessTheOpening, bundleByKey],
   );
 
   const requiredGames: GameKey[] = availableGames
@@ -81,29 +157,30 @@ export default function Daily({ data }: Props) {
   const shareText = useMemo(() => {
     return buildShareText(data.date, progress, {
       includeGuessTheOpening,
-      aniListUrl: allCompleted ? data.solution.aniListUrl : undefined,
+      aniListUrls: allCompleted ? solutionUrls : undefined,
     });
   }, [
     allCompleted,
     data.date,
     includeGuessTheOpening,
-    data.solution.aniListUrl,
     progress,
+    solutionUrls,
   ]);
 
   const shareCardPayload = useMemo(() => {
-    const preferredTitle =
-      data.solution.titles.userPreferred ??
-      data.solution.titles.english ??
-      data.solution.titles.romaji ??
-      data.solution.titles.native ??
-      null;
+    const preferredTitle = primarySolution
+      ? primarySolution.titles.userPreferred ??
+        primarySolution.titles.english ??
+        primarySolution.titles.romaji ??
+        primarySolution.titles.native ??
+        null
+      : null;
 
     return {
       title: preferredTitle,
       date: data.date,
       streak,
-      cover: data.solution.coverImage ?? null,
+      cover: primarySolution?.coverImage ?? null,
       includeGuessTheOpening,
       progress: {
         anidle: progress.anidle
@@ -135,12 +212,8 @@ export default function Daily({ data }: Props) {
     };
   }, [
     data.date,
-    data.solution.coverImage,
-    data.solution.titles.english,
-    data.solution.titles.native,
-    data.solution.titles.romaji,
-    data.solution.titles.userPreferred,
     includeGuessTheOpening,
+    primarySolution,
     progress.anidle,
     progress.guess_the_opening,
     progress.poster_zoomed,
@@ -243,9 +316,11 @@ export default function Daily({ data }: Props) {
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
               🔥 Streak {streak}
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
-              Media #{data.mediaId}
-            </div>
+            {mediaIdLabel && (
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
+                {mediaIdLabel}
+              </div>
+            )}
             <button
               type="button"
               className="rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
@@ -367,8 +442,8 @@ export default function Daily({ data }: Props) {
         )}
       </section>
 
-      {allCompleted && data.solution && (
-        <SolutionReveal solution={data.solution} />
+      {allCompleted && solutions.length > 0 && (
+        <SolutionReveal solutions={solutions} />
       )}
     </div>
   );

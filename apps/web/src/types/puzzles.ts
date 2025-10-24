@@ -59,13 +59,6 @@ export interface GuessOpeningGame {
   meta: GuessOpeningMeta;
 }
 
-export interface GamesPayload {
-  anidle: AnidleGame;
-  poster_zoomed: PosterZoomGame;
-  redacted_synopsis: RedactedSynopsisGame;
-  guess_the_opening?: GuessOpeningGame | null;
-}
-
 export interface SolutionTitles {
   romaji?: string | null;
   english?: string | null;
@@ -86,10 +79,39 @@ export interface SolutionPayload {
   streamingLinks: SolutionStreamingLink[];
 }
 
+export interface AnidlePuzzleBundle {
+  mediaId: number;
+  puzzle: AnidleGame;
+  solution: SolutionPayload;
+}
+
+export interface PosterZoomPuzzleBundle {
+  mediaId: number;
+  puzzle: PosterZoomGame;
+  solution: SolutionPayload;
+}
+
+export interface RedactedSynopsisPuzzleBundle {
+  mediaId: number;
+  puzzle: RedactedSynopsisGame;
+  solution: SolutionPayload;
+}
+
+export interface GuessOpeningPuzzleBundle {
+  mediaId: number;
+  puzzle: GuessOpeningGame;
+  solution: SolutionPayload;
+}
+
+export interface GamesPayload {
+  anidle: AnidlePuzzleBundle;
+  poster_zoomed: PosterZoomPuzzleBundle;
+  redacted_synopsis: RedactedSynopsisPuzzleBundle;
+  guess_the_opening?: GuessOpeningPuzzleBundle | null;
+}
+
 export interface DailyPuzzleResponse {
   date: string;
-  mediaId: number;
   games: GamesPayload;
-  solution: SolutionPayload;
   guess_the_opening_enabled: boolean;
 }

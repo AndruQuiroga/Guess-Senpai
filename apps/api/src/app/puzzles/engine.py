@@ -19,14 +19,18 @@ from ..services.history_repository import (
 from .models import (
     AnidleGame,
     AnidleHints,
+    AnidlePuzzleBundle,
     DailyPuzzleResponse,
     GamesPayload,
     GuessOpeningGame,
     GuessOpeningMeta,
+    GuessOpeningPuzzleBundle,
     OpeningClip,
     PosterZoomGame,
     PosterZoomMeta,
+    PosterZoomPuzzleBundle,
     RedactedSynopsisGame,
+    RedactedSynopsisPuzzleBundle,
     RoundSpec,
     SolutionPayload,
     SolutionStreamingLink,
@@ -348,6 +352,33 @@ def _select_media(seed: str, pool: Sequence[Media]) -> Media:
     return pool[index]
 
 
+def _choose_media_from_pool(
+    base_seed: str,
+    game_key: str,
+    pool: Sequence[Media],
+    excluded_ids: set[int],
+    *,
+    attempt: int = 0,
+    attempted_ids: Optional[set[int]] = None,
+) -> Media:
+    if not pool:
+        raise ValueError("Candidate pool is empty")
+
+    filtered: List[Media] = [
+        media
+        for media in pool
+        if media.id not in excluded_ids
+        and (attempted_ids is None or media.id not in attempted_ids)
+    ]
+    if not filtered:
+        filtered = [media for media in pool if media.id not in excluded_ids]
+    if not filtered:
+        filtered = list(pool)
+
+    seed = f"{base_seed}:{game_key}:{attempt}"
+    return _select_media(seed, filtered)
+
+
 def _puzzle_cache_key(day: date, user: Optional[UserContext], include_guess_opening: bool) -> str:
     suffix = f"user:{user.user_id}" if user else "anon"
     opening_flag = "oped:1" if include_guess_opening else "oped:0"
@@ -370,33 +401,90 @@ async def _assemble_daily_puzzle(
         recent_ids = await _get_recent_media(cache, user.user_id)
 
     pool = _build_candidate_pool(popular_pool, user_lists, recent_ids)
-    seed = day.isoformat()
+    base_seed = day.isoformat()
     if user:
-        seed = f"{seed}:{user.user_id}"
-    chosen = _select_media(seed, pool)
-    media = await _load_media_details(chosen.id, cache, settings)
+        base_seed = f"{base_seed}:{user.user_id}"
 
-    games = GamesPayload(
-        anidle=_build_anidle(media),
-        poster_zoomed=_build_poster(media),
-        redacted_synopsis=_build_synopsis(media),
-        guess_the_opening=None,
+    selected_ids: set[int] = set()
+    recorded_ids: List[int] = []
+
+    anidle_candidate = _choose_media_from_pool(base_seed, "anidle", pool, selected_ids)
+    anidle_media = await _load_media_details(anidle_candidate.id, cache, settings)
+    selected_ids.add(anidle_media.id)
+    recorded_ids.append(anidle_media.id)
+    anidle_bundle = AnidlePuzzleBundle(
+        mediaId=anidle_media.id,
+        puzzle=_build_anidle(anidle_media),
+        solution=_build_solution(anidle_media),
     )
 
+    poster_candidate = _choose_media_from_pool(
+        base_seed, "poster_zoomed", pool, selected_ids
+    )
+    poster_media = await _load_media_details(poster_candidate.id, cache, settings)
+    selected_ids.add(poster_media.id)
+    recorded_ids.append(poster_media.id)
+    poster_bundle = PosterZoomPuzzleBundle(
+        mediaId=poster_media.id,
+        puzzle=_build_poster(poster_media),
+        solution=_build_solution(poster_media),
+    )
+
+    synopsis_candidate = _choose_media_from_pool(
+        base_seed, "redacted_synopsis", pool, selected_ids
+    )
+    synopsis_media = await _load_media_details(synopsis_candidate.id, cache, settings)
+    selected_ids.add(synopsis_media.id)
+    recorded_ids.append(synopsis_media.id)
+    synopsis_bundle = RedactedSynopsisPuzzleBundle(
+        mediaId=synopsis_media.id,
+        puzzle=_build_synopsis(synopsis_media),
+        solution=_build_solution(synopsis_media),
+    )
+
+    guess_bundle: Optional[GuessOpeningPuzzleBundle] = None
     if include_guess_opening:
-        opening_game = await _build_guess_opening(media, cache)
-        games.guess_the_opening = opening_game
+        attempted_ids: set[int] = set()
+        max_attempts = max(len(pool), 1)
+        for attempt in range(max_attempts):
+            candidate = _choose_media_from_pool(
+                base_seed,
+                "guess_the_opening",
+                pool,
+                selected_ids,
+                attempt=attempt,
+                attempted_ids=attempted_ids,
+            )
+            opening_media = await _load_media_details(candidate.id, cache, settings)
+            attempted_ids.add(opening_media.id)
+            opening_game = await _build_guess_opening(opening_media, cache)
+            if not opening_game:
+                continue
+            selected_ids.add(opening_media.id)
+            recorded_ids.append(opening_media.id)
+            guess_bundle = GuessOpeningPuzzleBundle(
+                mediaId=opening_media.id,
+                puzzle=opening_game,
+                solution=_build_solution(opening_media),
+            )
+            break
+
+    games = GamesPayload(
+        anidle=anidle_bundle,
+        poster_zoomed=poster_bundle,
+        redacted_synopsis=synopsis_bundle,
+        guess_the_opening=guess_bundle,
+    )
 
     if user:
-        await _record_recent_media(cache, user.user_id, media.id)
+        for media_id in recorded_ids:
+            await _record_recent_media(cache, user.user_id, media_id)
 
-    guess_opening_enabled = bool(games.guess_the_opening)
+    guess_opening_enabled = bool(guess_bundle)
 
     return DailyPuzzleResponse(
         date=day,
-        mediaId=media.id,
         games=games,
-        solution=_build_solution(media),
         guess_the_opening_enabled=guess_opening_enabled,
     )
 
