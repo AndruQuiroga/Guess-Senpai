@@ -346,7 +346,7 @@ export default function Daily({ data }: Props) {
   }, []);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl">
         <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -392,8 +392,9 @@ export default function Daily({ data }: Props) {
 
       {syncToast && (
         <div
+          role="status"
           aria-live="polite"
-          className={`fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium shadow-glow backdrop-blur ${
+          className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium shadow-glow backdrop-blur sm:px-5 ${
             syncToast.tone === "success"
               ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-100"
               : "border-rose-400/40 bg-rose-500/20 text-rose-100"
