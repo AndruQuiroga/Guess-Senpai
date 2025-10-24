@@ -483,10 +483,16 @@ export default function Anidle({
   const renderScalar = useCallback(
     (label: string, value: ScalarFeedback, suffix = "") => {
       const tone = SCALAR_TONES[value.status];
-      const display =
+      const guessDisplay =
         typeof value.guess === "number"
           ? `${value.guess}${suffix}`
           : "—";
+      const targetDisplay =
+        typeof value.target === "number" ? `${value.target}${suffix}` : null;
+      const display =
+        targetDisplay != null
+          ? `${guessDisplay} → ${targetDisplay}`
+          : guessDisplay;
       return (
         <div>
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
