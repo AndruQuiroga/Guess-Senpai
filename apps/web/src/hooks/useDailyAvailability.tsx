@@ -19,6 +19,21 @@ import type { DailyPuzzleResponse } from "../types/puzzles";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
+declare global {
+  interface Window {
+    plausible?: (eventName: string, options?: Record<string, unknown>) => void;
+  }
+}
+
+function logDailyAvailabilityError() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent("daily-availability-error"));
+  window.plausible?.("daily-availability-error");
+}
+
 interface DailyAvailabilityState {
   guessTheOpeningEnabled: boolean;
   loading: boolean;
@@ -80,6 +95,7 @@ export function DailyAvailabilityProvider({ children }: { children: ReactNode })
       });
     } catch (error) {
       console.warn("Failed to load daily availability", error);
+      logDailyAvailabilityError();
       if (!mountedRef.current) {
         return;
       }
