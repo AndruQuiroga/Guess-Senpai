@@ -62,7 +62,7 @@ SYNOPSIS_ROUNDS = [
 OPENING_ROUNDS = [
     RoundSpec(difficulty=1, hints=["length", "season"]),
     RoundSpec(difficulty=2, hints=["artist"]),
-    RoundSpec(difficulty=3, hints=["song"]),
+    RoundSpec(difficulty=3, hints=["song", "sequence"]),
 ]
 
 CHARACTER_SILHOUETTE_ROUNDS = [

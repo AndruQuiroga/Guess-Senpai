@@ -97,6 +97,9 @@ export default function GuessOpening({
           if (hint === "song" && payload.meta.songTitle) {
             badges.push(`Song: ${payload.meta.songTitle}`);
           }
+          if (hint === "sequence" && payload.meta.sequence) {
+            badges.push(`OP ${payload.meta.sequence}`);
+          }
         });
       });
     if (completed) {
