@@ -180,9 +180,10 @@ export default function PosterZoom({
         setGuesses((prev) => [...prev, value]);
         if (result.correct) {
           setCompleted(true);
+          const acceptedTitle = result.match ?? payload.answer;
           setFeedback({
             type: "success",
-            message: `Poster solved! ${payload.answer}`,
+            message: `Poster solved! ${acceptedTitle}`,
           });
         } else {
           setFeedback({ type: "error", message: "Not quite. Keep trying!" });
@@ -284,7 +285,11 @@ export default function PosterZoom({
           </div>
         )}
         {feedback?.type === "success" && (
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <div
+            className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+            role="status"
+            aria-label={`Poster solved! ${payload.answer}`}
+          >
             {feedback.message}
           </div>
         )}
