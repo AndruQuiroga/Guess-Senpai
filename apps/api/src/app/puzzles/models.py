@@ -69,11 +69,35 @@ class GuessOpeningGame(BaseModel):
     meta: GuessOpeningMeta
 
 
+class AnidlePuzzleBundle(BaseModel):
+    mediaId: int
+    puzzle: AnidleGame
+    solution: SolutionPayload
+
+
+class PosterZoomPuzzleBundle(BaseModel):
+    mediaId: int
+    puzzle: PosterZoomGame
+    solution: SolutionPayload
+
+
+class RedactedSynopsisPuzzleBundle(BaseModel):
+    mediaId: int
+    puzzle: RedactedSynopsisGame
+    solution: SolutionPayload
+
+
+class GuessOpeningPuzzleBundle(BaseModel):
+    mediaId: int
+    puzzle: GuessOpeningGame
+    solution: SolutionPayload
+
+
 class GamesPayload(BaseModel):
-    anidle: AnidleGame
-    poster_zoomed: PosterZoomGame
-    redacted_synopsis: RedactedSynopsisGame
-    guess_the_opening: Optional[GuessOpeningGame] = None
+    anidle: AnidlePuzzleBundle
+    poster_zoomed: PosterZoomPuzzleBundle
+    redacted_synopsis: RedactedSynopsisPuzzleBundle
+    guess_the_opening: Optional[GuessOpeningPuzzleBundle] = None
 
 
 class SolutionStreamingLink(BaseModel):
@@ -91,9 +115,7 @@ class SolutionPayload(BaseModel):
 
 class DailyPuzzleResponse(BaseModel):
     date: date
-    mediaId: int
     games: GamesPayload
-    solution: SolutionPayload
     guess_the_opening_enabled: bool = False
 
 

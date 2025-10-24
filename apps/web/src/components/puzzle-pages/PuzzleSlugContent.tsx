@@ -28,7 +28,7 @@ interface Props {
 export function PuzzleSlugContent({ data, slug }: Props) {
   const gameKey = slug.gameKey;
 
-  const payload = useMemo<GamesPayload[keyof GamesPayload] | null>(() => {
+  const bundle = useMemo<GamesPayload[keyof GamesPayload] | null>(() => {
     if (!data || !gameKey) return null;
     return data.games[gameKey as keyof GamesPayload] ?? null;
   }, [data, gameKey]);
@@ -67,7 +67,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
 
   switch (gameKey) {
     case "anidle":
-      if (!payload) {
+      if (!bundle) {
         return (
           <PlaceholderPuzzlePage
             title={slug.title}
@@ -79,13 +79,13 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       return (
         <AnidlePage
           slug={slug.slug}
-          payload={payload as AnidleGame}
+          payload={(bundle as { puzzle: AnidleGame }).puzzle}
           progress={progress.anidle}
           onProgressChange={progressHandlers.anidle}
         />
       );
     case "poster_zoomed":
-      if (!payload) {
+      if (!bundle) {
         return (
           <PlaceholderPuzzlePage
             title={slug.title}
@@ -94,17 +94,20 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           />
         );
       }
+      {
+        const posterBundle = bundle as { mediaId: number; puzzle: PosterZoomGame };
       return (
         <PosterZoomedPage
           slug={slug.slug}
-          mediaId={data.mediaId}
-          payload={payload as PosterZoomGame}
+          mediaId={posterBundle.mediaId}
+          payload={posterBundle.puzzle}
           progress={progress.poster_zoomed}
           onProgressChange={progressHandlers.poster_zoomed}
         />
       );
+      }
     case "redacted_synopsis":
-      if (!payload) {
+      if (!bundle) {
         return (
           <PlaceholderPuzzlePage
             title={slug.title}
@@ -116,13 +119,13 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       return (
         <RedactedSynopsisPage
           slug={slug.slug}
-          payload={payload as RedactedSynopsisGame}
+          payload={(bundle as { puzzle: RedactedSynopsisGame }).puzzle}
           progress={progress.redacted_synopsis}
           onProgressChange={progressHandlers.redacted_synopsis}
         />
       );
     case "guess_the_opening":
-      if (!payload) {
+      if (!bundle) {
         return (
           <PlaceholderPuzzlePage
             title={slug.title}
@@ -131,15 +134,18 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           />
         );
       }
+      {
+        const openingBundle = bundle as { mediaId: number; puzzle: GuessOpeningGame };
       return (
         <GuessOpeningPage
           slug={slug.slug}
-          mediaId={data.mediaId}
-          payload={payload as GuessOpeningGame}
+          mediaId={openingBundle.mediaId}
+          payload={openingBundle.puzzle}
           progress={progress.guess_the_opening}
           onProgressChange={progressHandlers.guess_the_opening}
         />
       );
+      }
     default:
       return (
         <PlaceholderPuzzlePage

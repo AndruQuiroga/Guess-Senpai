@@ -13,6 +13,8 @@ const GAME_DESCRIPTORS: Array<{
 
 export interface ShareTextOptions {
   includeGuessTheOpening?: boolean;
+  aniListUrls?: string[];
+  /** @deprecated use aniListUrls */
   aniListUrl?: string;
 }
 
@@ -72,8 +74,13 @@ export function buildShareText(
   lines.push("#GuessSenpai");
 
   const allCompleted = requiredKeys.every((key) => progress[key]?.completed);
-  if (allCompleted && options?.aniListUrl) {
-    lines.push("", options.aniListUrl);
+  const shareUrls = [
+    ...(options?.aniListUrls ?? []),
+    ...(options?.aniListUrl ? [options.aniListUrl] : []),
+  ].filter((url): url is string => Boolean(url));
+  const uniqueUrls = Array.from(new Set(shareUrls));
+  if (allCompleted && uniqueUrls.length > 0) {
+    lines.push("", ...uniqueUrls);
   }
 
   return lines.join("\n");
