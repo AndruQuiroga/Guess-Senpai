@@ -32,6 +32,49 @@ const BASE_GAME_KEYS: readonly GameKey[] = [
   "redacted_synopsis",
 ];
 
+type ProgressSummaryProps = {
+  streakCount: number;
+  timeRemaining: string | null;
+  completedCount: number;
+  totalAvailable: number;
+};
+
+function ProgressSummary({
+  streakCount,
+  timeRemaining,
+  completedCount,
+  totalAvailable,
+}: ProgressSummaryProps): JSX.Element {
+  const resetLabel = timeRemaining
+    ? `Resets in ${timeRemaining}`
+    : "Resets soon";
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/90 sm:text-base">
+      <span className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-amber-100">
+        <span aria-hidden className="text-base sm:text-lg">
+          🔥
+        </span>
+        <span className="block truncate">Streak {streakCount}</span>
+      </span>
+      <span className="inline-flex min-w-0 items-center gap-2 text-white/80">
+        <span aria-hidden className="text-base sm:text-lg">
+          ⏱️
+        </span>
+        <span className="block truncate sm:max-w-[16ch]">{resetLabel}</span>
+      </span>
+      <span className="inline-flex items-center gap-2 whitespace-nowrap text-white/80">
+        <span aria-hidden className="text-base sm:text-lg">
+          ✅
+        </span>
+        <span className="block truncate">
+          {completedCount}/{totalAvailable} completed
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function renderPreviewBackground(
   media: GamePreviewMedia | undefined,
   accentColor: string,
@@ -213,20 +256,6 @@ export default function HomePage() {
     return () => window.clearInterval(intervalId);
   }, [nextResetIso]);
 
-  const progressChipElements = (
-    <>
-      <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
-        🔥 Streak {streakCount}
-      </div>
-      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
-        {timeRemaining ? `⏱️ Resets in ${timeRemaining}` : "⏱️ Resets soon"}
-      </div>
-      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
-        {completedCount}/{totalAvailable} completed
-      </div>
-    </>
-  );
-
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [previewGame, setPreviewGame] = useState<GameDirectoryEntry | null>(
     null,
@@ -310,8 +339,13 @@ export default function HomePage() {
             </p>
           ) : null}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <div className="flex flex-wrap items-center gap-3 lg:hidden">
-              {progressChipElements}
+            <div className="lg:hidden">
+              <ProgressSummary
+                streakCount={streakCount}
+                timeRemaining={timeRemaining}
+                completedCount={completedCount}
+                totalAvailable={totalAvailable}
+              />
             </div>
             <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
               <Link
@@ -413,8 +447,13 @@ export default function HomePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="hidden flex-wrap items-center gap-3 lg:flex">
-            {progressChipElements}
+          <div className="hidden lg:block">
+            <ProgressSummary
+              streakCount={streakCount}
+              timeRemaining={timeRemaining}
+              completedCount={completedCount}
+              totalAvailable={totalAvailable}
+            />
           </div>
           {shareLocked ? (
             <div className="flex items-center gap-4 rounded-2xl border border-white/12 bg-white/10 px-4 py-3 text-left text-sm text-neutral-200/90">
