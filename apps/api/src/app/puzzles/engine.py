@@ -670,22 +670,10 @@ async def _assemble_daily_puzzle(
             )
             break
 
-    difficulty_hint: dict[str, int] = {}
+    difficulty_hint: Optional[int] = None
     if user:
         preferences = await load_user_preferences(user.user_id)
-        allowed_keys = {
-            "anidle",
-            "poster_zoomed",
-            "redacted_synopsis",
-            "character_silhouette",
-        }
-        if guess_bundle:
-            allowed_keys.add("guess_the_opening")
-        difficulty_hint = {
-            key: value
-            for key, value in preferences.difficulty.items()
-            if key in allowed_keys
-        }
+        difficulty_hint = preferences.difficulty_level
 
     games = GamesPayload(
         anidle=anidle_bundle,
@@ -693,7 +681,7 @@ async def _assemble_daily_puzzle(
         redacted_synopsis=synopsis_bundle,
         character_silhouette=character_bundle,
         guess_the_opening=guess_bundle,
-        difficulty=difficulty_hint,
+        difficulty_level=difficulty_hint,
     )
 
     if user:

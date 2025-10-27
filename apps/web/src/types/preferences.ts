@@ -1,15 +1,11 @@
-import type { GameKey } from "./progress";
-
-export type GameDifficultyPreferences = Partial<Record<GameKey, number>>;
-
 export interface UserPreferences {
-  difficulty: GameDifficultyPreferences;
+  difficultyLevel: number | null;
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
-  difficulty: {},
+  difficultyLevel: null,
 };
 
 export function createDefaultUserPreferences(): UserPreferences {
-  return { difficulty: {} };
+  return { difficultyLevel: null };
 }

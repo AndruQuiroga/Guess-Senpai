@@ -2,36 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { GameKey } from "../types/progress";
-import {
-  createDefaultUserPreferences,
-  type GameDifficultyPreferences,
-  type UserPreferences,
-} from "../types/preferences";
+import { createDefaultUserPreferences, type UserPreferences } from "../types/preferences";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 interface PreferencesResponse {
-  difficulty?: Record<string, unknown>;
-}
-
-function normalizeDifficulty(
-  value: PreferencesResponse["difficulty"],
-): GameDifficultyPreferences {
-  if (!value || typeof value !== "object") {
-    return {};
-  }
-
-  const normalized: GameDifficultyPreferences = {};
-  for (const [key, raw] of Object.entries(value)) {
-    const level = Number(raw);
-    if (!Number.isFinite(level)) {
-      continue;
-    }
-    normalized[key as GameKey] = Math.round(level);
-  }
-
-  return normalized;
+  difficulty_level?: unknown;
 }
 
 function mergePreferences(response: PreferencesResponse | null): UserPreferences {
@@ -40,8 +16,26 @@ function mergePreferences(response: PreferencesResponse | null): UserPreferences
   }
 
   return {
-    difficulty: normalizeDifficulty(response.difficulty),
+    difficultyLevel: normalizeDifficultyLevel(response.difficulty_level),
   };
+}
+
+function normalizeDifficultyLevel(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  const rounded = Math.round(numeric);
+  if (Number.isNaN(rounded)) {
+    return null;
+  }
+
+  return Math.max(1, Math.min(3, rounded));
 }
 
 export function useUserPreferences() {
@@ -51,7 +45,10 @@ export function useUserPreferences() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const difficulty = useMemo(() => preferences.difficulty, [preferences.difficulty]);
+  const difficultyLevel = useMemo(
+    () => preferences.difficultyLevel,
+    [preferences.difficultyLevel],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -93,27 +90,22 @@ export function useUserPreferences() {
     void refresh();
   }, [refresh]);
 
-  const updateDifficulty = useCallback(
-    async (game: GameKey, level: number) => {
-      const roundedLevel = Math.round(level);
+  const updateDifficulty = useCallback((level: number) => {
+    const roundedLevel = Math.round(level);
 
-      setPreferences((previous) => ({
-        ...previous,
-        difficulty: {
-          ...previous.difficulty,
-          [game]: roundedLevel,
-        },
-      }));
+    setPreferences((previous) => ({
+      ...previous,
+      difficultyLevel: normalizeDifficultyLevel(roundedLevel),
+    }));
 
+    const submit = async () => {
       try {
         const response = await fetch(`${API_BASE}/profile/preferences`, {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            difficulty: {
-              [game]: roundedLevel,
-            },
+            difficulty_level: roundedLevel,
           }),
         });
 
@@ -126,13 +118,14 @@ export function useUserPreferences() {
       } catch (caught) {
         console.warn("Failed to update difficulty preference on server", caught);
       }
-    },
-    [],
-  );
+    };
+
+    void submit();
+  }, []);
 
   return {
     preferences,
-    difficulty,
+    difficultyLevel,
     loading,
     error,
     refresh,

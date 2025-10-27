@@ -37,7 +37,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
   }, [data, gameKey]);
 
   const { progress, recordGame } = usePuzzleProgress(data?.date ?? "");
-  const { difficulty, updateDifficulty } = useUserPreferences();
+  const { difficultyLevel, updateDifficulty } = useUserPreferences();
 
   const availablePuzzles = useMemo(() => {
     if (!data) return [];
@@ -65,17 +65,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       guess_the_opening: (state) => recordGame("guess_the_opening", state),
     }),
     [recordGame],
-  );
-
-  const difficultyHandlers = useMemo<Record<GameKey, (level: number) => void>>(
-    () => ({
-      anidle: (level) => updateDifficulty("anidle", level),
-      poster_zoomed: (level) => updateDifficulty("poster_zoomed", level),
-      redacted_synopsis: (level) => updateDifficulty("redacted_synopsis", level),
-      character_silhouette: (level) => updateDifficulty("character_silhouette", level),
-      guess_the_opening: (level) => updateDifficulty("guess_the_opening", level),
-    }),
-    [updateDifficulty],
   );
 
   const nextSlug = useMemo(() => {
@@ -136,9 +125,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={anidleBundle.puzzle}
             progress={progress.anidle}
             dailyProgress={progress}
-            accountDifficulty={difficulty.anidle}
-            difficultyHint={data.games.difficulty?.anidle}
-            onDifficultyChange={difficultyHandlers.anidle}
+            accountDifficulty={difficultyLevel ?? undefined}
+            difficultyHint={data.games.difficulty_level ?? undefined}
+            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.anidle}
             nextSlug={nextSlug}
           />
@@ -164,9 +153,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
             dailyProgress={progress}
-            accountDifficulty={difficulty.poster_zoomed}
-            difficultyHint={data.games.difficulty?.poster_zoomed}
-            onDifficultyChange={difficultyHandlers.poster_zoomed}
+            accountDifficulty={difficultyLevel ?? undefined}
+            difficultyHint={data.games.difficulty_level ?? undefined}
+            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.poster_zoomed}
             nextSlug={nextSlug}
           />
@@ -195,9 +184,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={silhouetteBundle.puzzle}
             progress={progress.character_silhouette}
             dailyProgress={progress}
-            accountDifficulty={difficulty.character_silhouette}
-            difficultyHint={data.games.difficulty?.character_silhouette}
-            onDifficultyChange={difficultyHandlers.character_silhouette}
+            accountDifficulty={difficultyLevel ?? undefined}
+            difficultyHint={data.games.difficulty_level ?? undefined}
+            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.character_silhouette}
             nextSlug={nextSlug}
           />
@@ -226,9 +215,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={synopsisBundle.puzzle}
             progress={progress.redacted_synopsis}
             dailyProgress={progress}
-            accountDifficulty={difficulty.redacted_synopsis}
-            difficultyHint={data.games.difficulty?.redacted_synopsis}
-            onDifficultyChange={difficultyHandlers.redacted_synopsis}
+            accountDifficulty={difficultyLevel ?? undefined}
+            difficultyHint={data.games.difficulty_level ?? undefined}
+            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.redacted_synopsis}
             nextSlug={nextSlug}
           />
@@ -254,9 +243,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={openingBundle.puzzle}
             progress={progress.guess_the_opening}
             dailyProgress={progress}
-            accountDifficulty={difficulty.guess_the_opening}
-            difficultyHint={data.games.difficulty?.guess_the_opening}
-            onDifficultyChange={difficultyHandlers.guess_the_opening}
+            accountDifficulty={difficultyLevel ?? undefined}
+            difficultyHint={data.games.difficulty_level ?? undefined}
+            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.guess_the_opening}
             nextSlug={nextSlug}
           />
