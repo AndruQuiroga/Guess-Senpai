@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from ..core.config import settings
+from ..core.database import get_session_factory
 from ..puzzles import engine as puzzle_engine
 from ..puzzles.engine import UserContext, _title_variants, get_daily_puzzle
 from ..puzzles.models import (
@@ -16,6 +17,7 @@ from ..puzzles.models import (
     RecentMediaSummary,
     StreakPayload,
 )
+from ..services import title_index
 from ..services.cache import get_cache
 from ..services.progress import (
     load_daily_progress,
@@ -26,7 +28,7 @@ from ..services.progress import (
     store_streak,
 )
 from ..services.session import SessionData, get_session_manager
-from ..services.anilist import MediaTitlePair, search_media
+from ..services.anilist import search_media
 
 router = APIRouter()
 
@@ -290,6 +292,7 @@ async def evaluate_anidle_guess(
         raise HTTPException(status_code=400, detail="Guess cannot be empty")
 
     cache = await get_cache(settings.redis_url)
+    session_factory = get_session_factory()
     try:
         target_media = await puzzle_engine._load_media_details(
             payload.puzzle_media_id, cache, settings
@@ -308,7 +311,31 @@ async def evaluate_anidle_guess(
 
     normalized_guess = _normalize_text(guess_value)
 
+    index_matches: list[title_index.TitleMatch] = []
     if guess_media is None:
+        async with session_factory() as session:
+            index_matches = await title_index.search_titles(session, guess_value, limit=5)
+        best_candidate = None
+        for match in index_matches:
+            try:
+                candidate = await puzzle_engine._load_media_details(
+                    match.media_id, cache, settings
+                )
+            except Exception:
+                continue
+            if best_candidate is None:
+                best_candidate = candidate
+            variants = puzzle_engine._title_variants(candidate)
+            if any(
+                variant and _normalize_text(variant) == normalized_guess
+                for variant in variants
+            ):
+                guess_media = candidate
+                break
+        if guess_media is None and best_candidate is not None:
+            guess_media = best_candidate
+
+    if guess_media is None and not index_matches:
         user_ctx = await _resolve_user_context(request)
         token = user_ctx.access_token if user_ctx else None
         search_results = await search_media(guess_value, limit=5, token=token)
@@ -380,26 +407,35 @@ async def search_titles(
     search_term = q.strip()
     if not search_term:
         return TitleSuggestionResponse(results=[])
-    user_ctx = await _resolve_user_context(request)
-    token = user_ctx.access_token if user_ctx else None
-    media = await search_media(search_term, limit=limit, token=token)
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        index_results = await title_index.search_titles(session, search_term, limit=limit)
 
-    def _resolve_title(pair: MediaTitlePair) -> str:
-        title = pair.title
-        return (
-            title.userPreferred
-            or title.english
-            or title.romaji
-            or title.native
-            or ""
+    if index_results:
+        return TitleSuggestionResponse(
+            results=[TitleSuggestion(id=item.media_id, title=item.title) for item in index_results]
         )
 
-    results: list[TitleSuggestion] = []
-    for item in media:
-        resolved = _resolve_title(item)
-        if resolved:
-            results.append(TitleSuggestion(id=item.id, title=resolved))
-    return TitleSuggestionResponse(results=results)
+    user_ctx = await _resolve_user_context(request)
+    token = user_ctx.access_token if user_ctx else None
+    cache = await get_cache(settings.redis_url)
+    remote_results = await search_media(search_term, limit=limit, token=token)
+    for pair in remote_results:
+        try:
+            await puzzle_engine._load_media_details(pair.id, cache, settings)
+        except Exception:
+            continue
+
+    async with session_factory() as session:
+        refreshed = await title_index.search_titles(session, search_term, limit=limit)
+
+    if refreshed:
+        return TitleSuggestionResponse(
+            results=[TitleSuggestion(id=item.media_id, title=item.title) for item in refreshed]
+        )
+
+    # No matches even after remote lookup; return empty set.
+    return TitleSuggestionResponse(results=[])
 
 
 @router.get("/archive", response_model=ArchiveIndexResponse)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import logging
 import re
 from dataclasses import asdict, dataclass
 from datetime import date
@@ -9,7 +10,7 @@ from typing import List, Optional, Sequence
 
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
-from ..services import animethemes, anilist
+from ..services import animethemes, anilist, title_index
 from ..services.anilist import CoverImage, Media, MediaCharacterEdge, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
 from ..services.history_repository import (
@@ -101,6 +102,8 @@ STREAMING_SITES = {
 
 PUZZLE_CACHE_PREFIX = "guesssenpai:puzzle"
 USER_HISTORY_KEY_TEMPLATE = "guesssenpai:user-history:{user_id}"
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class UserContext:
@@ -412,7 +415,19 @@ async def _load_media_details(media_id: int, cache: CacheBackend, settings: Sett
         return details.model_dump(mode="json")
 
     raw = await cache.remember(cache_key, settings.anilist_cache_ttl_seconds, creator)
-    return Media.model_validate(raw)
+    media = Media.model_validate(raw)
+
+    variants = _title_variants(media)
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        try:
+            await title_index.ingest_media(session, media, variants)
+            await session.commit()
+        except Exception:  # pragma: no cover - index warming must not break gameplay
+            await session.rollback()
+            logger.exception("Failed to warm title index for media %s", media.id)
+
+    return media
 
 
 async def _fetch_user_lists(cache: CacheBackend, user: UserContext) -> MediaListCollection:
@@ -522,6 +537,8 @@ def _choose_media_from_pool(
         if media.id not in excluded_ids
         and (attempted_ids is None or media.id not in attempted_ids)
     ]
+    if not filtered and attempted_ids:
+        filtered = [media for media in pool if media.id not in attempted_ids]
     if not filtered:
         filtered = [media for media in pool if media.id not in excluded_ids]
     if not filtered:
@@ -647,6 +664,9 @@ async def _assemble_daily_puzzle(
         attempted_ids: set[int] = set()
         max_attempts = max(len(pool), 1)
         for attempt in range(max_attempts):
+            if not any(media.id not in selected_ids for media in pool):
+                if user is None:
+                    break
             candidate = _choose_media_from_pool(
                 base_seed,
                 "guess_the_opening",
@@ -661,8 +681,7 @@ async def _assemble_daily_puzzle(
             if not opening_game:
                 continue
             selected_ids.add(opening_media.id)
-            if opening_media.id not in recorded_ids:
-                recorded_ids.append(opening_media.id)
+            recorded_ids.append(opening_media.id)
             guess_bundle = GuessOpeningPuzzleBundle(
                 mediaId=opening_media.id,
                 puzzle=opening_game,
