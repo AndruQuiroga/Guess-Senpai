@@ -2,26 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type {
-  DailyDifficultySelections,
-  DailyProgress,
-  GameKey,
-  GameProgress,
-} from "../types/progress";
+import type { DailyProgress, GameKey, GameProgress } from "../types/progress";
 
-export type {
-  DailyDifficultySelections,
-  DailyProgress,
-  GameKey,
-  GameProgress,
-} from "../types/progress";
+export type { DailyProgress, GameKey, GameProgress } from "../types/progress";
 
 const STORAGE_KEY = "guesssenpai-progress";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 interface PersistedDailyState {
   progress: DailyProgress;
-  difficulty: DailyDifficultySelections;
 }
 
 type StorageShape = Record<string, unknown>;
@@ -39,15 +28,14 @@ export interface RefreshResult {
   error?: ProgressFetchError;
 }
 
-const EMPTY_STATE: PersistedDailyState = { progress: {}, difficulty: {} };
+const EMPTY_STATE: PersistedDailyState = { progress: {} };
 
 function cloneState(state: PersistedDailyState | null | undefined): PersistedDailyState {
   if (!state) {
-    return { progress: {}, difficulty: {} };
+    return { progress: {} };
   }
   return {
     progress: { ...(state.progress ?? {}) },
-    difficulty: { ...(state.difficulty ?? {}) },
   };
 }
 
@@ -56,20 +44,6 @@ function normalizeProgress(value: unknown): DailyProgress {
     return {};
   }
   return { ...(value as DailyProgress) };
-}
-
-function normalizeDifficulty(value: unknown): DailyDifficultySelections {
-  if (!value || typeof value !== "object") {
-    return {};
-  }
-  const normalized: DailyDifficultySelections = {};
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-    const numeric = Number(raw);
-    if (Number.isFinite(numeric)) {
-      normalized[key as GameKey] = numeric;
-    }
-  }
-  return normalized;
 }
 
 function readStoredState(date: string): PersistedDailyState {
@@ -90,15 +64,13 @@ function readStoredState(date: string): PersistedDailyState {
       return cloneState(EMPTY_STATE);
     }
     const record = entry as Record<string, unknown>;
-    if ("progress" in record || "difficulty" in record) {
+    if ("progress" in record) {
       return {
         progress: normalizeProgress(record.progress),
-        difficulty: normalizeDifficulty(record.difficulty),
       };
     }
     return {
       progress: normalizeProgress(entry),
-      difficulty: {},
     };
   } catch (error) {
     console.warn("Failed to read puzzle progress", error);
@@ -113,7 +85,6 @@ function writeStoredState(date: string, value: PersistedDailyState) {
     const parsed: StorageShape = stored ? JSON.parse(stored) : {};
     parsed[date] = {
       progress: { ...value.progress },
-      difficulty: { ...value.difficulty },
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
   } catch (error) {
@@ -172,9 +143,8 @@ export function usePuzzleProgress(date: string) {
       }
 
       const serverProgress = payload.progress ?? {};
-      persist((prev) => ({
+      persist(() => ({
         progress: serverProgress,
-        difficulty: { ...prev.difficulty },
       }));
       return serverProgress;
     },
@@ -237,52 +207,14 @@ export function usePuzzleProgress(date: string) {
     [date],
   );
 
-  const pushDifficultyUpdate = useCallback(
-    async (game: GameKey, level: number) => {
-      try {
-        const response = await fetch(`${API_BASE}/profile/preferences`, {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            difficulty: {
-              [game]: level,
-            },
-          }),
-        });
-        if (!response.ok && response.status !== 401) {
-          console.warn(
-            "Failed to update difficulty preference on server",
-            response.statusText,
-          );
-        }
-      } catch (error) {
-        console.warn("Failed to update difficulty preference on server", error);
-      }
-    },
-    [],
-  );
-
   const recordGame = useCallback(
     (game: GameKey, progressState: GameProgress) => {
       persist((prev) => ({
         progress: { ...prev.progress, [game]: progressState },
-        difficulty: { ...prev.difficulty },
       }));
       void pushUpdate(game, progressState);
     },
     [persist, pushUpdate],
-  );
-
-  const recordDifficulty = useCallback(
-    (game: GameKey, level: number) => {
-      persist((prev) => ({
-        progress: { ...prev.progress },
-        difficulty: { ...prev.difficulty, [game]: level },
-      }));
-      void pushDifficultyUpdate(game, level);
-    },
-    [persist, pushDifficultyUpdate],
   );
 
   const refresh = useCallback(async (): Promise<RefreshResult> => {
@@ -317,9 +249,7 @@ export function usePuzzleProgress(date: string) {
 
   return {
     progress: state.progress,
-    difficulty: state.difficulty,
     recordGame,
-    recordDifficulty,
     refresh,
     isRefreshing,
     refreshError,

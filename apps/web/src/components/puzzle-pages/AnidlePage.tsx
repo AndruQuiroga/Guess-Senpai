@@ -15,7 +15,7 @@ interface Props {
   payload: AnidleGame;
   progress?: GameProgress;
   dailyProgress?: DailyProgress;
-  difficultyChoice?: number;
+  accountDifficulty?: number;
   difficultyHint?: number;
   onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
@@ -46,7 +46,7 @@ export function AnidlePage({
   payload,
   progress,
   dailyProgress,
-  difficultyChoice,
+  accountDifficulty,
   difficultyHint,
   onDifficultyChange,
   onProgressChange,
@@ -68,7 +68,7 @@ export function AnidlePage({
     [totalRounds],
   );
 
-  const selectedDifficulty = clampDifficulty(difficultyChoice);
+  const selectedDifficulty = clampDifficulty(accountDifficulty);
   const recommendedDifficulty = clampDifficulty(difficultyHint);
   const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
   const [displayRound, setDisplayRound] = useState(progress?.round ?? highlightDifficulty);
