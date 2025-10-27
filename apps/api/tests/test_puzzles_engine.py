@@ -3,6 +3,10 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+import base64
+
+import cv2
+import numpy as np
 import pytest
 
 from app.puzzles import engine
@@ -112,6 +116,42 @@ def make_character_silhouette(media: Media) -> CharacterSilhouetteGame:
     )
 
 
+def test_generate_character_silhouette_cuts_background(monkeypatch: pytest.MonkeyPatch) -> None:
+    image = np.full((200, 200, 3), 255, dtype=np.uint8)
+    cv2.rectangle(image, (60, 40), (140, 180), (0, 0, 0), thickness=-1)
+    cv2.circle(image, (100, 70), 20, (0, 0, 255), thickness=-1)
+    success, encoded = cv2.imencode(".png", image)
+    assert success
+    payload = encoded.tobytes()
+
+    class DummyResponse:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+        @property
+        def content(self) -> bytes:
+            return payload
+
+    monkeypatch.setattr(engine.httpx, "get", lambda url, timeout=10.0: DummyResponse())
+
+    data_uri = engine._generate_character_silhouette("https://example.com/test.png")
+    assert data_uri is not None
+    header, encoded_image = data_uri.split(",", 1)
+    assert header == "data:image/png;base64"
+    result = cv2.imdecode(
+        np.frombuffer(base64.b64decode(encoded_image), dtype=np.uint8),
+        cv2.IMREAD_COLOR,
+    )
+    assert result is not None
+    assert result.shape[:2] == (200, 200)
+
+    assert result[0, 0].max() <= 5
+    assert int(result.sum()) > 0
+
+
 def test_build_poster_bundle_without_cover_image() -> None:
     media = make_media(505, "No Cover")
 
@@ -186,7 +226,7 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
         return list(popular)
 
     async def fake_load_media_details(media_id: int, cache, settings):
-        return media_by_id[media_id]
+        return media_by_id.get(media_id) or make_media(media_id, f"Media {media_id}")
 
     async def fake_build_guess_opening_round(media: Media, cache, **kwargs):
         return make_guess_opening(media, **kwargs)
@@ -239,7 +279,7 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
         return list(popular)
 
     async def fake_load_media_details(media_id: int, cache, settings):
-        return media_by_id[media_id]
+        return media_by_id.get(media_id) or make_media(media_id, f"Media {media_id}")
 
     attempts: list[int] = []
 

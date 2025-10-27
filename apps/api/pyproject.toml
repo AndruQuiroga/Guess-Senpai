@@ -22,6 +22,7 @@ dependencies = [
     "alembic==1.13.3",
     "pywebpush==1.14.0",
     "Pillow==10.4.0",
+    "opencv-python-headless==4.10.0.84",
 ]
 
 [project.optional-dependencies]
