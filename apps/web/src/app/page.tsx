@@ -15,6 +15,13 @@ import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
 import { buildShareText, formatShareDate } from "../utils/shareText";
 
+const BASE_GAME_KEYS: readonly GameKey[] = [
+  "anidle",
+  "poster_zoomed",
+  "character_silhouette",
+  "redacted_synopsis",
+];
+
 function todayIsoDate(): string {
   const now = new Date();
   const year = now.getUTCFullYear();
@@ -74,15 +81,13 @@ export default function HomePage() {
       ),
     [games],
   );
-  const baseKeys: GameKey[] = [
-    "anidle",
-    "poster_zoomed",
-    "character_silhouette",
-    "redacted_synopsis",
-  ];
-  const keysToConsider: GameKey[] = includeGuessTheOpening
-    ? [...baseKeys, "guess_the_opening"]
-    : baseKeys;
+  const keysToConsider: readonly GameKey[] = useMemo(
+    () =>
+      includeGuessTheOpening
+        ? [...BASE_GAME_KEYS, "guess_the_opening"]
+        : BASE_GAME_KEYS,
+    [includeGuessTheOpening],
+  );
 
   const totalAvailable = keysToConsider.length;
   const completedCount = keysToConsider.filter(
@@ -90,6 +95,24 @@ export default function HomePage() {
   ).length;
   const allCompleted = keysToConsider.every((key) => progress[key]?.completed);
   const streak = useStreak(todayIso, allCompleted);
+
+  const hasStartedAnyRounds = useMemo(() => {
+    return keysToConsider.some((key) => {
+      const entry = progress[key];
+      if (!entry) {
+        return false;
+      }
+      if (entry.completed) {
+        return true;
+      }
+      if (Array.isArray(entry.guesses) && entry.guesses.length > 0) {
+        return true;
+      }
+      return typeof entry.round === "number" && entry.round > 0;
+    });
+  }, [keysToConsider, progress]);
+
+  const shareLocked = completedCount === 0 && !hasStartedAnyRounds;
 
   const shareText = useMemo(
     () =>
@@ -132,6 +155,12 @@ export default function HomePage() {
     }
     setShareStatus("Unable to share on this device");
   }, [shareText]);
+
+  useEffect(() => {
+    if (shareLocked && shareStatus) {
+      setShareStatus(null);
+    }
+  }, [shareLocked, shareStatus]);
 
   useEffect(() => {
     if (!shareStatus) return;
@@ -223,7 +252,8 @@ export default function HomePage() {
                   Listen & guess
                 </span>
                 <span>
-                  Catch audio clues, spot the reference, and see how it works in the full guide.
+                  Catch audio clues, spot the reference, and see how it works in
+                  the full guide.
                 </span>
               </span>
             </Link>
@@ -239,7 +269,8 @@ export default function HomePage() {
                   Unlock hints
                 </span>
                 <span>
-                  Learn when to reveal extra clues and strategize your hint usage step-by-step.
+                  Learn when to reveal extra clues and strategize your hint
+                  usage step-by-step.
                 </span>
               </span>
             </Link>
@@ -255,7 +286,8 @@ export default function HomePage() {
                   Share your streak
                 </span>
                 <span>
-                  See tips for exporting recap cards and celebrating wins with your squad.
+                  See tips for exporting recap cards and celebrating wins with
+                  your squad.
                 </span>
               </span>
             </Link>
@@ -283,15 +315,31 @@ export default function HomePage() {
           <div className="hidden flex-wrap items-center gap-3 lg:flex">
             {progressChipElements}
           </div>
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-            onClick={handleShare}
-          >
-            Share progress
-          </button>
+          {shareLocked ? (
+            <div className="flex items-center gap-4 rounded-2xl border border-white/12 bg-white/5 px-4 py-3 text-left text-sm text-neutral-200/90">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-xl text-neutral-300">
+                🔒
+              </span>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-white/85">
+                  Play a round to unlock sharing
+                </p>
+                <p className="text-xs text-neutral-300/80">
+                  Start any puzzle to generate a recap card worth sharing.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              onClick={handleShare}
+            >
+              Share progress
+            </button>
+          )}
         </div>
-        {shareStatus && (
+        {shareStatus && !shareLocked && (
           <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs text-white/90 shadow-inner transition">
             {shareStatus}
           </p>
