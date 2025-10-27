@@ -70,6 +70,13 @@ POSTER_ROUNDS = [
     RoundSpec(difficulty=3, hints=["year", "format"]),
 ]
 
+MAX_POSTER_HINTS = max(0, len(POSTER_ROUNDS) - 1)
+
+if hasattr(Image, "Resampling"):
+    POSTER_RESAMPLE = Image.Resampling.LANCZOS  # type: ignore[attr-defined]
+else:  # pragma: no cover - fallback for older Pillow
+    POSTER_RESAMPLE = Image.LANCZOS  # type: ignore[attr-defined]
+
 SYNOPSIS_ROUNDS = [
     RoundSpec(difficulty=1, hints=["unmask:1"]),
     RoundSpec(difficulty=2, hints=["unmask:3"]),
@@ -421,10 +428,58 @@ def _deserialize_cached_image(payload: Any) -> Optional[Tuple[bytes, str]]:
     return decoded, mime
 
 
-def _normalize_clarity(value: float) -> float:
-    if value != value:  # NaN guard
+def _normalize_hint_count(value: Any) -> int:
+    try:
+        hints_value = int(value)
+    except (TypeError, ValueError):
+        return 0
+    if hints_value < 0:
+        return 0
+    return hints_value
+
+
+def _resolve_poster_hint_round(hints_used: int, total_rounds: int) -> int:
+    if total_rounds <= 0:
+        return 1
+    return max(1, min(total_rounds, hints_used + 1))
+
+
+def _compute_clarity_level(hint_round: int, total_rounds: int) -> float:
+    if total_rounds <= 1:
         return 1.0
-    return max(0.0, min(1.0, float(value)))
+    progress = (hint_round - 1) / max(1, total_rounds - 1)
+    min_clarity = 0.2
+    normalized = min_clarity + (1 - min_clarity) * progress
+    return max(0.0, min(1.0, round(normalized, 2)))
+
+
+def _apply_crop_stage(poster: Image.Image, stage: PosterCropStage) -> Image.Image:
+    width, height = poster.size
+    if width <= 0 or height <= 0:
+        return poster
+
+    scale = stage.scale if stage.scale and stage.scale > 0 else 1.0
+    crop_width = width / scale
+    crop_height = height / scale
+
+    if crop_width <= 0 or crop_height <= 0:
+        return poster
+
+    center_x = (stage.offset_x / 100.0) * width
+    center_y = (stage.offset_y / 100.0) * height
+
+    max_left = max(0.0, width - crop_width)
+    max_top = max(0.0, height - crop_height)
+    left = min(max_left, max(0.0, center_x - (crop_width / 2)))
+    top = min(max_top, max(0.0, center_y - (crop_height / 2)))
+    right = left + crop_width
+    bottom = top + crop_height
+
+    cropped = poster.crop((left, top, right, bottom))
+    if cropped.size == poster.size:
+        return cropped
+
+    return cropped.resize(poster.size, resample=POSTER_RESAMPLE)
 
 
 async def _load_poster_source(
@@ -467,10 +522,19 @@ async def _load_poster_source(
     return content, mime
 
 
-def _render_poster_variant(source: bytes, clarity: float) -> Tuple[bytes, str]:
+def _render_poster_variant(
+    source: bytes,
+    hint_round: int,
+    total_rounds: int,
+    crop_stage: Optional[PosterCropStage],
+) -> Tuple[bytes, str]:
+    clarity = _compute_clarity_level(hint_round, total_rounds)
+
     try:
         with Image.open(io.BytesIO(source)) as poster:
             poster = poster.convert("RGB")
+            if crop_stage is not None:
+                poster = _apply_crop_stage(poster, crop_stage)
             blur_radius = (1.0 - clarity) * 12.0
             if blur_radius > 0:
                 poster = poster.filter(ImageFilter.GaussianBlur(radius=blur_radius))
@@ -484,10 +548,10 @@ def _render_poster_variant(source: bytes, clarity: float) -> Tuple[bytes, str]:
     return output.getvalue(), "image/jpeg"
 
 
-async def generate_poster_image(media_id: int, clarity: float) -> Tuple[bytes, str]:
+async def generate_poster_image(media_id: int, hints: int) -> Tuple[bytes, str]:
     cache = await _get_cache()
-    normalized = _normalize_clarity(clarity)
-    bucket = int(round(normalized * 100))
+    requested_hints = _normalize_hint_count(hints)
+    bucket = min(requested_hints, MAX_POSTER_HINTS)
     cache_key = f"poster-image:{media_id}:{bucket}"
 
     cached = await cache.get(cache_key)
@@ -496,13 +560,36 @@ async def generate_poster_image(media_id: int, clarity: float) -> Tuple[bytes, s
         return cached_image
 
     media = await _load_media_details(media_id, cache, settings)
+    crop_stages = _build_poster_crop_stages(media)
+    total_rounds = max(1, max(len(crop_stages), len(POSTER_ROUNDS)))
+    max_hint_count = max(0, total_rounds - 1)
+    effective_hints = min(bucket, max_hint_count)
+    final_cache_key = f"poster-image:{media_id}:{effective_hints}"
+
+    if final_cache_key != cache_key:
+        cached = await cache.get(final_cache_key)
+        cached_image = _deserialize_cached_image(cached)
+        if cached_image:
+            return cached_image
+
+    hint_round = _resolve_poster_hint_round(effective_hints, total_rounds)
+    crop_stage: Optional[PosterCropStage] = None
+    if crop_stages:
+        crop_index = min(len(crop_stages) - 1, hint_round - 1)
+        crop_stage = crop_stages[crop_index]
+
     source, _ = await _load_poster_source(media, cache, settings)
-    variant_bytes, mime = _render_poster_variant(source, normalized)
+    variant_bytes, mime = _render_poster_variant(
+        source,
+        hint_round,
+        total_rounds,
+        crop_stage,
+    )
 
     try:
         encoded = base64.b64encode(variant_bytes).decode("ascii")
         await cache.set(
-            cache_key,
+            final_cache_key,
             {"data": encoded, "mime": mime},
             settings.puzzle_cache_ttl_seconds,
         )

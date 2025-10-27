@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
@@ -104,8 +103,6 @@ export default function PosterZoom({
     onProgressChange({ completed, round, guesses });
   }, [completed, round, guesses, onProgressChange]);
 
-  const cropStages = payload.cropStages ?? [];
-
   const hintRound = useMemo(
     () =>
       completed
@@ -114,78 +111,25 @@ export default function PosterZoom({
     [accountDifficulty, completed, round, totalRounds],
   );
 
-  const fallbackZoom = useMemo(() => {
-    if (completed) return 1;
-    const initialScale = 1.35;
-    if (totalRounds <= 1) {
-      return 1;
-    }
-    const progress = (hintRound - 1) / (totalRounds - 1);
-    return initialScale + (1 - initialScale) * progress;
-  }, [completed, hintRound, totalRounds]);
-
-  const activeCropStage = useMemo(() => {
-    if (!cropStages.length) {
-      return null;
-    }
-    if (completed) {
-      return cropStages[cropStages.length - 1];
-    }
-    const index = Math.max(0, Math.min(cropStages.length - 1, hintRound - 1));
-    return cropStages[index];
-  }, [completed, cropStages, hintRound]);
-
-  const clarityLevel = useMemo(() => {
-    if (completed) {
-      return 1;
-    }
-    if (totalRounds <= 1) {
-      return 1;
-    }
-    const progress = (hintRound - 1) / (totalRounds - 1);
-    const minClarity = 0.2;
-    const normalized = minClarity + (1 - minClarity) * progress;
-    return Math.min(1, Math.max(0, Number(normalized.toFixed(2))));
-  }, [completed, hintRound, totalRounds]);
-
   const posterImageBase = useMemo(
     () => `${API_BASE}/puzzles/poster/${mediaId}/image`,
     [mediaId],
   );
 
-  const imageSrc = useMemo(() => {
-    const clarityParam = clarityLevel.toFixed(2);
-    return `${posterImageBase}?clarity=${clarityParam}`;
-  }, [clarityLevel, posterImageBase]);
-
-  const imageTransform = useMemo(() => {
-    if (!activeCropStage) {
-      return {
-        scale: fallbackZoom,
-        translateX: 0,
-        translateY: 0,
-      };
+  const activeHintCount = useMemo(() => {
+    if (totalRounds <= 1) {
+      return 0;
     }
+    if (completed) {
+      return totalRounds - 1;
+    }
+    const clampedRound = Math.max(1, Math.min(totalRounds, hintRound));
+    return Math.max(0, Math.min(totalRounds - 1, clampedRound - 1));
+  }, [completed, hintRound, totalRounds]);
 
-    const translateX = 50 - activeCropStage.offset_x;
-    const translateY = 50 - activeCropStage.offset_y;
-
-    return {
-      scale: activeCropStage.scale,
-      translateX,
-      translateY,
-    };
-  }, [activeCropStage, fallbackZoom]);
-
-  const imageStyles = useMemo<CSSProperties>(() => {
-    const transform = `translate3d(${imageTransform.translateX}%, ${imageTransform.translateY}%, 0) scale(${imageTransform.scale})`;
-
-    return {
-      transform,
-      transition: "transform 700ms ease-out",
-      willChange: "transform",
-    };
-  }, [imageTransform.scale, imageTransform.translateX, imageTransform.translateY]);
+  const imageSrc = useMemo(() => {
+    return `${posterImageBase}?hints=${activeHintCount}`;
+  }, [activeHintCount, posterImageBase]);
 
   const activeHints = useMemo(() => {
     const hints: string[] = [];
@@ -294,7 +238,6 @@ export default function PosterZoom({
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
-            style={imageStyles}
           />
         ) : (
           <div className="text-neutral-600">Poster unavailable</div>
