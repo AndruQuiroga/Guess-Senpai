@@ -374,59 +374,53 @@ export default function HomePage() {
               </button>
             </div>
           </div>
-          <div className="mt-8 grid gap-3 text-sm text-neutral-200 sm:grid-cols-3">
-            <Link
-              href="/how-to-play"
-              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/10 p-4 text-left text-white/95 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/40 via-purple-500/40 to-pink-500/40 text-lg">
+          <ul className="mt-8 space-y-3 text-lg leading-relaxed text-neutral-200">
+            <li className="flex items-start gap-3">
+              <span aria-hidden className="mt-0.5 text-xl">
                 🎧
               </span>
-              <span className="space-y-1">
-                <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-neutral-200/80">
-                  Listen & guess
-                </span>
-                <span>
-                  Catch audio clues, spot the reference, and see how it works in
-                  the full guide.
-                </span>
+              <span>
+                <Link
+                  href="/how-to-play"
+                  className="font-semibold text-white transition hover:text-brand-200"
+                >
+                  Listen &amp; guess
+                </Link>{" "}
+                Catch audio clues, spot the reference, and see how it works in
+                the full guide.
               </span>
-            </Link>
-            <Link
-              href="/how-to-play"
-              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/10 p-4 text-left text-white/95 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg">
+            </li>
+            <li className="flex items-start gap-3">
+              <span aria-hidden className="mt-0.5 text-xl">
                 🧩
               </span>
-              <span className="space-y-1">
-                <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-neutral-200/80">
+              <span>
+                <Link
+                  href="/how-to-play"
+                  className="font-semibold text-white transition hover:text-brand-200"
+                >
                   Unlock hints
-                </span>
-                <span>
-                  Learn when to reveal extra clues and strategize your hint
-                  usage step-by-step.
-                </span>
+                </Link>{" "}
+                Learn when to reveal extra clues and strategize your hint usage
+                step-by-step.
               </span>
-            </Link>
-            <Link
-              href="/how-to-play"
-              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/10 p-4 text-left text-white/95 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg">
+            </li>
+            <li className="flex items-start gap-3">
+              <span aria-hidden className="mt-0.5 text-xl">
                 📣
               </span>
-              <span className="space-y-1">
-                <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-neutral-200/80">
+              <span>
+                <Link
+                  href="/how-to-play"
+                  className="font-semibold text-white transition hover:text-brand-200"
+                >
                   Share your streak
-                </span>
-                <span>
-                  See tips for exporting recap cards and celebrating wins with
-                  your squad.
-                </span>
+                </Link>{" "}
+                See tips for exporting recap cards and celebrating wins with your
+                squad.
               </span>
-            </Link>
-          </div>
+            </li>
+          </ul>
           {hasIncompleteGame ? (
             <p className="text-sm text-neutral-200/90">
               You left off on {nextIncompleteGame?.title}
