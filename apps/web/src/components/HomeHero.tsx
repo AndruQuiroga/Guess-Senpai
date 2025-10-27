@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import DailyResetTimer from "./DailyResetTimer";
+import { LoginCallout } from "./LoginCallout";
 
 export type ProgressSummaryChunk = {
   id: "streak" | "completion";
@@ -130,15 +131,7 @@ export function HomeHero({
             Track progress for {formattedDate} without leaving the fold.
           </p>
           {showLoginCallout ? (
-            <p className="text-sm leading-relaxed text-neutral-200/80">
-              <Link
-                href="/login"
-                className="font-semibold text-white transition hover:text-brand-200"
-              >
-                Log in with AniList
-              </Link>{" "}
-              to sync your streaks and archive completions across every device.
-            </p>
+            <LoginCallout className="max-w-xs sm:max-w-sm" />
           ) : null}
           {primaryCta || secondaryCta ? (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
