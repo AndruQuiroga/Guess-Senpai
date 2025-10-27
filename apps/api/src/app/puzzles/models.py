@@ -13,6 +13,11 @@ class RoundSpec(BaseModel):
     hints: List[str]
 
 
+class SynopsisHint(BaseModel):
+    ratio: float
+    text: str
+
+
 class AnidleHints(BaseModel):
     genres: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
@@ -21,6 +26,7 @@ class AnidleHints(BaseModel):
     duration: Optional[int] = None
     popularity: Optional[int] = None
     average_score: Optional[int] = None
+    synopsis: List[SynopsisHint] = Field(default_factory=list)
 
 
 class AnidleGame(BaseModel):

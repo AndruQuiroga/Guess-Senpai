@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import html
 import logging
+import random
 import re
 from dataclasses import asdict, dataclass
 from datetime import date
@@ -41,12 +42,15 @@ from .models import (
     RoundSpec,
     SolutionPayload,
     SolutionStreamingLink,
+    SynopsisHint,
 )
 
+ANIDLE_SYNOPSIS_REVEAL_LEVELS: Sequence[float] = (0.3, 0.5, 0.7)
+
 ANIDLE_ROUNDS = [
-    RoundSpec(difficulty=1, hints=["genres", "year"]),
-    RoundSpec(difficulty=2, hints=["episodes", "popularity", "average_score"]),
-    RoundSpec(difficulty=3, hints=["duration", "tags"]),
+    RoundSpec(difficulty=1, hints=["synopsis:0"]),
+    RoundSpec(difficulty=2, hints=["synopsis:1"]),
+    RoundSpec(difficulty=3, hints=["synopsis:2"]),
 ]
 
 POSTER_ROUNDS = [
@@ -159,6 +163,62 @@ def _extract_top_tags(media: Media, limit: int = 6) -> List[str]:
     return [name for _, name in tags[:limit]]
 
 
+def _generate_synopsis_levels(
+    text: str, seed: int, reveal_levels: Sequence[float]
+) -> List[SynopsisHint]:
+    if not text:
+        return []
+
+    word_matches = list(re.finditer(r"\b[\w']+\b", text))
+    candidates = [match for match in word_matches if match.group(0).upper() != "REDACTED"]
+
+    if not candidates:
+        return [SynopsisHint(ratio=max(0.0, min(level, 1.0)), text=text.strip()) for level in reveal_levels]
+
+    rng = random.Random(seed)
+    ordering = list(range(len(candidates)))
+    rng.shuffle(ordering)
+    shuffled = [candidates[index] for index in ordering]
+
+    hints: List[SynopsisHint] = []
+    for level in reveal_levels:
+        ratio = max(0.0, min(level, 1.0))
+        if ratio <= 0.0:
+            reveal_count = 0
+        elif ratio >= 1.0:
+            reveal_count = len(candidates)
+        else:
+            reveal_count = max(1, int(round(len(candidates) * ratio)))
+
+        visible_spans = {
+            shuffled[index].span()
+            for index in range(min(reveal_count, len(shuffled)))
+        }
+
+        pieces: List[str] = []
+        cursor = 0
+        for match in word_matches:
+            start, end = match.span()
+            pieces.append(text[cursor:start])
+            token = match.group(0)
+            if token.upper() == "REDACTED" or (start, end) in visible_spans:
+                pieces.append(token)
+            else:
+                pieces.append("[REDACTED]")
+            cursor = end
+        pieces.append(text[cursor:])
+
+        redacted_text = "".join(pieces).strip()
+        hints.append(SynopsisHint(ratio=ratio, text=redacted_text))
+
+    return hints
+
+
+def _build_anidle_synopsis(media: Media) -> List[SynopsisHint]:
+    text, _ = _redact_description(media)
+    return _generate_synopsis_levels(text, media.id, ANIDLE_SYNOPSIS_REVEAL_LEVELS)
+
+
 def _build_anidle(media: Media) -> AnidleGame:
     hints = AnidleHints(
         genres=[g for g in media.genres if g],
@@ -168,6 +228,7 @@ def _build_anidle(media: Media) -> AnidleGame:
         duration=media.duration,
         popularity=media.popularity,
         average_score=media.averageScore,
+        synopsis=_build_anidle_synopsis(media),
     )
     return AnidleGame(spec=ANIDLE_ROUNDS, answer=_choose_answer(media), hints=hints)
 
