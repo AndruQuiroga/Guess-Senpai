@@ -10,6 +10,7 @@ import {
   type HeroCta,
   type ProgressSummaryChunk,
 } from "../components/HomeHero";
+import { ShareRecapCard } from "../components/ShareRecapCard";
 import {
   type GameDirectoryEntry,
   type GamePreviewMedia,
@@ -26,8 +27,8 @@ import {
   buildShareEvent,
   formatShareDate,
   formatShareEventMessage,
+  type ShareEventData,
 } from "../utils/shareText";
-import { showToast } from "../utils/toast";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 
 const BASE_GAME_KEYS: readonly GameKey[] = [
@@ -270,9 +271,7 @@ export default function HomePage() {
     });
   }, [keysToConsider, progress]);
 
-  const shareLocked = completedCount === 0 && !hasStartedAnyRounds;
-
-  const shareEvent = useMemo(
+  const shareEvent = useMemo<ShareEventData>(
     () =>
       buildShareEvent(todayIso, progress, {
         includeGuessTheOpening,
@@ -283,6 +282,11 @@ export default function HomePage() {
   const shareMessage = useMemo(
     () => formatShareEventMessage(shareEvent),
     [shareEvent],
+  );
+
+  const shareFileName = useMemo(
+    () => `guesssenpai-${todayIso}-share`,
+    [todayIso],
   );
 
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
@@ -320,24 +324,6 @@ export default function HomePage() {
   const [previewGame, setPreviewGame] = useState<GameDirectoryEntry | null>(
     null,
   );
-
-  const handleShare = useCallback(async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ text: shareMessage });
-        showToast("Progress shared", "success");
-        return;
-      }
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareMessage);
-        showToast("Copied to clipboard", "success");
-        return;
-      }
-    } catch (error) {
-      console.warn("Share cancelled", error);
-    }
-    showToast("Unable to share on this device", "error");
-  }, [shareMessage]);
 
   const handleOpenPreview = useCallback((game: GameDirectoryEntry) => {
     setPreviewGame(game);
@@ -387,12 +373,19 @@ export default function HomePage() {
         streakInfo={streakInfo}
         progressChunks={progressChunks}
         showLoginCallout={showLoginCallout}
-        shareLocked={shareLocked}
-        onShare={handleShare}
         primaryCta={primaryCta}
         secondaryCta={secondaryCta}
         nextIncompleteGame={nextIncompleteGame}
       />
+
+      {allCompleted ? (
+        <ShareRecapCard
+          event={shareEvent}
+          shareMessage={shareMessage}
+          fileName={shareFileName}
+          streakCount={streakCount}
+        />
+      ) : null}
 
       <section className="space-y-6">
         <div className="space-y-2">
