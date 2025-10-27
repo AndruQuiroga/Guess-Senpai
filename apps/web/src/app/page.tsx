@@ -477,10 +477,9 @@ export default function HomePage() {
                     : game.comingSoon
                       ? "Coming soon"
                       : "Unavailable";
-                const overlayClasses =
-                  "opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100";
+                const overlayClasses = "opacity-60";
                 const cardClasses =
-                  "relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition group-hover:border-brand-400/50 group-hover:shadow-[0_0_40px_rgba(59,130,246,0.35)] group-focus-within:border-brand-400/50 group-focus-within:shadow-[0_0_40px_rgba(59,130,246,0.35)]";
+                  "relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/70 p-6 text-white shadow-ambient backdrop-blur-xl transition hover:border-white/20 focus-within:border-white/25";
 
                 const progressForGame = game.gameKey
                   ? progress[game.gameKey]
@@ -496,6 +495,47 @@ export default function HomePage() {
                   event?.stopPropagation();
                   handleOpenPreview(game);
                 };
+
+                const previewButton = (
+                  <button
+                    type="button"
+                    onClick={handlePreviewClick}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/40 text-white/80 shadow-ambient backdrop-blur transition hover:border-white/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    aria-label="Preview game"
+                  >
+                    <svg
+                      aria-hidden
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <span className="sr-only">Preview game</span>
+                  </button>
+                );
+
+                const actionCta = showAvailabilityError ? null : (
+                  <Link
+                    href={`/games/${game.slug}`}
+                    className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white shadow-ambient transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                  >
+                    {canResume ? "Resume" : "Start playing"}
+                    <svg
+                      aria-hidden
+                      className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
+                    </svg>
+                  </Link>
+                );
 
                 const content = (
                   <>
@@ -514,74 +554,40 @@ export default function HomePage() {
                       <p className="text-sm leading-relaxed text-neutral-200">
                         {game.tagline}
                       </p>
-                    </div>
-                    {showAvailabilityError ? (
-                      <div className="relative z-20 mt-6 flex flex-wrap items-center gap-3">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
-                          ⚠️ Unable to load today&apos;s availability
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleAvailabilityRetry}
-                          disabled={availabilityLoading}
-                          className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
-                        >
-                          Retry
-                        </button>
+                      <div className="mt-auto flex flex-col gap-4">
+                        {showAvailabilityError ? (
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
+                              ⚠️ Unable to load today&apos;s availability
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleAvailabilityRetry}
+                              disabled={availabilityLoading}
+                              className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-3">
+                            {actionCta}
+                            {previewButton}
+                          </div>
+                        )}
+                        {showAvailabilityError ? (
+                          <div className="flex justify-end">
+                            {previewButton}
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
+                    </div>
                   </>
                 );
 
                 return (
                   <div key={game.slug} className="flex h-full flex-col gap-3">
-                    <div className="group relative">
-                      <div className={`${cardClasses} flex-1 text-left`}>
-                        {content}
-                      </div>
-                      <Link
-                        href={`/games/${game.slug}`}
-                        aria-hidden="true"
-                        tabIndex={-1}
-                        className="absolute inset-0 z-10 rounded-3xl"
-                      />
-                      {!showAvailabilityError ? (
-                        <Link
-                          href={`/games/${game.slug}`}
-                          className="pointer-events-auto absolute bottom-6 left-6 z-30 inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-                        >
-                          {canResume ? "Resume" : "Start playing"}
-                          <svg
-                            aria-hidden
-                            className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-within:translate-x-1"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
-                          </svg>
-                        </Link>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={handlePreviewClick}
-                        className="absolute right-4 top-4 z-40 inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-black/40 px-4 text-sm font-semibold text-white/90 shadow-ambient backdrop-blur transition hover:border-white/40 hover:bg-black/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-                      >
-                        <svg
-                          aria-hidden
-                          className="h-4 w-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                        Preview game
-                      </button>
-                    </div>
+                    <div className={cardClasses}>{content}</div>
                     {game.playable && canResume ? (
                       <span className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/70">
                         Progress carries over when this mode launches
