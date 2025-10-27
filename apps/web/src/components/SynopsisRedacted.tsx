@@ -33,6 +33,78 @@ interface Props {
 
 const TOTAL_ROUNDS = 3;
 
+type SynopsisToken =
+  | { type: "word"; text: string }
+  | { type: "space"; text: string }
+  | { type: "punctuation"; text: string }
+  | { type: "newline" }
+  | { type: "redacted" };
+
+const ROUND_REVEAL_FRACTIONS: Record<number, number> = {
+  1: 0.3,
+  2: 0.6,
+  3: 1,
+};
+
+function createSeededRandom(seed: number): () => number {
+  let t = (seed || 1) + 0x6d2b79f5;
+  return () => {
+    t |= 0;
+    t = Math.imul(t ^ (t >>> 15), 1 | t);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle<T>(input: T[], seed: number): T[] {
+  const random = createSeededRandom(seed);
+  const result = [...input];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function tokenizeSynopsis(text: string): SynopsisToken[] {
+  const tokens: SynopsisToken[] = [];
+  const pattern = /(\[REDACTED\])|(\r?\n)|([A-Za-z0-9'’\-]+)|(\s+)|([^A-Za-z0-9\s]+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match[1]) {
+      tokens.push({ type: "redacted" });
+      continue;
+    }
+    if (match[2]) {
+      tokens.push({ type: "newline" });
+      continue;
+    }
+    if (match[3]) {
+      tokens.push({ type: "word", text: match[3] });
+      continue;
+    }
+    if (match[4]) {
+      tokens.push({ type: "space", text: match[4] });
+      continue;
+    }
+    if (match[5]) {
+      tokens.push({ type: "punctuation", text: match[5] });
+    }
+  }
+  return tokens.length > 0 ? tokens : [{ type: "word", text }];
+}
+
+function renderMaskedWord(index: number, text: string): ReactNode {
+  return (
+    <span
+      key={`masked-${index}`}
+      className="inline-block select-none align-baseline rounded-sm bg-black/90 px-1 py-0.5 text-transparent"
+    >
+      {text}
+    </span>
+  );
+}
+
 type FeedbackState =
   | { type: "success"; message: string }
   | { type: "error"; message: string }
@@ -55,6 +127,25 @@ export default function SynopsisRedacted({
   const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
   const normalizedAnswer = useMemo(() => payload.answer.trim().toLowerCase(), [payload.answer]);
+
+  const tokens = useMemo(() => tokenizeSynopsis(payload.text), [payload.text]);
+
+  const maskableWordIndices = useMemo(() => {
+    const indices: number[] = [];
+    tokens.forEach((token, index) => {
+      if (token.type === "word") {
+        indices.push(index);
+      }
+    });
+    return indices;
+  }, [tokens]);
+
+  const shuffledMaskOrder = useMemo(() => {
+    if (maskableWordIndices.length === 0) {
+      return maskableWordIndices;
+    }
+    return seededShuffle(maskableWordIndices, mediaId);
+  }, [maskableWordIndices, mediaId]);
 
   useEffect(() => {
     if (!initialProgress) {
@@ -113,53 +204,82 @@ export default function SynopsisRedacted({
     return maxTokens;
   }, [completed, hintRound, payload.masked_tokens.length, payload.spec]);
 
-  const revealedText = useMemo<ReactNode>(() => {
-    if (tokensToReveal <= 0) return payload.text;
+  const revealedWordSet = useMemo(() => {
+    if (maskableWordIndices.length === 0) {
+      return new Set<number>();
+    }
+    if (completed) {
+      return new Set(maskableWordIndices);
+    }
+    const clampedRound = Math.max(1, Math.min(TOTAL_ROUNDS, hintRound));
+    const fraction = ROUND_REVEAL_FRACTIONS[clampedRound] ?? ROUND_REVEAL_FRACTIONS[1];
+    const revealCount = Math.ceil(shuffledMaskOrder.length * fraction);
+    return new Set(shuffledMaskOrder.slice(0, revealCount));
+  }, [completed, hintRound, maskableWordIndices, shuffledMaskOrder]);
 
-    const parts = payload.text.split("[REDACTED]");
-    if (parts.length === 1) return payload.text;
+  const revealedText = useMemo<ReactNode>(() => {
+    if (tokens.length === 0) {
+      return payload.text;
+    }
 
     const replacements = payload.masked_tokens.slice(0, tokensToReveal);
     const content: ReactNode[] = [];
     let replacementIndex = 0;
 
-    parts.forEach((part, partIndex) => {
-      content.push(
-        <span key={`text-${partIndex}`} className="whitespace-pre-wrap">
-          {part}
-        </span>
-      );
-
-      if (partIndex === parts.length - 1) {
+    tokens.forEach((token, index) => {
+      if (token.type === "word") {
+        if (revealedWordSet.has(index) || completed) {
+          content.push(
+            <span key={`word-${index}`} className="inline-block align-baseline">
+              {token.text}
+            </span>,
+          );
+        } else {
+          content.push(renderMaskedWord(index, token.text));
+        }
         return;
       }
 
-      const replacement =
-        replacementIndex < replacements.length
-          ? replacements[replacementIndex]
-          : undefined;
+      if (token.type === "space") {
+        content.push(token.text);
+        return;
+      }
 
-      if (replacement !== undefined && replacement !== null) {
+      if (token.type === "newline") {
+        content.push("\n");
+        return;
+      }
+
+      if (token.type === "punctuation") {
         content.push(
-          <span
-            key={`token-${partIndex}`}
-            className="inline-flex items-baseline rounded-sm border border-yellow-600/60 bg-yellow-200/90 px-1 font-semibold text-neutral-900 underline decoration-yellow-700 shadow-sm"
-          >
-            <span className="whitespace-pre-wrap">{replacement}</span>
-          </span>
+          <span key={`punct-${index}`} className="inline-block align-baseline">
+            {token.text}
+          </span>,
         );
-        replacementIndex += 1;
-      } else {
-        content.push(
-          <span key={`placeholder-${partIndex}`} className="whitespace-pre-wrap">
-            [REDACTED]
-          </span>
-        );
+        return;
+      }
+
+      if (token.type === "redacted") {
+        const replacement =
+          replacementIndex < replacements.length ? replacements[replacementIndex] : undefined;
+        if (replacement !== undefined && replacement !== null) {
+          content.push(
+            <span
+              key={`token-${index}`}
+              className="inline-flex items-baseline rounded-sm border border-yellow-600/60 bg-yellow-200/90 px-1 font-semibold text-neutral-900 underline decoration-yellow-700 shadow-sm"
+            >
+              <span className="whitespace-pre-wrap">{replacement}</span>
+            </span>,
+          );
+          replacementIndex += 1;
+        } else {
+          content.push(renderMaskedWord(index, "[REDACTED]"));
+        }
       }
     });
 
     return content;
-  }, [completed, payload.masked_tokens, payload.text, tokensToReveal]);
+  }, [completed, payload.masked_tokens, payload.text, revealedWordSet, tokens, tokensToReveal]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });
