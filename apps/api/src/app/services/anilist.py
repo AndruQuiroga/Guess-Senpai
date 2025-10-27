@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import date
 from typing import Any, Dict, List, Optional, Sequence
 
 import httpx
 from pydantic import BaseModel, Field
+
+from .cache import CacheBackend
 
 ANILIST_GQL = "https://graphql.anilist.co"
 ANILIST_AUTH_BASE = "https://anilist.co/api/v2/oauth"
@@ -130,6 +134,137 @@ query PopularPool($page: Int!, $perPage: Int!) {
       isAdult: false
       format_in: [TV, TV_SHORT, MOVIE, ONA, OVA]
       status_not_in: [NOT_YET_RELEASED, CANCELLED]
+    ) {
+      id
+      title {
+        romaji
+        english
+        native
+        userPreferred
+      }
+      synonyms
+      season
+      seasonYear
+      startDate { year }
+      episodes
+      duration
+      genres
+      tags { name rank isGeneralSpoiler }
+      popularity
+      averageScore
+      description(asHtml: false)
+      status
+      format
+      coverImage { extraLarge large medium color }
+      bannerImage
+      isAdult
+    }
+  }
+}
+"""
+
+TOP_RATED_QUERY = """
+query TopRated($page: Int!, $perPage: Int!) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      total
+      currentPage
+      hasNextPage
+    }
+    media(
+      type: ANIME
+      sort: [SCORE_DESC, POPULARITY_DESC]
+      isAdult: false
+      format_in: [TV, TV_SHORT, MOVIE, ONA, OVA]
+      status_not_in: [NOT_YET_RELEASED, CANCELLED]
+    ) {
+      id
+      title {
+        romaji
+        english
+        native
+        userPreferred
+      }
+      synonyms
+      season
+      seasonYear
+      startDate { year }
+      episodes
+      duration
+      genres
+      tags { name rank isGeneralSpoiler }
+      popularity
+      averageScore
+      description(asHtml: false)
+      status
+      format
+      coverImage { extraLarge large medium color }
+      bannerImage
+      isAdult
+    }
+  }
+}
+"""
+
+TOP_POPULAR_QUERY = """
+query TopPopular($page: Int!, $perPage: Int!) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      total
+      currentPage
+      hasNextPage
+    }
+    media(
+      type: ANIME
+      sort: [POPULARITY_DESC, SCORE_DESC]
+      isAdult: false
+      format_in: [TV, TV_SHORT, MOVIE, ONA, OVA]
+      status_not_in: [NOT_YET_RELEASED, CANCELLED]
+    ) {
+      id
+      title {
+        romaji
+        english
+        native
+        userPreferred
+      }
+      synonyms
+      season
+      seasonYear
+      startDate { year }
+      episodes
+      duration
+      genres
+      tags { name rank isGeneralSpoiler }
+      popularity
+      averageScore
+      description(asHtml: false)
+      status
+      format
+      coverImage { extraLarge large medium color }
+      bannerImage
+      isAdult
+    }
+  }
+}
+"""
+
+SEASONAL_POPULAR_QUERY = """
+query SeasonalPopular($page: Int!, $perPage: Int!, $season: MediaSeason!, $seasonYear: Int!) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      total
+      currentPage
+      hasNextPage
+    }
+    media(
+      type: ANIME
+      sort: [POPULARITY_DESC, SCORE_DESC]
+      isAdult: false
+      format_in: [TV, TV_SHORT, MOVIE, ONA, OVA]
+      status_not_in: [NOT_YET_RELEASED, CANCELLED]
+      season: $season
+      seasonYear: $seasonYear
     ) {
       id
       title {
@@ -326,6 +461,82 @@ async def fetch_popular_pool(per_page: int = 100, pages: int = 2) -> List[Media]
             break
         current_page += 1
     return media
+
+
+def _clamp_per_page(value: int, default: int) -> int:
+    if value <= 0:
+        return default
+    return max(1, min(value, 100))
+
+
+def _resolve_season(target_day: date) -> tuple[str, int]:
+    month = target_day.month
+    if month in (1, 2, 3):
+        return "WINTER", target_day.year
+    if month in (4, 5, 6):
+        return "SPRING", target_day.year
+    if month in (7, 8, 9):
+        return "SUMMER", target_day.year
+    return "FALL", target_day.year
+
+
+async def _fetch_media_slice(query: str, variables: Dict[str, Any]) -> List[Media]:
+    payload = await gql_request(query, variables)
+    media_payload = payload.get("Page", {}).get("media", [])
+    return [Media.model_validate(item) for item in media_payload]
+
+
+async def fetch_opening_pool(
+    cache: CacheBackend,
+    *,
+    day: date | None = None,
+    top_rated_limit: int = 25,
+    top_popular_limit: int = 50,
+    seasonal_limit: int = 25,
+    ttl: int = 86_400,
+) -> List[Media]:
+    target_day = day or date.today()
+    top_rated_per_page = _clamp_per_page(top_rated_limit, 25)
+    top_popular_per_page = _clamp_per_page(top_popular_limit, 50)
+    seasonal_per_page = _clamp_per_page(seasonal_limit, 25)
+
+    season, season_year = _resolve_season(target_day)
+    cache_key = (
+        f"anilist:opening:{target_day.isoformat()}"
+        f":{top_rated_per_page}:{top_popular_per_page}:{seasonal_per_page}"
+    )
+
+    async def creator() -> List[dict]:
+        top_rated_task = _fetch_media_slice(
+            TOP_RATED_QUERY, {"page": 1, "perPage": top_rated_per_page}
+        )
+        top_popular_task = _fetch_media_slice(
+            TOP_POPULAR_QUERY, {"page": 1, "perPage": top_popular_per_page}
+        )
+        seasonal_task = _fetch_media_slice(
+            SEASONAL_POPULAR_QUERY,
+            {
+                "page": 1,
+                "perPage": seasonal_per_page,
+                "season": season,
+                "seasonYear": season_year,
+            },
+        )
+        top_rated, top_popular, seasonal = await asyncio.gather(
+            top_rated_task, top_popular_task, seasonal_task
+        )
+        combined: List[Media] = []
+        seen: set[int] = set()
+        for bucket in (top_rated, top_popular, seasonal):
+            for media in bucket:
+                if media.id in seen:
+                    continue
+                seen.add(media.id)
+                combined.append(media)
+        return [media.model_dump(mode="json") for media in combined]
+
+    raw_media = await cache.remember(cache_key, ttl, creator)
+    return [Media.model_validate(item) for item in raw_media]
 
 
 async def fetch_media_details(media_id: int) -> Media:
