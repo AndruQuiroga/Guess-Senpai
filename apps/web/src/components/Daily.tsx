@@ -341,6 +341,8 @@ export default function Daily({ data }: Props) {
     return () => window.clearInterval(intervalId);
   }, [nextResetIso]);
 
+  const countdownDisplay = timeRemaining ?? "— — : — —";
+
   const [syncToast, setSyncToast] = useState<
     | {
         tone: "success" | "error";
@@ -370,58 +372,55 @@ export default function Daily({ data }: Props) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl sm:p-7">
-        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-display font-semibold tracking-tight text-white drop-shadow-[0_0_12px_rgba(59,130,246,0.35)]">
-              GuessSenpai Daily
-            </h1>
-            <p className="text-sm text-neutral-300">{formattedDate}</p>
+      <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised px-6 py-7 shadow-ambient backdrop-blur-2xl sm:px-8">
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="flex-1 space-y-6">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-brand-200/80">
+                Daily challenge
+              </p>
+              <h1 className="text-3xl font-display font-semibold tracking-tight text-white drop-shadow-[0_0_12px_rgba(59,130,246,0.35)] sm:text-[2.6rem]">
+                GuessSenpai Daily
+              </h1>
+              <p className="text-sm text-neutral-300/90">{formattedDate}</p>
+            </div>
+            <div className="flex flex-wrap gap-2.5 text-sm">
+              <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
+                🔥 Streak {streakCount}
+              </span>
+              {mediaIdLabel && (
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 font-medium text-white/90 backdrop-blur-sm">
+                  {mediaIdLabel}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleSync}
+                disabled={isRefreshing}
+              >
+                {syncButtonLabel}
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:auto-cols-max sm:grid-flow-col sm:items-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
-              🔥 Streak {streakCount}
+          <div className="flex w-full max-w-sm flex-none items-center justify-center self-stretch">
+            <div className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/10 px-6 py-6 text-center shadow-ambient backdrop-blur-2xl sm:px-7">
+              <span className="text-xs font-semibold uppercase tracking-[0.4em] text-white/70">
+                Time left
+              </span>
+              <span className="mt-3 block font-mono text-4xl font-semibold leading-none text-white sm:text-5xl">
+                {countdownDisplay}
+              </span>
+              <span className="mt-3 block text-sm text-neutral-200/80">
+                Keep playing before the next drop lands.
+              </span>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
-              {timeRemaining ? `⏱️ Resets in ${timeRemaining}` : "⏱️ Resets soon"}
-            </div>
-            {mediaIdLabel && (
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
-                {mediaIdLabel}
-              </div>
-            )}
-            <button
-              type="button"
-              className="rounded-2xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={handleSync}
-              disabled={isRefreshing}
-            >
-              {syncButtonLabel}
-            </button>
           </div>
         </div>
       </header>
-
-      <GlassSection innerClassName="space-y-4 text-neutral-200">
-        <div className="space-y-1">
-          <h2 className="text-lg font-display font-semibold tracking-tight text-white">
-            Share your run
-          </h2>
-          <p className="text-sm text-neutral-300/90">
-            Choose a theme, generate a recap card, and spread the word with a single tap.
-          </p>
-        </div>
-        <ShareComposer
-          payload={shareCardPayload}
-          shareLocked={shareLocked}
-          fileName={shareFileName}
-        />
-      </GlassSection>
-
-      <StreakWidget currentDateIso={data.date} completed={allCompleted} />
-
-      <NotificationOptInCard />
 
       {syncToast && (
         <div
@@ -437,57 +436,86 @@ export default function Daily({ data }: Props) {
         </div>
       )}
 
-      <section className="space-y-5 sm:space-y-6">
-        <div className="space-y-1">
-          <h2 className="text-xl font-display font-semibold tracking-tight text-white sm:text-2xl">
-            Today&apos;s puzzles
-          </h2>
-          <p className="text-sm leading-relaxed text-neutral-300/90">
-            Follow the timeline to preview your first hints and jump straight into each challenge.
-          </p>
+      <section className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] lg:items-start">
+        <div className="space-y-5 sm:space-y-6">
+          <div className="space-y-1">
+            <h2 className="text-xl font-display font-semibold tracking-tight text-white sm:text-2xl">
+              Today&apos;s games
+            </h2>
+            <p className="text-sm leading-relaxed text-neutral-300/90">
+              Jump straight into each challenge—every puzzle is just a tap away.
+            </p>
+          </div>
+
+          {timelineEntries.length > 0 ? (
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-5 shadow-ambient backdrop-blur-2xl sm:p-7">
+              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent sm:inset-x-9" />
+              <div className="relative sm:pl-8">
+                <span className="pointer-events-none absolute left-[0.35rem] top-6 bottom-6">
+                  <span className="block h-full w-px bg-white/15" />
+                </span>
+                <ol className="space-y-6 sm:space-y-8">
+                  {timelineEntries.map((entry, index) => (
+                    <GamePreviewCard
+                      key={entry.slug}
+                      slug={entry.slug}
+                      title={entry.title}
+                      description={entry.description}
+                      status={entry.status}
+                      statusLabel={entry.statusLabel}
+                      statusIcon={entry.statusIcon}
+                      accentColor={entry.accentColor}
+                      ctaLabel={entry.ctaLabel}
+                      href={`/games/${entry.slug}`}
+                      index={index}
+                      preview={previewComponents[entry.gameKey] ?? null}
+                    />
+                  ))}
+                </ol>
+              </div>
+            </div>
+          ) : (
+            <GlassSection
+              className="border-dashed border-white/10 bg-surface-raised/50"
+              innerClassName="space-y-2 text-center"
+            >
+              <p className="text-sm font-medium text-white/90">
+                No daily puzzles are available right now.
+              </p>
+              <p className="text-xs text-neutral-300/80">
+                Check back soon for fresh challenges.
+              </p>
+            </GlassSection>
+          )}
         </div>
 
-        {timelineEntries.length > 0 ? (
-          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-5 shadow-ambient backdrop-blur-2xl sm:p-7">
-            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent sm:inset-x-9" />
-            <div className="relative sm:pl-8">
-              <span className="pointer-events-none absolute left-[0.35rem] top-6 bottom-6">
-                <span className="block h-full w-px bg-white/15" />
-              </span>
-              <ol className="space-y-6 sm:space-y-8">
-                {timelineEntries.map((entry, index) => (
-                  <GamePreviewCard
-                    key={entry.slug}
-                    slug={entry.slug}
-                    title={entry.title}
-                    description={entry.description}
-                    status={entry.status}
-                    statusLabel={entry.statusLabel}
-                    statusIcon={entry.statusIcon}
-                    accentColor={entry.accentColor}
-                    ctaLabel={entry.ctaLabel}
-                    href={`/games/${entry.slug}`}
-                    index={index}
-                    preview={previewComponents[entry.gameKey] ?? null}
-                  />
-                ))}
-              </ol>
+        <aside className="order-last lg:order-none">
+          <GlassSection innerClassName="space-y-4 text-neutral-200" className="h-full border-white/5 bg-surface-raised/70">
+            <div className="space-y-1">
+              <h2 className="text-lg font-display font-semibold tracking-tight text-white">
+                Share your run
+              </h2>
+              <p className="text-sm text-neutral-300/90">
+                Craft a recap card with a single tap and show off your streak.
+              </p>
             </div>
-          </div>
-        ) : (
-          <GlassSection
-            className="border-dashed border-white/10 bg-surface-raised/50"
-            innerClassName="space-y-2 text-center"
-          >
-            <p className="text-sm font-medium text-white/90">
-              No daily puzzles are available right now.
-            </p>
-            <p className="text-xs text-neutral-300/80">
-              Check back soon for fresh challenges.
-            </p>
+            <ShareComposer
+              payload={shareCardPayload}
+              shareLocked={shareLocked}
+              fileName={shareFileName}
+            />
           </GlassSection>
-        )}
+        </aside>
       </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <StreakWidget
+          currentDateIso={data.date}
+          completed={allCompleted}
+          className="h-full"
+        />
+        <NotificationOptInCard />
+      </div>
 
       {allCompleted && solutions.length > 0 && (
         <SolutionReveal solutions={solutions} streak={streakInfo} />
