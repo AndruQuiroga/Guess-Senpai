@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { DailyCompletionBanner } from "../components/DailyCompletionBanner";
 import { GamePreviewModal } from "../components/GamePreviewModal";
 import {
   HomeHero,
@@ -341,17 +342,21 @@ export default function HomePage() {
     [streakCount, completedCount, totalAvailable],
   );
 
-  const primaryCta: HeroCta =
-    hasIncompleteGame && nextIncompleteGame
+  const showCompletionBanner = allCompleted;
+
+  const primaryCta: HeroCta | undefined = !showCompletionBanner
+    ? hasIncompleteGame && nextIncompleteGame
       ? {
           href: `/games/${nextIncompleteGame.slug}`,
           label: `Resume ${nextIncompleteGame.title}`,
         }
-      : { href: "/games/daily", label: "Play today’s lineup" };
-
-  const secondaryCta: HeroCta | undefined = hasIncompleteGame
-    ? { href: "/games/daily", label: "Continue" }
+      : { href: "/games/daily", label: "Play today’s lineup" }
     : undefined;
+
+  const secondaryCta: HeroCta | undefined =
+    !showCompletionBanner && hasIncompleteGame
+      ? { href: "/games/daily", label: "Continue" }
+      : undefined;
 
   return (
     <div className="space-y-16">
@@ -365,6 +370,10 @@ export default function HomePage() {
         nextIncompleteGame={nextIncompleteGame}
         timeRemaining={timeRemaining}
       />
+
+      {showCompletionBanner ? (
+        <DailyCompletionBanner timeRemaining={timeRemaining} />
+      ) : null}
 
       {allCompleted ? (
         <ShareRecapCard

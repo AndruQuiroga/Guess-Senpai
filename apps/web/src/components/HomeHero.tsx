@@ -98,7 +98,7 @@ interface HomeHeroProps {
   streakInfo: StreakSummary;
   progressChunks: ProgressSummaryChunk[];
   showLoginCallout: boolean;
-  primaryCta: HeroCta;
+  primaryCta?: HeroCta;
   secondaryCta?: HeroCta;
   nextIncompleteGame: { slug: string; title: string } | null;
   timeRemaining: string | null;
@@ -140,22 +140,26 @@ export function HomeHero({
               to sync your streaks and archive completions across every device.
             </p>
           ) : null}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <Link
-              href={primaryCta.href}
-              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-7 py-3 text-base font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_28px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-            >
-              {primaryCta.label}
-            </Link>
-            {secondaryCta ? (
-              <Link
-                href={secondaryCta.href}
-                className="inline-flex items-center justify-center rounded-2xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/85 transition hover:border-white/40 hover:text-white"
-              >
-                {secondaryCta.label}
-              </Link>
-            ) : null}
-          </div>
+          {primaryCta || secondaryCta ? (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+              {primaryCta ? (
+                <Link
+                  href={primaryCta.href}
+                  className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-7 py-3 text-base font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_28px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                >
+                  {primaryCta.label}
+                </Link>
+              ) : null}
+              {secondaryCta ? (
+                <Link
+                  href={secondaryCta.href}
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/85 transition hover:border-white/40 hover:text-white"
+                >
+                  {secondaryCta.label}
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="flex w-full max-w-lg flex-col gap-6 rounded-4xl border border-white/15 bg-white/5 p-6 text-sm text-neutral-200/90 shadow-ambient backdrop-blur-xl">
           <div className="space-y-1 text-white/85">
