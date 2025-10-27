@@ -9,7 +9,12 @@ from pydantic import BaseModel
 from ..core.config import settings
 from ..core.database import get_session_factory
 from ..puzzles import engine as puzzle_engine
-from ..puzzles.engine import UserContext, _title_variants, get_daily_puzzle
+from ..puzzles.engine import (
+    UserContext,
+    _choose_answer,
+    _title_variants,
+    get_daily_puzzle,
+)
 from ..puzzles.models import (
     DailyProgressPayload,
     DailyPuzzleResponse,
@@ -106,6 +111,7 @@ class AnidleGuessEvaluationResponse(BaseModel):
 class GuessVerificationPayload(BaseModel):
     media_id: int
     guess: str
+    guess_media_id: Optional[int] = None
 
 
 class GuessVerificationResponse(BaseModel):
@@ -274,11 +280,32 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
 
     variants = _title_variants(media)
     normalized_guess = _normalize(guess)
+    normalized_variants = {_normalize(variant) for variant in variants if variant}
+
+    guess_media = None
+    if payload.guess_media_id:
+        try:
+            guess_media = await puzzle_engine._load_media_details(
+                payload.guess_media_id, cache, settings
+            )
+        except Exception:  # pragma: no cover - fallback to text matching
+            guess_media = None
+
     match = None
-    for variant in variants:
-        if variant and _normalize(variant) == normalized_guess:
-            match = variant
-            break
+    if guess_media is not None:
+        guess_variants = _title_variants(guess_media)
+        for variant in guess_variants:
+            if variant and _normalize(variant) in normalized_variants:
+                match = variant
+                break
+        if guess_media.id == media.id and match is None:
+            match = _choose_answer(media)
+
+    if match is None:
+        for variant in variants:
+            if variant and _normalize(variant) == normalized_guess:
+                match = variant
+                break
 
     return GuessVerificationResponse(correct=match is not None, match=match)
 

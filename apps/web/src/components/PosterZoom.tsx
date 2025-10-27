@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { PosterZoomGame as PosterPayload } from "../types/puzzles";
@@ -8,6 +8,11 @@ import { resolveHintRound } from "../utils/difficulty";
 import { formatMediaFormatLabel } from "../utils/formatMediaFormatLabel";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
+import {
+  TitleGuessField,
+  type TitleGuessFieldHandle,
+  type TitleGuessSelection,
+} from "./games/TitleGuessField";
 
 interface Props {
   mediaId: number;
@@ -43,6 +48,7 @@ export default function PosterZoom({
   );
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [submitting, setSubmitting] = useState(false);
+  const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
   const totalRounds = useMemo(() => {
     if (payload.spec.length > 0) {
@@ -178,12 +184,11 @@ export default function PosterZoom({
     return Array.from(new Set(hints));
   }, [completed, hintRound, payload]);
 
-  const handleGuessSubmit = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
+  const attemptGuess = useCallback(
+    async ({ value, suggestionId }: TitleGuessSelection) => {
       if (completed || submitting) return;
-      const value = guess.trim();
-      if (!value) {
+      const trimmed = value.trim();
+      if (!trimmed) {
         setFeedback({
           type: "error",
           message: "Enter a guess before submitting.",
@@ -194,8 +199,8 @@ export default function PosterZoom({
       setSubmitting(true);
       setFeedback(null);
       try {
-        const result = await verifyGuess(mediaId, value);
-        setGuesses((prev) => [...prev, value]);
+        const result = await verifyGuess(mediaId, trimmed, suggestionId);
+        setGuesses((prev) => [...prev, trimmed]);
         if (result.correct) {
           setCompleted(true);
           const acceptedTitle = result.match ?? payload.answer;
@@ -218,7 +223,31 @@ export default function PosterZoom({
         setSubmitting(false);
       }
     },
-    [completed, guess, mediaId, payload.answer, submitting, totalRounds],
+    [completed, mediaId, payload.answer, submitting, totalRounds],
+  );
+
+  const handleFieldSubmit = useCallback(
+    (selection: TitleGuessSelection) => {
+      void attemptGuess(selection);
+    },
+    [attemptGuess],
+  );
+
+  const handleGuessSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (completed || submitting) return;
+      const selection = guessFieldRef.current?.submit();
+      if (!selection) {
+        setFeedback({
+          type: "error",
+          message: "Enter a guess before submitting.",
+        });
+        return;
+      }
+      void attemptGuess(selection);
+    },
+    [attemptGuess, completed, submitting],
   );
 
   return (
@@ -268,13 +297,16 @@ export default function PosterZoom({
         onSubmit={handleGuessSubmit}
         className="flex flex-col gap-3 sm:flex-row"
       >
-        <input
-          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:opacity-70"
-          placeholder={completed ? "Poster solved!" : "Type your guess…"}
+        <TitleGuessField
+          ref={guessFieldRef}
+          className="w-full"
           value={guess}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => setGuess(event.target.value)}
+          onValueChange={setGuess}
+          onSubmit={handleFieldSubmit}
           disabled={completed || submitting}
-          aria-label="Poster Zoom guess"
+          placeholder={completed ? "Poster solved!" : "Type your guess…"}
+          ariaLabel="Poster Zoom guess"
+          suggestionsLabel="Poster title suggestions"
         />
         <button
           type="submit"

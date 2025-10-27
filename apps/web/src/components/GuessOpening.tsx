@@ -1,19 +1,17 @@
 "use client";
 
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ChangeEvent,
-} from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { GuessOpeningGame as GuessOpeningPayload } from "../types/puzzles";
 import { resolveHintRound } from "../utils/difficulty";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
+import {
+  TitleGuessField,
+  type TitleGuessFieldHandle,
+  type TitleGuessSelection,
+} from "./games/TitleGuessField";
 
 interface Props {
   mediaId: number;
@@ -55,6 +53,7 @@ export default function GuessOpening({
   const [canonicalTitle, setCanonicalTitle] = useState(payload.answer);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [submitting, setSubmitting] = useState(false);
+  const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
   useEffect(() => {
     if (!initialProgress) {
@@ -140,12 +139,11 @@ export default function GuessOpening({
     : (clip.videoUrl ?? clip.audioUrl ?? undefined);
   const hasMedia = Boolean(mediaSrc);
 
-  const handleGuessSubmit = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
+  const attemptGuess = useCallback(
+    async ({ value, suggestionId }: TitleGuessSelection) => {
       if (completed || submitting) return;
-      const value = guess.trim();
-      if (!value) {
+      const trimmed = value.trim();
+      if (!trimmed) {
         setFeedback({
           type: "error",
           message: "Enter a guess before submitting.",
@@ -156,8 +154,8 @@ export default function GuessOpening({
       setSubmitting(true);
       setFeedback(null);
       try {
-        const result = await verifyGuess(mediaId, value);
-        setGuesses((prev) => [...prev, value]);
+        const result = await verifyGuess(mediaId, trimmed, suggestionId);
+        setGuesses((prev) => [...prev, trimmed]);
         if (result.correct) {
           const matchTitle = result.match?.trim()
             ? result.match
@@ -186,7 +184,37 @@ export default function GuessOpening({
         setSubmitting(false);
       }
     },
-    [completed, guess, mediaId, payload.answer, submitting, totalRounds],
+    [
+      completed,
+      mediaId,
+      payload.answer,
+      submitting,
+      totalRounds,
+    ],
+  );
+
+  const handleFieldSubmit = useCallback(
+    (selection: TitleGuessSelection) => {
+      void attemptGuess(selection);
+    },
+    [attemptGuess],
+  );
+
+  const handleGuessSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (completed || submitting) return;
+      const selection = guessFieldRef.current?.submit();
+      if (!selection) {
+        setFeedback({
+          type: "error",
+          message: "Enter a guess before submitting.",
+        });
+        return;
+      }
+      void attemptGuess(selection);
+    },
+    [attemptGuess, completed, submitting],
   );
 
   return (
@@ -251,21 +279,22 @@ export default function GuessOpening({
         onSubmit={handleGuessSubmit}
         className="flex flex-col gap-3 sm:flex-row"
       >
-        <input
-          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:opacity-70"
+        <TitleGuessField
+          ref={guessFieldRef}
+          className="w-full"
+          value={guess}
+          onValueChange={setGuess}
+          onSubmit={handleFieldSubmit}
+          disabled={completed || submitting}
           placeholder={
             completed ? `Opening solved! ${canonicalTitle}` : "Type your guess…"
           }
-          value={guess}
-          onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            setGuess(event.target.value)
-          }
-          disabled={completed || submitting}
-          aria-label={
+          ariaLabel={
             completed
               ? `Opening solved: ${canonicalTitle}`
               : "Guess the opening"
           }
+          suggestionsLabel="Opening title suggestions"
         />
         <button
           type="submit"

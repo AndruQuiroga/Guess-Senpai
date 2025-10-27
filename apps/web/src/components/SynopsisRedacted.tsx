@@ -1,13 +1,25 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { RedactedSynopsisGame as SynopsisPayload } from "../types/puzzles";
 import { resolveHintRound } from "../utils/difficulty";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
+import {
+  TitleGuessField,
+  type TitleGuessFieldHandle,
+  type TitleGuessSelection,
+} from "./games/TitleGuessField";
 
 interface Props {
   mediaId: number;
@@ -40,6 +52,7 @@ export default function SynopsisRedacted({
   const [guesses, setGuesses] = useState<string[]>(initialProgress?.guesses ?? []);
   const [completed, setCompleted] = useState(initialProgress?.completed ?? false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
   const normalizedAnswer = useMemo(() => payload.answer.trim().toLowerCase(), [payload.answer]);
 
@@ -152,57 +165,84 @@ export default function SynopsisRedacted({
     onProgressChange({ completed, round, guesses });
   }, [completed, round, guesses, onProgressChange]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (completed) return;
-    const value = guess.trim();
-    if (!value) {
-      setFeedback({
-        type: "error",
-        message: "Enter a guess before submitting.",
-      });
-      return;
-    }
-    setFeedback(null);
-    try {
-      const result = await verifyGuess(mediaId, value);
-      setGuesses((prev) => [...prev, value]);
-      if (result.correct) {
-        setCompleted(true);
-        setFeedback({
-          type: "success",
-          message: `Correct! The anime is ${payload.answer}`,
-        });
-      } else {
-        setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+  const attemptGuess = useCallback(
+    async ({ value, suggestionId }: TitleGuessSelection) => {
+      if (completed) return;
+      const trimmed = value.trim();
+      if (!trimmed) {
         setFeedback({
           type: "error",
-          message: "Not quite. Keep trying!",
+          message: "Enter a guess before submitting.",
         });
+        return;
       }
-    } catch (error) {
-      setGuesses((prev) => [...prev, value]);
-      if (value.toLowerCase() === normalizedAnswer) {
-        setCompleted(true);
-        setFeedback({
-          type: "success",
-          message: `Correct! The anime is ${payload.answer}`,
-        });
-      } else {
-        setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to verify your guess. Please try again.";
+
+      setFeedback(null);
+      try {
+        const result = await verifyGuess(mediaId, trimmed, suggestionId);
+        setGuesses((prev) => [...prev, trimmed]);
+        if (result.correct) {
+          setCompleted(true);
+          setFeedback({
+            type: "success",
+            message: `Correct! The anime is ${payload.answer}`,
+          });
+        } else {
+          setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+          setFeedback({
+            type: "error",
+            message: "Not quite. Keep trying!",
+          });
+        }
+      } catch (error) {
+        setGuesses((prev) => [...prev, trimmed]);
+        if (trimmed.toLowerCase() === normalizedAnswer) {
+          setCompleted(true);
+          setFeedback({
+            type: "success",
+            message: `Correct! The anime is ${payload.answer}`,
+          });
+        } else {
+          setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Unable to verify your guess. Please try again.";
+          setFeedback({
+            type: "error",
+            message,
+          });
+        }
+      } finally {
+        setGuess("");
+      }
+    },
+    [completed, mediaId, normalizedAnswer, payload.answer],
+  );
+
+  const handleFieldSubmit = useCallback(
+    (selection: TitleGuessSelection) => {
+      void attemptGuess(selection);
+    },
+    [attemptGuess],
+  );
+
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (completed) return;
+      const selection = guessFieldRef.current?.submit();
+      if (!selection) {
         setFeedback({
           type: "error",
-          message,
+          message: "Enter a guess before submitting.",
         });
+        return;
       }
-    } finally {
-      setGuess("");
-    }
-  };
+      void attemptGuess(selection);
+    },
+    [attemptGuess, completed],
+  );
 
   return (
     <div className="space-y-5">
@@ -217,13 +257,16 @@ export default function SynopsisRedacted({
         )}
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-        <input
-          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/25 disabled:cursor-not-allowed disabled:opacity-60"
-          placeholder={completed ? payload.answer : "Guess the anime…"}
+        <TitleGuessField
+          ref={guessFieldRef}
+          className="w-full"
           value={guess}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setGuess(event.target.value)}
+          onValueChange={setGuess}
+          onSubmit={handleFieldSubmit}
           disabled={completed}
-          aria-label="Synopsis guess"
+          placeholder={completed ? payload.answer : "Guess the anime…"}
+          ariaLabel="Synopsis guess"
+          suggestionsLabel="Synopsis title suggestions"
         />
         <button
           type="submit"

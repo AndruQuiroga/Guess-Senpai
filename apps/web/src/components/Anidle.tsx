@@ -3,15 +3,13 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
+  type FormEvent,
 } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
-import { useTitleSuggestions } from "../hooks/useTitleSuggestions";
 import { AnidleGame as AnidlePayload } from "../types/puzzles";
 import { resolveHintRound } from "../utils/difficulty";
 import {
@@ -23,6 +21,11 @@ import {
   type ScalarStatus,
 } from "../utils/evaluateAnidleGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
+import {
+  TitleGuessField,
+  type TitleGuessFieldHandle,
+  type TitleGuessSelection,
+} from "./games/TitleGuessField";
 
 interface Props {
   mediaId: number;
@@ -93,8 +96,6 @@ export default function Anidle({
   const [completed, setCompleted] = useState(
     initialProgress?.completed ?? false,
   );
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [evaluations, setEvaluations] = useState<AnidleGuessEvaluation[]>([]);
   const [hydrating, setHydrating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -102,9 +103,7 @@ export default function Anidle({
 
   const hydratedGuessesKeyRef = useRef<string | null>(null);
   const previousMediaIdRef = useRef<number | null>(null);
-
-  const blurTimeoutRef = useRef<number | null>(null);
-  const listboxId = `${useId()}-anidle-suggestions`;
+  const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
   const normalizedAnswer = useMemo(
     () => payload.answer.trim().toLowerCase(),
@@ -143,13 +142,6 @@ export default function Anidle({
       setRound(() => Math.max(1, Math.min(TOTAL_ROUNDS, targetRound)));
     });
   }, [registerRoundController]);
-
-  const { suggestions, loading, error } = useTitleSuggestions(
-    completed ? "" : guess,
-    {
-      limit: 8,
-    },
-  );
 
   const hintRound = useMemo(
     () =>
@@ -357,8 +349,6 @@ export default function Anidle({
           advanceRound();
         }
         setGuess("");
-        setIsMenuOpen(false);
-        setHighlightedIndex(-1);
       } catch (error) {
         const message =
           error instanceof Error
@@ -372,35 +362,24 @@ export default function Anidle({
     [advanceRound, mediaId, normalizedAnswer, submitting],
   );
 
-  const handleSubmit = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
+  const handleFieldSubmit = useCallback(
+    (selection: TitleGuessSelection) => {
       if (completed || submitting) return;
-      const value = guess.trim();
-      if (!value) return;
-      const match = suggestions.find(
-        (item) => item.title.trim().toLowerCase() === value.toLowerCase(),
-      );
-      await submitGuess(value, match?.id);
+      void submitGuess(selection.value, selection.suggestionId);
     },
-    [completed, guess, submitGuess, submitting, suggestions],
+    [completed, submitGuess, submitting],
   );
 
-  useEffect(() => {
-    if (!isMenuOpen) {
-      setHighlightedIndex(-1);
-    }
-  }, [isMenuOpen]);
-
-  useEffect(() => {
-    setHighlightedIndex(-1);
-  }, [suggestions]);
-
-  useEffect(() => {
-    if (completed) {
-      setIsMenuOpen(false);
-    }
-  }, [completed]);
+  const handleSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (completed || submitting) return;
+      const selection = guessFieldRef.current?.submit();
+      if (!selection) return;
+      await submitGuess(selection.value, selection.suggestionId);
+    },
+    [completed, submitGuess, submitting],
+  );
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -412,88 +391,6 @@ export default function Anidle({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (blurTimeoutRef.current) {
-        window.clearTimeout(blurTimeoutRef.current);
-        blurTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleInputChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setGuess(event.target.value);
-      setIsMenuOpen(true);
-    },
-    [],
-  );
-
-  const handleFocus = useCallback(() => {
-    if (blurTimeoutRef.current) {
-      window.clearTimeout(blurTimeoutRef.current);
-      blurTimeoutRef.current = null;
-    }
-    if (!completed) {
-      setIsMenuOpen(true);
-    }
-  }, [completed]);
-
-  const handleBlur = useCallback(() => {
-    if (blurTimeoutRef.current) {
-      window.clearTimeout(blurTimeoutRef.current);
-    }
-    blurTimeoutRef.current = window.setTimeout(() => {
-      setIsMenuOpen(false);
-      blurTimeoutRef.current = null;
-    }, 120);
-  }, []);
-
-  const handleInputKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (completed || submitting) return;
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        if (suggestions.length === 0) {
-          setHighlightedIndex(-1);
-          return;
-        }
-        setIsMenuOpen(true);
-        setHighlightedIndex((prev) => {
-          const next = prev + 1;
-          return next >= suggestions.length ? 0 : next;
-        });
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        if (suggestions.length === 0) {
-          setHighlightedIndex(-1);
-          return;
-        }
-        setIsMenuOpen(true);
-        setHighlightedIndex((prev) => {
-          const next = prev <= 0 ? suggestions.length - 1 : prev - 1;
-          return next;
-        });
-      } else if (
-        event.key === "Enter" &&
-        highlightedIndex >= 0 &&
-        suggestions[highlightedIndex]
-      ) {
-        event.preventDefault();
-        const suggestion = suggestions[highlightedIndex];
-        void submitGuess(suggestion.title, suggestion.id);
-      } else if (event.key === "Escape") {
-        setIsMenuOpen(false);
-        setHighlightedIndex(-1);
-      }
-    },
-    [completed, highlightedIndex, submitGuess, submitting, suggestions],
-  );
-
-  const trimmedGuess = guess.trim();
-  const suggestionsVisible =
-    isMenuOpen && !completed && !submitting && trimmedGuess.length >= 2;
 
   const renderScalar = useCallback(
     (label: string, value: ScalarFeedback, suffix = "") => {
@@ -592,82 +489,19 @@ export default function Anidle({
         <div className="relative w-full">
           <input
             className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:opacity-70"
-            placeholder={completed ? "You solved Anidle!" : "Type your guess…"}
+          <TitleGuessField
+            ref={guessFieldRef}
+            className="w-full"
             value={guess}
-            onChange={handleInputChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            onKeyDown={handleInputKeyDown}
+            onValueChange={setGuess}
+            onSubmit={handleFieldSubmit}
             disabled={completed || submitting}
-            aria-label="Anidle guess"
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={suggestionsVisible}
-            aria-controls={
-              suggestionsVisible && suggestions.length > 0
-                ? listboxId
-                : undefined
+            placeholder={
+              completed ? "You solved Anidle!" : "Type your guess…"
             }
-            aria-activedescendant={
-              highlightedIndex >= 0 && suggestions[highlightedIndex]
-                ? `${listboxId}-option-${highlightedIndex}`
-                : undefined
-            }
+            ariaLabel="Anidle guess"
+            suggestionsLabel="Anidle title suggestions"
           />
-          {suggestionsVisible && (
-            <div className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl backdrop-blur">
-              {loading ? (
-                <div className="px-4 py-3 text-sm text-neutral-300">
-                  Searching…
-                </div>
-              ) : error ? (
-                <div className="px-4 py-3 text-sm text-rose-300">
-                  Couldn't load suggestions
-                </div>
-              ) : suggestions.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-neutral-400">
-                  No matches found
-                </div>
-              ) : (
-                <ul
-                  role="listbox"
-                  id={listboxId}
-                  aria-label="Anidle title suggestions"
-                  className="max-h-60 overflow-y-auto py-2"
-                >
-                  {suggestions.map((suggestion, index) => {
-                    const isActive = index === highlightedIndex;
-                    return (
-                      <li
-                        key={suggestion.id}
-                        id={`${listboxId}-option-${index}`}
-                        role="option"
-                        aria-selected={isActive}
-                      >
-                        <button
-                          type="button"
-                          className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm transition ${
-                            isActive
-                              ? "bg-brand-500/20 text-white"
-                              : "text-neutral-200 hover:bg-white/5"
-                          }`}
-                          onMouseDown={(event: MouseEvent<HTMLButtonElement>) => {
-                            event.preventDefault();
-                            if (submitting) return;
-                            void submitGuess(suggestion.title, suggestion.id);
-                          }}
-                          onMouseEnter={() => setHighlightedIndex(index)}
-                          onFocus={() => setHighlightedIndex(index)}
-                        >
-                          <span>{suggestion.title}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          )}
         </div>
         <button
           type="submit"
