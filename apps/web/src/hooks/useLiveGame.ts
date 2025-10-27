@@ -23,6 +23,27 @@ function normalizeTimestamp(value: unknown): number {
   return Math.round(value * 1000);
 }
 
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  if (error instanceof Event) {
+    return new Error(`WebSocket ${error.type} event`);
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return new Error((error as { message: string }).message);
+  }
+  if (typeof error === "string") {
+    return new Error(error);
+  }
+  return new Error("Unknown WebSocket error");
+}
+
 function toWebSocketUrl(base: string): string {
   if (base.startsWith("https://")) {
     return `wss://${base.slice("https://".length)}`;
@@ -307,7 +328,7 @@ export function useLiveGame(options: UseLiveGameOptions): UseLiveGameState {
 
     lobbySocket.addEventListener("error", (error) => {
       setLobbyStatus("error");
-      setLastError(error as Error);
+      setLastError(normalizeError(error));
     });
 
     const matchSocket = new WebSocket(matchUrl);
@@ -406,7 +427,7 @@ export function useLiveGame(options: UseLiveGameOptions): UseLiveGameState {
 
     matchSocket.addEventListener("error", (error) => {
       setMatchStatus("error");
-      setLastError(error as Error);
+      setLastError(normalizeError(error));
     });
   }, [closeSockets, options.slug, options.lobbyId, options.matchId, playerProfile]);
 

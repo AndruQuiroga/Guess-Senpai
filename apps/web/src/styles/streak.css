@@ -1,3 +1,5 @@
+@tailwind components;
+
 @layer components {
   .streak-heatmap {
     @apply grid grid-flow-col auto-cols-[0.95rem] gap-[3px] overflow-hidden rounded-2xl bg-neutral-900/40 p-3 shadow-inner;

@@ -2,6 +2,18 @@
 
 declare const self: ServiceWorkerGlobalScope;
 
+declare global {
+  interface NotificationAction {
+    action: string;
+    title: string;
+    icon?: string;
+  }
+  interface NotificationOptions {
+    renotify?: boolean;
+    actions?: NotificationAction[];
+  }
+}
+
 const CACHE_PREFIX = "guesssenpai";
 const CACHE_VERSION = "v1";
 const STATIC_CACHE = `${CACHE_PREFIX}-static-${CACHE_VERSION}`;

@@ -5,19 +5,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 const PUBLIC_VAPID_KEY = process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY || "";
 
-interface PushSubscriptionKeys {
+interface SubscriptionKeys {
   p256dh: string;
   auth: string;
 }
 
-interface PushSubscriptionJSON {
+interface NormalizedPushSubscription {
   endpoint: string;
   expirationTime: number | null;
-  keys: PushSubscriptionKeys;
+  keys: SubscriptionKeys;
 }
 
 interface SubscriptionRequestPayload {
-  subscription: PushSubscriptionJSON;
+  subscription: NormalizedPushSubscription;
   userAgent?: string;
 }
 
@@ -144,8 +144,21 @@ export function useNotificationOptIn(): UseNotificationOptInResult {
           applicationServerKey: urlBase64ToUint8Array(vapidKey),
         }));
 
+      const rawSubscription = subscription.toJSON();
+      const keys = rawSubscription.keys ?? {};
+      if (!keys.p256dh || !keys.auth) {
+        throw new Error("Push subscription is missing encryption keys.");
+      }
+
       const payload: SubscriptionRequestPayload = {
-        subscription: subscription.toJSON() as PushSubscriptionJSON,
+        subscription: {
+          endpoint: rawSubscription.endpoint,
+          expirationTime: rawSubscription.expirationTime ?? null,
+          keys: {
+            p256dh: keys.p256dh,
+            auth: keys.auth,
+          },
+        },
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
       };
 
