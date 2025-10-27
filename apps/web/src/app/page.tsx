@@ -194,6 +194,56 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+          <div className="mt-8 grid gap-3 text-sm text-neutral-200 sm:grid-cols-3">
+            <Link
+              href="/how-to-play"
+              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/5 p-4 text-left text-white/90 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/40 via-purple-500/40 to-pink-500/40 text-lg">
+                🎧
+              </span>
+              <span className="space-y-1">
+                <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-neutral-200/80">
+                  Listen & guess
+                </span>
+                <span>
+                  Catch audio clues, spot the reference, and see how it works in the full guide.
+                </span>
+              </span>
+            </Link>
+            <Link
+              href="/how-to-play"
+              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/5 p-4 text-left text-white/90 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg">
+                🧩
+              </span>
+              <span className="space-y-1">
+                <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-neutral-200/80">
+                  Unlock hints
+                </span>
+                <span>
+                  Learn when to reveal extra clues and strategize your hint usage step-by-step.
+                </span>
+              </span>
+            </Link>
+            <Link
+              href="/how-to-play"
+              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/5 p-4 text-left text-white/90 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg">
+                📣
+              </span>
+              <span className="space-y-1">
+                <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-neutral-200/80">
+                  Share your streak
+                </span>
+                <span>
+                  See tips for exporting recap cards and celebrating wins with your squad.
+                </span>
+              </span>
+            </Link>
+          </div>
           {hasIncompleteGame ? (
             <p className="text-sm text-neutral-200/90">
               You left off on {nextIncompleteGame?.title}
