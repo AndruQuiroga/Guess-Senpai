@@ -1,70 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-
-interface AccountState {
-  authenticated: boolean;
-  user?: {
-    id: number;
-    username?: string | null;
-    avatar?: string | null;
-  };
-}
+import { useAccount } from "../hooks/useAccount";
 
 export default function AccountBadge() {
-  const [account, setAccount] = useState<AccountState>({ authenticated: false });
-  const [loading, setLoading] = useState(true);
-  const [streakCount, setStreakCount] = useState<number | null>(null);
-
-  const fetchAccount = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE}/auth/anilist/me`, {
-        credentials: "include",
-      });
-      const data = (await response.json()) as AccountState;
-      setAccount(data);
-      if (data.authenticated) {
-        const streakResponse = await fetch(`${API_BASE}/puzzles/streak`, {
-          credentials: "include",
-        });
-        if (streakResponse.ok) {
-          const streakData = (await streakResponse.json()) as { count?: number };
-          setStreakCount(typeof streakData.count === "number" ? streakData.count : null);
-        } else {
-          setStreakCount(null);
-        }
-      } else {
-        setStreakCount(null);
-      }
-    } catch (error) {
-      console.warn("Unable to fetch account info", error);
-      setAccount({ authenticated: false });
-      setStreakCount(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAccount();
-  }, [fetchAccount]);
-
-  const handleLogout = async () => {
-    try {
-      await fetch(`${API_BASE}/auth/anilist/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-      setAccount({ authenticated: false });
-      setStreakCount(null);
-    } catch (error) {
-      console.warn("Logout failed", error);
-    }
-  };
+  const { account, loading, streakCount, logout } = useAccount();
 
   if (loading) {
     return (
@@ -112,7 +53,9 @@ export default function AccountBadge() {
       </Link>
       <button
         type="button"
-        onClick={handleLogout}
+        onClick={() => {
+          void logout();
+        }}
         className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-neutral-200 transition hover:border-red-400/60 hover:text-red-200"
       >
         Logout

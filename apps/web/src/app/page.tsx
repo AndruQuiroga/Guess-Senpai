@@ -11,6 +11,7 @@ import {
   useDailyAvailability,
   useRuntimeGamesDirectory,
 } from "../hooks/useDailyAvailability";
+import { useAccount } from "../hooks/useAccount";
 import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
@@ -75,6 +76,7 @@ function todayIsoDate(): string {
 export default function HomePage() {
   const todayIso = useMemo(() => todayIsoDate(), []);
   const formattedDate = useMemo(() => formatShareDate(todayIso), [todayIso]);
+  const { account, loading: accountLoading } = useAccount();
   const { progress } = usePuzzleProgress(todayIso);
   const games = useRuntimeGamesDirectory();
   const { playableGames, upcomingGames } = useMemo(() => {
@@ -227,6 +229,8 @@ export default function HomePage() {
     [],
   );
 
+  const showLoginCallout = !accountLoading && !account.authenticated;
+
   return (
     <div className="space-y-16">
       <section className="relative overflow-hidden rounded-4xl border border-white/10 bg-surface-raised p-10 text-white shadow-ambient backdrop-blur-2xl sm:p-16">
@@ -279,6 +283,19 @@ export default function HomePage() {
               >
                 Learn the rules
               </Link>
+              {showLoginCallout ? (
+                <div className="flex max-w-xs flex-col gap-2">
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center rounded-2xl border border-brand-400/50 bg-brand-500/20 px-6 py-2.5 text-sm font-semibold text-brand-100 shadow-ambient transition hover:border-brand-300/70 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-200/80"
+                  >
+                    Log in with AniList
+                  </Link>
+                  <p className="text-xs leading-relaxed text-neutral-200/85">
+                    Logging in keeps your streaks and archive completions saved across devices.
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="mt-8 grid gap-3 text-sm text-neutral-200 sm:grid-cols-3">
