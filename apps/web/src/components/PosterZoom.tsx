@@ -162,27 +162,30 @@ export default function PosterZoom({
     if (!activeCropStage) {
       return {
         scale: fallbackZoom,
-        objectPosition: undefined as string | undefined,
-        transformOrigin: undefined as string | undefined,
+        translateX: 0,
+        translateY: 0,
       };
     }
-    const position = `${activeCropStage.offset_x}% ${activeCropStage.offset_y}%`;
+
+    const translateX = 50 - activeCropStage.offset_x;
+    const translateY = 50 - activeCropStage.offset_y;
+
     return {
       scale: activeCropStage.scale,
-      objectPosition: position,
-      transformOrigin: position,
+      translateX,
+      translateY,
     };
   }, [activeCropStage, fallbackZoom]);
 
   const imageStyles = useMemo<CSSProperties>(() => {
+    const transform = `translate3d(${imageTransform.translateX}%, ${imageTransform.translateY}%, 0) scale(${imageTransform.scale})`;
+
     return {
-      transform: `scale(${imageTransform.scale})`,
-      transformOrigin: imageTransform.transformOrigin,
-      objectPosition: imageTransform.objectPosition,
-      transition: "transform 700ms ease-out, object-position 700ms ease-out",
-      willChange: "transform, object-position",
+      transform,
+      transition: "transform 700ms ease-out",
+      willChange: "transform",
     };
-  }, [imageTransform.objectPosition, imageTransform.scale, imageTransform.transformOrigin]);
+  }, [imageTransform.scale, imageTransform.translateX, imageTransform.translateY]);
 
   const activeHints = useMemo(() => {
     const hints: string[] = [];
