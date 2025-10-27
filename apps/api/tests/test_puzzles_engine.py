@@ -15,6 +15,7 @@ from app.puzzles.models import (
     GuessOpeningMeta,
     OpeningClip,
     PosterZoomPuzzleBundle,
+    RedactedSynopsisSegment,
     RoundSpec,
 )
 from app.services.anilist import Media, Title
@@ -126,6 +127,31 @@ def test_redacted_synopsis_masks_majority_of_words() -> None:
     masked_text = {segments[index].text.casefold() for index in masked_indices}
     assert "mystery" in masked_text
     assert "story" in masked_text
+
+
+def test_anidle_synopsis_uses_redacted_masking(monkeypatch: pytest.MonkeyPatch) -> None:
+    media = make_media(888, "Masked Legends")
+
+    segments = [
+        RedactedSynopsisSegment(text="First", masked=True),
+        RedactedSynopsisSegment(text=" ", masked=False),
+        RedactedSynopsisSegment(text="Second", masked=True),
+        RedactedSynopsisSegment(text=" ", masked=False),
+        RedactedSynopsisSegment(text="Third", masked=True),
+    ]
+    masked_indices = [0, 2, 4]
+
+    def fake_redact(_media: Media) -> tuple[str, list[RedactedSynopsisSegment], list[int], list[str]]:
+        return "First Second Third", segments, masked_indices, ["First", "Second", "Third"]
+
+    monkeypatch.setattr(engine, "_redact_description", fake_redact)
+
+    hints = engine._build_anidle_synopsis(media)
+
+    assert [hint.ratio for hint in hints] == [0.3, 0.5, 0.7]
+    assert hints[0].text == "First [REDACTED] [REDACTED]"
+    assert hints[1].text == "First Second [REDACTED]"
+    assert hints[2].text == "First Second [REDACTED]"
 
 @pytest.mark.asyncio
 async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPatch) -> None:
