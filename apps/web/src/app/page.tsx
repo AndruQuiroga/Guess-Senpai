@@ -23,6 +23,7 @@ import {
   formatShareDate,
   formatShareEventMessage,
 } from "../utils/shareText";
+import { showToast } from "../utils/toast";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 
 const BASE_GAME_KEYS: readonly GameKey[] = [
@@ -256,7 +257,6 @@ export default function HomePage() {
     return () => window.clearInterval(intervalId);
   }, [nextResetIso]);
 
-  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [previewGame, setPreviewGame] = useState<GameDirectoryEntry | null>(
     null,
   );
@@ -265,31 +265,19 @@ export default function HomePage() {
     try {
       if (navigator.share) {
         await navigator.share({ text: shareMessage });
-        setShareStatus("Shared");
+        showToast("Progress shared", "success");
         return;
       }
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareMessage);
-        setShareStatus("Copied to clipboard");
+        showToast("Copied to clipboard", "success");
         return;
       }
     } catch (error) {
       console.warn("Share cancelled", error);
     }
-    setShareStatus("Unable to share on this device");
+    showToast("Unable to share on this device", "error");
   }, [shareMessage]);
-
-  useEffect(() => {
-    if (shareLocked && shareStatus) {
-      setShareStatus(null);
-    }
-  }, [shareLocked, shareStatus]);
-
-  useEffect(() => {
-    if (!shareStatus) return;
-    const timeout = window.setTimeout(() => setShareStatus(null), 3000);
-    return () => window.clearTimeout(timeout);
-  }, [shareStatus]);
 
   const handleOpenPreview = useCallback((game: GameDirectoryEntry) => {
     setPreviewGame(game);
@@ -450,34 +438,20 @@ export default function HomePage() {
             />
           </div>
           {shareLocked ? (
-            <div className="flex items-center gap-4 rounded-2xl border border-white/12 bg-white/10 px-4 py-3 text-left text-sm text-neutral-200/90">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-xl text-neutral-300">
-                🔒
-              </span>
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-white/85">
-                  Play a round to unlock sharing
-                </p>
-                <p className="text-xs text-neutral-300/80">
-                  Start any puzzle to generate a recap card worth sharing.
-                </p>
-              </div>
-            </div>
+            <p className="flex items-center gap-2 text-sm text-neutral-300/90">
+              <span aria-hidden className="text-base">🔒</span>
+              <span>Play a round to unlock sharing.</span>
+            </p>
           ) : (
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
               onClick={handleShare}
             >
               Share progress
             </button>
           )}
         </div>
-        {shareStatus && !shareLocked && (
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs text-white/90 shadow-inner transition">
-            {shareStatus}
-          </p>
-        )}
       </GlassSection>
 
       <section className="space-y-6">
