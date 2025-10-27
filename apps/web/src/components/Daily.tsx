@@ -1,7 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { GAMES_DIRECTORY } from "../config/games";
 import { GameKey, usePuzzleProgress } from "../hooks/usePuzzleProgress";
@@ -15,6 +20,15 @@ import { buildShareText, formatShareDate } from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
+import {
+  AnidlePreview,
+  CharacterSilhouettePreview,
+  GamePreviewCard,
+  GuessOpeningPreview,
+  PosterZoomPreview,
+  RedactedSynopsisPreview,
+  type GameProgressStatus,
+} from "./games";
 
 interface Props {
   data: DailyPuzzleResponse | null;
@@ -23,6 +37,18 @@ interface Props {
 type GamePayloadRecord = Partial<
   Record<GameKey, GamesPayload[keyof GamesPayload] | null>
 >;
+
+interface TimelineEntry {
+  slug: string;
+  title: string;
+  description?: string;
+  accentColor: string;
+  gameKey: GameKey;
+  status: GameProgressStatus;
+  statusLabel: string;
+  statusIcon: string;
+  ctaLabel: string;
+}
 
 export default function Daily({ data }: Props) {
   if (!data) {
@@ -157,82 +183,78 @@ export default function Daily({ data }: Props) {
     [includeGuessTheOpening, bundleByKey],
   );
 
-  type GameProgressStatus = "not-started" | "in-progress" | "completed";
+  const timelineEntries = useMemo<TimelineEntry[]>(() => {
+    return availableGames
+      .map((entry) => {
+        if (!entry.gameKey || !entry.slug) {
+          return null;
+        }
 
-  interface PlayableGame {
-    slug: string;
-    title: string;
-    status: GameProgressStatus;
-    statusLabel: string;
-    statusIcon: string;
-    gameKey: GameKey;
-  }
+        const progressForGame = progress[entry.gameKey];
+        const completed = Boolean(progressForGame?.completed);
+        const inProgress = Boolean(
+          progressForGame &&
+            !progressForGame.completed &&
+            ((progressForGame.round ?? 0) > 0 ||
+              (progressForGame.guesses?.length ?? 0) > 0),
+        );
 
-  const playableGames = useMemo<PlayableGame[]>(() => {
-    return availableGames.reduce<PlayableGame[]>((acc, entry) => {
-      if (!entry.gameKey || !entry.slug) {
-        return acc;
-      }
+        let status: GameProgressStatus = "not-started";
+        let statusLabel = "Not started";
+        let statusIcon = "•";
 
-      const progressForGame = progress[entry.gameKey];
-      const completed = Boolean(progressForGame?.completed);
-      const inProgress = Boolean(
-        progressForGame &&
-          !progressForGame.completed &&
-          ((progressForGame.round ?? 0) > 0 ||
-            (progressForGame.guesses?.length ?? 0) > 0),
-      );
+        if (completed) {
+          status = "completed";
+          statusLabel = "Completed";
+          statusIcon = "✓";
+        } else if (inProgress) {
+          status = "in-progress";
+          statusLabel = "In progress";
+          statusIcon = "◐";
+        }
 
-      let status: GameProgressStatus = "not-started";
-      let statusLabel = "Not started";
-      let statusIcon = "•";
+        const ctaLabel = completed ? "Replay" : inProgress ? "Resume" : "Play now";
 
-      if (completed) {
-        status = "completed";
-        statusLabel = "Completed";
-        statusIcon = "✓";
-      } else if (inProgress) {
-        status = "in-progress";
-        statusLabel = "In progress";
-        statusIcon = "◐";
-      }
-
-      acc.push({
-        slug: entry.slug,
-        title: entry.title,
-        status,
-        statusLabel,
-        statusIcon,
-        gameKey: entry.gameKey,
-      });
-
-      return acc;
-    }, []);
+        return {
+          slug: entry.slug,
+          title: entry.title,
+          description: entry.description,
+          accentColor: entry.accentColor,
+          gameKey: entry.gameKey,
+          status,
+          statusLabel,
+          statusIcon,
+          ctaLabel,
+        } satisfies TimelineEntry;
+      })
+      .filter((entry): entry is TimelineEntry => Boolean(entry));
   }, [availableGames, progress]);
 
-  const requiredGames: GameKey[] = playableGames.map((entry) => entry.gameKey);
+  const previewComponents = useMemo<Partial<Record<GameKey, ReactNode>>>(
+    () => ({
+      anidle: <AnidlePreview bundle={anidleBundle} />,
+      poster_zoomed: <PosterZoomPreview bundle={posterBundle} />,
+      character_silhouette: <CharacterSilhouettePreview bundle={silhouetteBundle} />,
+      redacted_synopsis: <RedactedSynopsisPreview bundle={synopsisBundle} />,
+      guess_the_opening:
+        includeGuessTheOpening && guessOpeningBundle ? (
+          <GuessOpeningPreview bundle={guessOpeningBundle} />
+        ) : null,
+    }),
+    [
+      anidleBundle,
+      posterBundle,
+      silhouetteBundle,
+      synopsisBundle,
+      includeGuessTheOpening,
+      guessOpeningBundle,
+    ],
+  );
+
+  const requiredGames: GameKey[] = timelineEntries.map((entry) => entry.gameKey);
 
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
   const streak = useStreak(data.date, allCompleted);
-
-  const activeSlug = useMemo(() => {
-    const firstIncomplete = playableGames.find(
-      (game) => game.status !== "completed",
-    );
-    return firstIncomplete?.slug ?? playableGames[0]?.slug ?? null;
-  }, [playableGames]);
-
-  const stepperStyles: Record<GameProgressStatus, string> = {
-    "not-started": "border-white/15 bg-white/5",
-    "in-progress": "border-amber-300/40 bg-amber-500/15",
-    completed: "border-emerald-300/40 bg-emerald-500/15",
-  };
-
-  const stepperIconStyles: Record<GameProgressStatus, string> = {
-    "not-started": "text-neutral-200",
-    "in-progress": "text-amber-200",
-    completed: "text-emerald-200",
-  };
 
   const shareText = useMemo(() => {
     return buildShareText(data.date, progress, {
@@ -451,7 +473,7 @@ export default function Daily({ data }: Props) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl">
+      <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl sm:p-7">
         <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -460,7 +482,7 @@ export default function Daily({ data }: Props) {
             </h1>
             <p className="text-sm text-neutral-300">{formattedDate}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:auto-cols-max sm:grid-flow-col sm:items-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
               🔥 Streak {streak}
             </div>
@@ -511,131 +533,42 @@ export default function Daily({ data }: Props) {
         </div>
       )}
 
-      <section className="space-y-4">
+      <section className="space-y-5 sm:space-y-6">
         <div className="space-y-1">
-          <h2 className="text-xl font-display font-semibold tracking-tight text-white">
+          <h2 className="text-xl font-display font-semibold tracking-tight text-white sm:text-2xl">
             Today&apos;s puzzles
           </h2>
-          <p className="text-sm text-neutral-300/90">
-            Work through each challenge below. You can play, pause, and resume
-            puzzles individually from their dedicated pages.
+          <p className="text-sm leading-relaxed text-neutral-300/90">
+            Follow the timeline to preview your first hints and jump straight into each challenge.
           </p>
         </div>
 
-        {playableGames.length > 0 && (
-          <nav aria-label="Today&apos;s puzzle progress" className="sm:-mx-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:gap-3 sm:overflow-x-auto sm:px-4 sm:py-1">
-              {playableGames.map((game) => {
-                const isActive = activeSlug === game.slug;
-                const stepperClassName = `${stepperStyles[game.status]} ${
-                  isActive ? "ring-2 ring-white/80" : "ring-0"
-                }`;
-
-                return (
-                  <Link
-                    key={game.slug}
-                    href={`/games/${game.slug}`}
-                    className={`group relative flex min-w-0 items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 sm:min-w-[12rem] ${stepperClassName}`}
-                    aria-current={isActive ? "step" : undefined}
-                  >
-                    <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-base font-semibold ${stepperIconStyles[game.status]}`}
-                      aria-hidden
-                    >
-                      {game.statusIcon}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium uppercase tracking-[0.24em] text-neutral-300/90">
-                        {game.statusLabel}
-                      </p>
-                      <p className="truncate text-sm font-semibold text-white">
-                        {game.title}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-        )}
-
-        {availableGames.length > 0 ? (
-          <div className="grid gap-5 lg:grid-cols-2">
-            {availableGames.map((game) => {
-              const key = game.gameKey;
-              const progressForGame = key ? progress[key] : undefined;
-              const completed = Boolean(progressForGame?.completed);
-              const inProgress = Boolean(
-                progressForGame &&
-                  !progressForGame.completed &&
-                  progressForGame.round > 0,
-              );
-              const statusLabel = completed
-                ? "Completed"
-                : inProgress
-                  ? "In progress"
-                  : "Not started";
-              const statusTone = completed
-                ? "text-emerald-200"
-                : inProgress
-                  ? "text-amber-200"
-                  : "text-neutral-300";
-              const ctaLabel = completed
-                ? "Replay"
-                : inProgress
-                  ? "Resume"
-                  : "Play now";
-
-              return (
-                <GlassSection
-                  key={game.slug}
-                  className="group relative overflow-hidden border-white/10 bg-surface-raised/80"
-                  innerClassName="relative flex h-full flex-col gap-5"
-                >
-                  <div
-                    aria-hidden
-                    className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${game.accentColor} opacity-10 transition duration-500 group-hover:opacity-25`}
+        {timelineEntries.length > 0 ? (
+          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-5 shadow-ambient backdrop-blur-2xl sm:p-7">
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent sm:inset-x-9" />
+            <div className="relative sm:pl-8">
+              <span className="pointer-events-none absolute left-[0.35rem] top-6 bottom-6">
+                <span className="block h-full w-px bg-white/15" />
+              </span>
+              <ol className="space-y-6 sm:space-y-8">
+                {timelineEntries.map((entry, index) => (
+                  <GamePreviewCard
+                    key={entry.slug}
+                    slug={entry.slug}
+                    title={entry.title}
+                    description={entry.description}
+                    status={entry.status}
+                    statusLabel={entry.statusLabel}
+                    statusIcon={entry.statusIcon}
+                    accentColor={entry.accentColor}
+                    ctaLabel={entry.ctaLabel}
+                    href={`/games/${entry.slug}`}
+                    index={index}
+                    preview={previewComponents[entry.gameKey] ?? null}
                   />
-
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.28em] text-neutral-300">
-                      <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[0.6rem] text-neutral-200/90">
-                        Daily puzzle
-                      </span>
-                      <span className={statusTone}>{statusLabel}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
-                        {game.title}
-                      </h2>
-                      {game.description ? (
-                        <p className="text-sm leading-relaxed text-neutral-200/90">
-                          {game.description}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 mt-auto flex flex-wrap items-center justify-between gap-3 pt-2 text-sm">
-                    <div className="text-xs uppercase tracking-[0.3em] text-neutral-400">
-                      {completed
-                        ? "Great job!"
-                        : inProgress
-                          ? "Progress saved"
-                          : "Ready when you are"}
-                    </div>
-
-                    <Link
-                      href={`/games/${game.slug}`}
-                      className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-                    >
-                      {ctaLabel}
-                    </Link>
-                  </div>
-                </GlassSection>
-              );
-            })}
+                ))}
+              </ol>
+            </div>
           </div>
         ) : (
           <GlassSection
