@@ -47,6 +47,44 @@ type ProgressSummaryProps = {
   layout?: "inline" | "pill";
 };
 
+type StatusTone = "resume" | "available" | "comingSoon" | "locked" | "warning";
+
+type StatusChipConfig = {
+  label: string;
+  tone: StatusTone;
+};
+
+const STATUS_TONE_STYLES: Record<
+  StatusTone,
+  { icon: string; className: string }
+> = {
+  resume: {
+    icon: "↺",
+    className:
+      "border-emerald-300/50 bg-emerald-400/15 text-emerald-50 shadow-[0_0_25px_-12px_rgba(16,185,129,0.8)]",
+  },
+  available: {
+    icon: "✨",
+    className:
+      "border-brand-300/50 bg-brand-400/15 text-brand-50 shadow-[0_0_25px_-12px_rgba(168,85,247,0.7)]",
+  },
+  comingSoon: {
+    icon: "⏳",
+    className:
+      "border-amber-300/50 bg-amber-400/15 text-amber-50 shadow-[0_0_25px_-12px_rgba(251,191,36,0.8)]",
+  },
+  locked: {
+    icon: "🔒",
+    className:
+      "border-white/20 bg-white/10 text-white/85 shadow-[0_0_20px_-12px_rgba(148,163,184,0.75)]",
+  },
+  warning: {
+    icon: "⚠️",
+    className:
+      "border-amber-400/60 bg-amber-500/10 text-amber-100 shadow-[0_0_25px_-12px_rgba(251,191,36,0.6)]",
+  },
+};
+
 function classNames(
   ...classes: Array<string | false | null | undefined>
 ): string {
@@ -149,6 +187,29 @@ function ProgressSummary({
         <ProgressSummaryChip key={chunk.id} chunk={chunk} layout={layout} />
       ))}
     </div>
+  );
+}
+
+function StatusChip({
+  config,
+  className,
+}: {
+  config: StatusChipConfig;
+  className?: string;
+}): JSX.Element {
+  const toneStyles = STATUS_TONE_STYLES[config.tone];
+
+  return (
+    <span
+      className={classNames(
+        "inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] transition",
+        toneStyles.className,
+        className,
+      )}
+    >
+      <span aria-hidden>{toneStyles.icon}</span>
+      <span>{config.label}</span>
+    </span>
   );
 }
 
@@ -412,9 +473,7 @@ export default function HomePage() {
               >
                 🔒
               </span>
-              <span className="text-left">
-                Play a round to unlock sharing.
-              </span>
+              <span className="text-left">Play a round to unlock sharing.</span>
             </button>
           ) : (
             <button
@@ -523,30 +582,40 @@ export default function HomePage() {
           </p>
         </div>
         {playableGames.length > 0 ? (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">
-              Available today
-            </h3>
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {playableGames.map((game) => {
-                const eyebrow = showAvailabilityError
-                  ? "Status unavailable"
-                  : game.playable
-                    ? "Available now"
-                    : game.comingSoon
-                      ? "Coming soon"
-                      : "Unavailable";
+          <div className="space-y-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+              <h3 className="text-lg font-semibold text-white">
+                Available today
+              </h3>
+              <p className="text-sm text-neutral-300/90">
+                Modern cards highlight what you can play now—tap in or preview
+                the run.
+              </p>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+              {playableGames.map((game, index) => {
                 const overlayClasses =
-                  "opacity-75 mix-blend-multiply saturate-150";
-                const cardClasses =
-                  "relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/70 p-6 text-white shadow-ambient backdrop-blur-xl transition hover:border-white/20 focus-within:border-white/25";
-
+                  index === 0 && playableGames.length > 1
+                    ? "opacity-70 mix-blend-multiply saturate-150"
+                    : "opacity-80 mix-blend-multiply saturate-125";
+                const isHero = index === 0 && playableGames.length > 1;
                 const progressForGame = game.gameKey
                   ? progress[game.gameKey]
                   : undefined;
                 const canResume = Boolean(
                   progressForGame && !progressForGame.completed,
                 );
+                const statusChip: StatusChipConfig = showAvailabilityError
+                  ? { tone: "warning", label: "Status unavailable" }
+                  : canResume
+                    ? { tone: "resume", label: "Resume run" }
+                    : { tone: "available", label: "Ready today" };
+
+                const secondaryInfo = canResume
+                  ? "Pick up where you left off."
+                  : progressForGame?.completed
+                    ? "Cleared for today—replay for streak practice."
+                    : "Three rounds stand between you and the win.";
 
                 const handlePreviewClick = (
                   event?: MouseEvent<HTMLElement>,
@@ -560,8 +629,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={handlePreviewClick}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/40 text-white/80 shadow-ambient backdrop-blur transition hover:border-white/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-                    aria-label="Preview game"
+                    className="inline-flex items-center gap-2 rounded-3xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/85 transition hover:border-white/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                   >
                     <svg
                       aria-hidden
@@ -576,16 +644,16 @@ export default function HomePage() {
                       <path d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
-                    <span className="sr-only">Preview game</span>
+                    Preview
                   </button>
                 );
 
-                const actionCta = showAvailabilityError ? null : (
+                const primaryCta = showAvailabilityError ? null : (
                   <Link
                     href={`/games/${game.slug}`}
-                    className="group inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white shadow-ambient transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    className="group inline-flex items-center gap-2 rounded-3xl border border-brand-300/50 bg-gradient-to-r from-brand-500 via-purple-500 to-amber-400 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_20px_45px_-28px_rgba(236,72,153,0.75)] transition hover:scale-[1.015] hover:shadow-[0_24px_60px_-28px_rgba(236,72,153,0.75)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                   >
-                    {canResume ? "Resume" : "Start playing"}
+                    {canResume ? "Resume now" : "Play mode"}
                     <svg
                       aria-hidden
                       className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
@@ -597,85 +665,101 @@ export default function HomePage() {
                   </Link>
                 );
 
-                const content = (
-                  <>
-                    {renderPreviewBackground(
-                      game.preview.media,
-                      game.accentColor,
-                      overlayClasses,
+                return (
+                  <article
+                    key={game.slug}
+                    className={classNames(
+                      "relative flex",
+                      isHero ? "lg:col-span-2 xl:col-span-2" : "",
                     )}
-                    <div className="relative z-10 flex flex-1 flex-col gap-4">
-                      <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-white/80">
-                        {eyebrow}
-                      </span>
-                      <h3 className="text-xl font-display font-semibold tracking-tight">
-                        {game.title}
-                      </h3>
-                      <p className="text-sm leading-relaxed text-neutral-100/90">
-                        {game.tagline}
-                      </p>
-                      <div className="mt-auto flex flex-col gap-4">
-                        {showAvailabilityError ? (
-                          <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
-                              ⚠️ Unable to load today&apos;s availability
-                            </span>
-                            <button
-                              type="button"
-                              onClick={handleAvailabilityRetry}
-                              disabled={availabilityLoading}
-                              className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
-                            >
-                              Retry
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between gap-3">
-                            {actionCta}
-                            {previewButton}
-                          </div>
-                        )}
-                        {showAvailabilityError ? (
-                          <div className="flex justify-end">
-                            {previewButton}
-                          </div>
-                        ) : null}
+                  >
+                    <div
+                      className={classNames(
+                        "group relative flex h-full w-full flex-col overflow-hidden rounded-4xl border border-white/10 bg-surface-raised/70 p-7 text-white shadow-ambient backdrop-blur-2xl transition hover:border-white/25 focus-within:border-white/25",
+                        isHero ? "lg:p-9" : "",
+                      )}
+                    >
+                      {renderPreviewBackground(
+                        game.preview.media,
+                        game.accentColor,
+                        overlayClasses,
+                      )}
+                      <div className="relative z-10 flex h-full flex-col gap-6">
+                        <div className="flex items-start justify-between gap-3">
+                          <StatusChip
+                            config={statusChip}
+                            className="text-[0.6rem] text-white/90 sm:text-[0.7rem]"
+                          />
+                          {previewButton}
+                        </div>
+                        <div className="space-y-3">
+                          <h3
+                            className={classNames(
+                              "font-display font-semibold tracking-tight text-white",
+                              isHero ? "text-2xl sm:text-3xl" : "text-xl",
+                            )}
+                          >
+                            {game.title}
+                          </h3>
+                          <p className="max-w-xl text-sm leading-relaxed text-neutral-100/85 sm:text-base">
+                            {game.tagline}
+                          </p>
+                        </div>
+                        <div className="flex flex-1 flex-col justify-end gap-4 text-sm text-neutral-200/90">
+                          <p className="text-neutral-100/85">{secondaryInfo}</p>
+                          {showAvailabilityError ? (
+                            <div className="flex flex-wrap items-center gap-3">
+                              <StatusChip
+                                config={{
+                                  tone: "warning",
+                                  label: "Unable to load availability",
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAvailabilityRetry}
+                                disabled={availabilityLoading}
+                                className="inline-flex items-center gap-2 rounded-3xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-3">
+                              {primaryCta}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </>
-                );
-
-                return (
-                  <div key={game.slug} className="flex h-full flex-col gap-3">
-                    <div className={cardClasses}>{content}</div>
-                    {game.playable && canResume ? (
-                      <p className="text-sm text-neutral-400">
-                        Progress carries over when this mode launches
-                      </p>
-                    ) : null}
-                  </div>
+                  </article>
                 );
               })}
             </div>
           </div>
         ) : null}
         {upcomingGames.length > 0 ? (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">On the horizon</h3>
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+              <h3 className="text-lg font-semibold text-white">
+                On the horizon
+              </h3>
+              <p className="text-sm text-neutral-300/90">
+                Peek at what unlocks next. Preview screens still work while
+                modes are in prep.
+              </p>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
               {upcomingGames.map((game) => {
-                const eyebrow = showAvailabilityError
-                  ? "Status unavailable"
-                  : game.comingSoon
-                    ? "Coming soon"
-                    : "Unavailable";
-                const statusLabel =
-                  upcomingUnlockLabels[game.slug] ?? "Unlocking soon.";
                 const overlayClasses =
                   "opacity-85 mix-blend-multiply saturate-150";
-                const cardClasses =
-                  "group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/5 bg-surface-raised/65 p-6 text-white shadow-ambient backdrop-blur-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60";
-
+                const statusChip: StatusChipConfig = showAvailabilityError
+                  ? { tone: "warning", label: "Status unavailable" }
+                  : game.comingSoon
+                    ? { tone: "comingSoon", label: "Coming soon" }
+                    : { tone: "locked", label: "Locked" };
+                const statusLabel =
+                  upcomingUnlockLabels[game.slug] ?? "Unlocking soon.";
                 const progressForGame = game.gameKey
                   ? progress[game.gameKey]
                   : undefined;
@@ -688,73 +772,78 @@ export default function HomePage() {
                   handleOpenPreview(game);
                 };
 
-                const content = (
-                  <>
-                    {renderPreviewBackground(
-                      game.preview.media,
-                      game.accentColor,
-                      overlayClasses,
-                    )}
-                    <div className="relative z-10 flex flex-1 flex-col gap-4">
-                      <span className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-white/80">
-                        {eyebrow}
-                      </span>
-                      <h3 className="text-xl font-display font-semibold tracking-tight text-white">
-                        {game.title}
-                      </h3>
-                      <p className="text-sm leading-relaxed text-neutral-100/85">
-                        {game.tagline}
-                      </p>
-                      <div className="mt-auto space-y-3 text-sm text-neutral-200/90">
-                        <span className="font-medium text-neutral-100">
-                          {statusLabel}
-                        </span>
-                        <span className="inline-flex items-center gap-2 text-neutral-100/80">
-                          Preview details
-                          <svg
-                            aria-hidden
-                            className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
-                          </svg>
-                        </span>
-                        {showAvailabilityError ? (
-                          <div className="flex flex-wrap items-center gap-3 pt-1">
-                            <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 font-medium text-amber-50">
-                              ⚠️ Unable to load today&apos;s availability
-                            </span>
-                            <button
-                              type="button"
-                              onClick={handleAvailabilityRetry}
-                              disabled={availabilityLoading}
-                              className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
-                            >
-                              Retry
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </>
-                );
-
                 return (
-                  <div key={game.slug} className="flex h-full flex-col gap-3">
+                  <article key={game.slug} className="relative flex">
                     <button
                       type="button"
                       onClick={handlePreviewClick}
-                      className={`${cardClasses} flex-1 text-left`}
+                      className="group relative flex h-full w-full flex-col overflow-hidden rounded-4xl border border-white/8 bg-surface-raised/65 p-7 text-left text-white shadow-ambient backdrop-blur-2xl transition hover:border-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/65"
                     >
-                      {content}
+                      {renderPreviewBackground(
+                        game.preview.media,
+                        game.accentColor,
+                        overlayClasses,
+                      )}
+                      <div className="relative z-10 flex h-full flex-col gap-6">
+                        <div className="flex items-start justify-between gap-3">
+                          <StatusChip
+                            config={statusChip}
+                            className="text-[0.6rem] text-white/90 sm:text-[0.7rem]"
+                          />
+                          <span className="inline-flex items-center gap-1 rounded-2xl border border-white/10 bg-white/10 px-3 py-1 text-[0.65rem] font-medium uppercase tracking-[0.28em] text-white/70">
+                            Preview
+                          </span>
+                        </div>
+                        <div className="space-y-3">
+                          <h3 className="text-xl font-display font-semibold tracking-tight text-white">
+                            {game.title}
+                          </h3>
+                          <p className="max-w-xl text-sm leading-relaxed text-neutral-100/85 sm:text-base">
+                            {game.tagline}
+                          </p>
+                        </div>
+                        <div className="mt-auto space-y-3 text-sm text-neutral-200/90">
+                          <span className="font-medium text-neutral-100">
+                            {statusLabel}
+                          </span>
+                          <span className="inline-flex items-center gap-2 text-neutral-100/85">
+                            Preview details
+                            <svg
+                              aria-hidden
+                              className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                            >
+                              <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
+                            </svg>
+                          </span>
+                          {progressForGame && !progressForGame.completed ? (
+                            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85">
+                              ↺ Progress carries over when this mode launches
+                            </span>
+                          ) : null}
+                          {showAvailabilityError ? (
+                            <div className="flex flex-wrap items-center gap-3 pt-1">
+                              <StatusChip
+                                config={{
+                                  tone: "warning",
+                                  label: "Unable to load availability",
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAvailabilityRetry}
+                                disabled={availabilityLoading}
+                                className="inline-flex items-center gap-2 rounded-3xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
                     </button>
-                    {progressForGame && !progressForGame.completed ? (
-                      <p className="text-sm text-neutral-400">
-                        Progress carries over when this mode launches
-                      </p>
-                    ) : null}
-                  </div>
+                  </article>
                 );
               })}
             </div>
