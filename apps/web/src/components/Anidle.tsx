@@ -278,8 +278,8 @@ export default function Anidle({
   const synopsisHints = useMemo(
     () =>
       aggregatedHints.filter(
-        (hint): hint is Extract<AggregatedHint, { type: "synopsis" }>
-          => hint.type === "synopsis",
+        (hint): hint is Extract<AggregatedHint, { type: "synopsis" }> =>
+          hint.type === "synopsis",
       ),
     [aggregatedHints],
   );
@@ -287,8 +287,8 @@ export default function Anidle({
   const chipHints = useMemo(
     () =>
       aggregatedHints.filter(
-        (hint): hint is Extract<AggregatedHint, { type: "text" | "tags" }>
-          => hint.type === "text" || hint.type === "tags",
+        (hint): hint is Extract<AggregatedHint, { type: "text" | "tags" }> =>
+          hint.type === "text" || hint.type === "tags",
       ),
     [aggregatedHints],
   );
