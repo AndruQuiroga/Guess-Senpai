@@ -269,13 +269,13 @@ export default function HomePage() {
                   }
                 }}
                 disabled={!firstPlayableGame}
-                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white/95 shadow-ambient transition hover:border-brand-400/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
               >
                 Watch a demo
               </button>
               <Link
                 href="/how-to-play"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white/95 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
               >
                 Learn the rules
               </Link>
@@ -284,7 +284,7 @@ export default function HomePage() {
           <div className="mt-8 grid gap-3 text-sm text-neutral-200 sm:grid-cols-3">
             <Link
               href="/how-to-play"
-              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/5 p-4 text-left text-white/90 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
+              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/10 p-4 text-left text-white/95 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/40 via-purple-500/40 to-pink-500/40 text-lg">
                 🎧
@@ -301,7 +301,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/how-to-play"
-              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/5 p-4 text-left text-white/90 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
+              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/10 p-4 text-left text-white/95 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg">
                 🧩
@@ -318,7 +318,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/how-to-play"
-              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/5 p-4 text-left text-white/90 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
+              className="group flex items-start gap-3 rounded-2xl border border-white/12 bg-white/10 p-4 text-left text-white/95 shadow-ambient backdrop-blur-md transition hover:border-brand-400/40 hover:text-white"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-lg">
                 📣
@@ -358,7 +358,7 @@ export default function HomePage() {
             {progressChipElements}
           </div>
           {shareLocked ? (
-            <div className="flex items-center gap-4 rounded-2xl border border-white/12 bg-white/5 px-4 py-3 text-left text-sm text-neutral-200/90">
+            <div className="flex items-center gap-4 rounded-2xl border border-white/12 bg-white/10 px-4 py-3 text-left text-sm text-neutral-200/90">
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-xl text-neutral-300">
                 🔒
               </span>

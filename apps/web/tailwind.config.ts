@@ -24,8 +24,8 @@ export default {
           900: "#172554",
         },
         surface: {
-          base: "rgba(12,17,36,0.85)",
-          raised: "rgba(19,27,45,0.72)",
+          base: "rgba(12, 17, 36, 0.9)",
+          raised: "rgba(18, 26, 46, 0.8)",
         },
       },
       boxShadow: {
