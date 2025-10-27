@@ -418,7 +418,12 @@ export default function HomePage() {
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-brand-500/40 via-purple-500/20 to-transparent blur-3xl sm:block" />
       </section>
 
-      <GlassSection innerClassName="space-y-6 text-neutral-200">
+      <GlassSection
+        innerClassName="space-y-6 text-neutral-200"
+        hoverGlow={false}
+        borderIntensity="subtle"
+        showAccent={false}
+      >
         <div className="space-y-2">
           <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
             Today&apos;s progress
