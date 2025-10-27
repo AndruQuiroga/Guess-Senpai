@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import GuessOpening from "../GuessOpening";
 import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
-import { GuessOpeningGame, GuessOpeningRound } from "../../types/puzzles";
+import { GuessOpeningGame } from "../../types/puzzles";
 
 interface Props {
   slug: string;
@@ -33,8 +33,12 @@ export function GuessOpeningPage({
 }: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
   const [controllerReady, setControllerReady] = useState(false);
-  const primaryRound: GuessOpeningRound | undefined = payload.rounds?.[0];
-  const totalRounds = Math.max(primaryRound?.spec.length ?? 3, 1);
+  const rounds = payload.rounds ?? [];
+  const totalRounds = Math.max(rounds.length, 1);
+  const roundKey = useMemo(
+    () => rounds.map((round) => round.mediaId).join("|"),
+    [rounds],
+  );
 
   const clampDifficulty = useCallback(
     (value: number | undefined | null) => {
@@ -50,12 +54,14 @@ export function GuessOpeningPage({
   const selectedDifficulty = clampDifficulty(accountDifficulty);
   const recommendedDifficulty = clampDifficulty(difficultyHint);
   const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
-  const [displayRound, setDisplayRound] = useState(progress?.round ?? highlightDifficulty);
+  const [displayRound, setDisplayRound] = useState(
+    progress?.round ?? highlightDifficulty,
+  );
 
   useEffect(() => {
     controller.current = null;
     setControllerReady(false);
-  }, [mediaId, primaryRound?.mediaId]);
+  }, [mediaId, roundKey]);
 
   useEffect(() => {
     if (!controllerReady) return;
@@ -67,7 +73,7 @@ export function GuessOpeningPage({
     setDisplayRound(progress?.round ?? highlightDifficulty);
   }, [progress?.round, highlightDifficulty]);
 
-  if (!primaryRound) {
+  if (rounds.length === 0) {
     return (
       <div className="rounded-3xl border border-white/10 bg-surface-raised p-6 text-neutral-100 shadow-ambient">
         Unable to load Guess the Opening for today. Please try again later.
@@ -93,7 +99,7 @@ export function GuessOpeningPage({
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <GuessOpening
-          payload={primaryRound}
+          payload={rounds}
           initialProgress={progress}
           onProgressChange={handleProgressChange}
           registerRoundController={(fn) => {
