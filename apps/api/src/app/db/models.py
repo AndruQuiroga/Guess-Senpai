@@ -38,6 +38,12 @@ class User(Base):
         passive_deletes=True,
         uselist=False,
     )
+    profile: Mapped[Optional["UserProfile"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
     recent_media_entries: Mapped[List["UserRecentMedia"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -100,3 +106,20 @@ class UserRecentMedia(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="recent_media_entries")
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
+    )
+    display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    avatar_frame: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    cosmetics: Mapped[Dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="profile")

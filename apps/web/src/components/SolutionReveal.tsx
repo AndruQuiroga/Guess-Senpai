@@ -1,15 +1,55 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { STREAK_MILESTONES, type StreakMilestone } from "../config/streak";
+import type { StreakSnapshot } from "../hooks/useStreak";
 import type { SolutionPayload } from "../types/puzzles";
 
 interface Props {
   solutions: SolutionPayload[];
+  streak?: StreakSnapshot;
 }
 
-export default function SolutionReveal({ solutions }: Props) {
+const STREAK_MILESTONE_STORAGE_KEY = "guesssenpai:streak:milestones";
+
+function readSeenMilestones(): number[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(STREAK_MILESTONE_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((value): value is number => typeof value === "number");
+  } catch {
+    return [];
+  }
+}
+
+function markMilestoneSeen(threshold: number) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const seen = new Set(readSeenMilestones());
+    seen.add(threshold);
+    window.localStorage.setItem(
+      STREAK_MILESTONE_STORAGE_KEY,
+      JSON.stringify(Array.from(seen.values()).sort((a, b) => a - b)),
+    );
+  } catch {
+    /* noop */
+  }
+}
+
+export default function SolutionReveal({ solutions, streak }: Props) {
   const entries = useMemo(() => {
     const seen = new Set<string>();
     return solutions.filter((solution) => {
@@ -21,6 +61,45 @@ export default function SolutionReveal({ solutions }: Props) {
       return true;
     });
   }, [solutions]);
+
+  const [activeMilestone, setActiveMilestone] = useState<StreakMilestone | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!streak) {
+      return;
+    }
+    const matched = STREAK_MILESTONES.find(
+      (milestone) => milestone.threshold === streak.count,
+    );
+    if (!matched) {
+      return;
+    }
+    const seenMilestones = readSeenMilestones();
+    if (seenMilestones.includes(matched.threshold)) {
+      return;
+    }
+    setActiveMilestone(matched);
+    markMilestoneSeen(matched.threshold);
+  }, [streak]);
+
+  useEffect(() => {
+    if (!activeMilestone) {
+      return;
+    }
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActiveMilestone(null);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [activeMilestone]);
+
+  const handleCloseMilestone = useCallback(() => {
+    setActiveMilestone(null);
+  }, []);
 
   if (entries.length === 0) {
     return null;
@@ -117,6 +196,68 @@ export default function SolutionReveal({ solutions }: Props) {
           );
         })}
       </div>
+
+      {activeMilestone && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/75 px-4 py-6"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              handleCloseMilestone();
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="streak-milestone-title"
+            className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-emerald-400/40 bg-surface-raised/95 p-6 text-left shadow-ambient backdrop-blur-2xl sm:p-8"
+          >
+            <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
+            <button
+              type="button"
+              onClick={handleCloseMilestone}
+              className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 p-2 text-sm text-white/80 transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              aria-label="Close milestone dialog"
+            >
+              ✕
+            </button>
+            <div className="space-y-6">
+              <div className="space-y-3 text-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200/80">
+                  Streak milestone unlocked
+                </p>
+                <h3
+                  id="streak-milestone-title"
+                  className="text-2xl font-display font-semibold text-white sm:text-3xl"
+                >
+                  {activeMilestone.title}
+                </h3>
+                <p className="text-sm text-neutral-300">
+                  {activeMilestone.rewardDescription}
+                </p>
+              </div>
+              <div className="relative mx-auto flex h-36 w-36 items-center justify-center rounded-full border border-white/20 bg-neutral-900/60 shadow-[0_0_28px_rgba(16,185,129,0.35)]">
+                <div
+                  className={`h-32 w-32 rounded-full border-2 border-white/50 bg-gradient-to-br ${activeMilestone.frameGradient}`}
+                  aria-hidden="true"
+                />
+              </div>
+              <div className="space-y-3 text-center">
+                <p className="text-lg font-semibold text-white">
+                  {activeMilestone.rewardName}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCloseMilestone}
+                  className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.02] hover:shadow-[0_0_22px_rgba(20,184,166,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                >
+                  Continue celebrating
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -10,6 +10,11 @@ interface StreakState {
   lastDate: string | null;
 }
 
+export interface StreakSnapshot {
+  count: number;
+  lastCompleted: string | null;
+}
+
 interface StreakResponse {
   count: number;
   last_completed: string | null;
@@ -73,7 +78,10 @@ function computeNextState(previous: StreakState, currentDateIso: string): Streak
   return { count: nextCount, lastDate: currentDateIso };
 }
 
-export function useStreak(currentDateIso: string, completed: boolean): number {
+export function useStreak(
+  currentDateIso: string,
+  completed: boolean,
+): StreakSnapshot {
   const [state, setState] = useState<StreakState>(() => readStoredState() ?? { count: 0, lastDate: null });
 
   useEffect(() => {
@@ -152,5 +160,5 @@ export function useStreak(currentDateIso: string, completed: boolean): number {
     });
   }, [completed, currentDateIso, pushServerUpdate]);
 
-  return state.count;
+  return { count: state.count, lastCompleted: state.lastDate };
 }
