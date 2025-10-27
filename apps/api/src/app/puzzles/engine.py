@@ -6,6 +6,7 @@ import hashlib
 import html
 import io
 import logging
+import math
 import random
 import re
 from dataclasses import asdict, dataclass
@@ -44,6 +45,7 @@ from .models import (
     PosterZoomMeta,
     PosterZoomPuzzleBundle,
     RedactedSynopsisGame,
+    RedactedSynopsisSegment,
     RedactedSynopsisPuzzleBundle,
     RoundSpec,
     SolutionPayload,
@@ -114,6 +116,9 @@ PUZZLE_CACHE_PREFIX = "guesssenpai:puzzle"
 USER_HISTORY_KEY_TEMPLATE = "guesssenpai:user-history:{user_id}"
 
 logger = logging.getLogger(__name__)
+
+TOKEN_PATTERN = re.compile(r"\s+|[^\w\s]+|\w+(?:'\w+)?", re.UNICODE)
+WORD_PATTERN = re.compile(r"\w+(?:'\w+)?", re.UNICODE)
 
 @dataclass
 class UserContext:
@@ -307,6 +312,41 @@ def _build_poster(media: Media) -> PosterZoomGame:
     )
 
 
+def _tokenize_synopsis(text: str) -> tuple[List[str], List[int]]:
+    tokens: List[str] = []
+    word_indices: List[int] = []
+    for match in TOKEN_PATTERN.finditer(text):
+        token = match.group(0)
+        tokens.append(token)
+        if WORD_PATTERN.fullmatch(token):
+            word_indices.append(len(tokens) - 1)
+    return tokens, word_indices
+
+
+def _mask_title_variants(tokens: List[str], word_indices: List[int], variants: Sequence[str]) -> set[int]:
+    masked: set[int] = set()
+    if not variants or not word_indices:
+        return masked
+
+    word_sequence = [tokens[index].casefold() for index in word_indices]
+
+    for variant in sorted(set(variants), key=len, reverse=True):
+        variant_words = [word.casefold() for word in WORD_PATTERN.findall(variant)]
+        if not variant_words:
+            continue
+        start = 0
+        max_start = len(word_sequence) - len(variant_words)
+        while start <= max_start:
+            if word_sequence[start : start + len(variant_words)] == variant_words:
+                for offset in range(len(variant_words)):
+                    masked.add(word_indices[start + offset])
+                start += len(variant_words)
+            else:
+                start += 1
+    return masked
+
+
+def _redact_description(media: Media) -> tuple[str, List[RedactedSynopsisSegment], List[int], List[str]]:
 def _deserialize_cached_image(payload: Any) -> Optional[Tuple[bytes, str]]:
     if not isinstance(payload, dict):
         return None
@@ -414,29 +454,60 @@ async def generate_poster_image(media_id: int, clarity: float) -> Tuple[bytes, s
 
 def _redact_description(media: Media) -> tuple[str, List[str]]:
     if not media.description:
-        return "", []
+        return "", [], [], []
+
     clean_text = _strip_html(media.description)
+    tokens, word_indices = _tokenize_synopsis(clean_text)
+    if not tokens:
+        return "", [], [], []
+
     variants = _title_variants(media)
-    masked_tokens: List[str] = []
-    redacted = clean_text
-    for variant in sorted(set(variants), key=len, reverse=True):
-        escaped = re.escape(variant)
-        pattern = re.compile(rf"(?i)\b{escaped}\b")
-        if pattern.search(redacted):
-            masked_tokens.append(variant)
-        redacted = pattern.sub("[REDACTED]", redacted)
-    # Collapse extra whitespace created by substitutions.
-    redacted = re.sub(r"\s{2,}", " ", redacted)
-    return redacted.strip(), masked_tokens
+    title_masked_indices = _mask_title_variants(tokens, word_indices, variants)
+
+    word_count = len(word_indices)
+    masked_indices: set[int] = set(title_masked_indices)
+    if word_count == 1:
+        masked_target = 1
+    else:
+        desired = math.ceil(word_count * 0.7)
+        desired = max(desired, len(masked_indices))
+        if word_count > 1:
+            desired = min(desired, word_count - 1) if len(masked_indices) < word_count else word_count
+        masked_target = max(1, min(desired, word_count))
+
+    if len(masked_indices) < masked_target:
+        remaining_indices = [index for index in word_indices if index not in masked_indices]
+        if remaining_indices:
+            seed_source = hashlib.sha256(f"synopsis:{media.id}".encode("utf-8")).hexdigest()
+            seed = int(seed_source[:16], 16)
+            rng = random.Random(seed)
+            rng.shuffle(remaining_indices)
+            needed = masked_target - len(masked_indices)
+            for index in remaining_indices[:needed]:
+                masked_indices.add(index)
+
+    additional_indices = sorted(index for index in masked_indices if index not in title_masked_indices)
+    title_indices_sorted = sorted(title_masked_indices)
+    masked_word_indices = additional_indices + [index for index in title_indices_sorted if index not in additional_indices]
+
+    segments = [
+        RedactedSynopsisSegment(text=token, masked=index in masked_indices)
+        for index, token in enumerate(tokens)
+    ]
+    masked_words = [segments[index].text for index in masked_word_indices]
+
+    return clean_text.strip(), segments, masked_word_indices, masked_words
 
 
 def _build_synopsis(media: Media) -> RedactedSynopsisGame:
-    text, masked_tokens = _redact_description(media)
+    text, segments, masked_indices, masked_words = _redact_description(media)
     return RedactedSynopsisGame(
         spec=SYNOPSIS_ROUNDS,
         answer=_choose_answer(media),
         text=text,
-        masked_tokens=masked_tokens,
+        segments=segments,
+        masked_word_indices=masked_indices,
+        masked_words=masked_words,
     )
 
 

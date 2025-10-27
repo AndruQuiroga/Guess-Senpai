@@ -40,7 +40,20 @@ describe("SynopsisRedacted autocomplete", () => {
       spec: [{ difficulty: 1, hints: ["unmask:2"] }],
       answer: "Steins;Gate",
       text: "A genius tests a microwave...",
-      masked_tokens: ["time", "machine"],
+      segments: [
+        { text: "A", masked: false },
+        { text: " ", masked: false },
+        { text: "genius", masked: true },
+        { text: " ", masked: false },
+        { text: "tests", masked: true },
+        { text: " ", masked: false },
+        { text: "a", masked: false },
+        { text: " ", masked: false },
+        { text: "microwave", masked: true },
+        { text: "...", masked: false },
+      ],
+      masked_word_indices: [2, 4, 8],
+      masked_words: ["genius", "tests", "microwave"],
     };
 
     const user = userEvent.setup();

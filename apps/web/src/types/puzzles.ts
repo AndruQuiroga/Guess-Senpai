@@ -45,11 +45,18 @@ export interface PosterZoomGame {
   cropStages?: PosterCropStage[];
 }
 
+export interface RedactedSynopsisSegment {
+  text: string;
+  masked: boolean;
+}
+
 export interface RedactedSynopsisGame {
   spec: RoundSpec[];
   answer: string;
   text: string;
-  masked_tokens: string[];
+  segments: RedactedSynopsisSegment[];
+  masked_word_indices: number[];
+  masked_words: string[];
 }
 
 export interface CharacterSilhouetteRound {

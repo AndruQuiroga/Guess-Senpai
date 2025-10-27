@@ -13,7 +13,12 @@ export function RedactedSynopsisPreview({ bundle }: RedactedSynopsisPreviewProps
   if (!bundle) return null;
 
   const roundHints = bundle.puzzle.spec?.[0]?.hints ?? [];
-  const snippet = summarizeText(bundle.puzzle.text);
+  const segments = bundle.puzzle.segments ?? [];
+  const previewSource =
+    segments.length > 0
+      ? segments.map((segment) => (segment.masked ? segment.text.replace(/./g, "█") || "█" : segment.text)).join("")
+      : bundle.puzzle.text;
+  const snippet = summarizeText(previewSource);
 
   return (
     <div className="space-y-3">

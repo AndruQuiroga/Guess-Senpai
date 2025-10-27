@@ -76,7 +76,7 @@ export default function SynopsisRedacted({
       }
     }
     setGuess("");
-  }, [initialProgress, payload.answer, payload.text]);
+  }, [initialProgress, payload.answer, payload.text, payload.segments]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -93,9 +93,10 @@ export default function SynopsisRedacted({
     [accountDifficulty, completed, round],
   );
 
-  const tokensToReveal = useMemo(() => {
+  const wordsToReveal = useMemo(() => {
+    const totalMasked = (payload.masked_word_indices ?? []).length;
     if (completed) {
-      return payload.masked_tokens.length;
+      return totalMasked;
     }
 
     const activeSpecs = payload.spec.filter((spec) => spec.difficulty <= hintRound);
@@ -110,56 +111,50 @@ export default function SynopsisRedacted({
         }
       });
     });
-    return maxTokens;
-  }, [completed, hintRound, payload.masked_tokens.length, payload.spec]);
+    return Math.min(maxTokens, totalMasked);
+  }, [completed, hintRound, payload.masked_word_indices, payload.spec]);
 
-  const revealedText = useMemo<ReactNode>(() => {
-    if (tokensToReveal <= 0) return payload.text;
+  const revealedWordCount = useMemo(() => {
+    if (completed) {
+      return (payload.masked_word_indices ?? []).length;
+    }
+    return wordsToReveal;
+  }, [completed, payload.masked_word_indices, wordsToReveal]);
 
-    const parts = payload.text.split("[REDACTED]");
-    if (parts.length === 1) return payload.text;
+  const renderedSynopsis = useMemo<ReactNode>(() => {
+    const segments = payload.segments;
+    if (!segments || segments.length === 0) {
+      return <span className="whitespace-pre-wrap">{payload.text}</span>;
+    }
 
-    const replacements = payload.masked_tokens.slice(0, tokensToReveal);
-    const content: ReactNode[] = [];
-    let replacementIndex = 0;
+    const order = payload.masked_word_indices ?? [];
+    const revealCount = completed ? order.length : wordsToReveal;
+    const revealSet = new Set(order.slice(0, revealCount));
 
-    parts.forEach((part, partIndex) => {
-      content.push(
-        <span key={`text-${partIndex}`} className="whitespace-pre-wrap">
-          {part}
+    return segments.map((segment, index) => {
+      const isMasked = segment.masked && !revealSet.has(index);
+      if (isMasked) {
+        const maskText = segment.text.replace(/./g, "█") || "█";
+        return (
+          <span key={`segment-${index}`} className="relative inline-flex align-baseline">
+            <span className="sr-only">Masked word</span>
+            <span
+              aria-hidden
+              className="inline-flex items-center rounded-sm bg-black/80 px-1 py-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.3em] text-white shadow-sm"
+            >
+              {maskText}
+            </span>
+          </span>
+        );
+      }
+
+      return (
+        <span key={`segment-${index}`} className="whitespace-pre-wrap">
+          {segment.text}
         </span>
       );
-
-      if (partIndex === parts.length - 1) {
-        return;
-      }
-
-      const replacement =
-        replacementIndex < replacements.length
-          ? replacements[replacementIndex]
-          : undefined;
-
-      if (replacement !== undefined && replacement !== null) {
-        content.push(
-          <span
-            key={`token-${partIndex}`}
-            className="inline-flex items-baseline rounded-sm border border-yellow-600/60 bg-yellow-200/90 px-1 font-semibold text-neutral-900 underline decoration-yellow-700 shadow-sm"
-          >
-            <span className="whitespace-pre-wrap">{replacement}</span>
-          </span>
-        );
-        replacementIndex += 1;
-      } else {
-        content.push(
-          <span key={`placeholder-${partIndex}`} className="whitespace-pre-wrap">
-            [REDACTED]
-          </span>
-        );
-      }
     });
-
-    return content;
-  }, [completed, payload.masked_tokens, payload.text, tokensToReveal]);
+  }, [completed, payload.masked_word_indices, payload.segments, payload.text, wordsToReveal]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });
@@ -247,12 +242,12 @@ export default function SynopsisRedacted({
   return (
     <div className="space-y-5">
       <div className="rounded-[1.8rem] border border-white/10 bg-white/5 p-5 text-base leading-relaxed text-neutral-100 shadow-inner shadow-black/10 whitespace-pre-wrap">
-        {revealedText}
+        {renderedSynopsis}
       </div>
       <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
-        {tokensToReveal > 0 && (
+        {revealedWordCount > 0 && (
           <span className="rounded-full border border-brand-400/30 bg-brand-500/10 px-3 py-1 font-semibold text-white/90">
-            Unmasked tokens: {tokensToReveal}
+            Revealed words: {revealedWordCount}
           </span>
         )}
       </div>
