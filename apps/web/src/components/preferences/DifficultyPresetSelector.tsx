@@ -2,29 +2,29 @@
 
 import { useMemo } from "react";
 
-export interface DifficultyPreset {
+export interface DifficultyPresetOption {
   value: number;
   label: string;
   description: string;
 }
 
-interface GameDifficultyPresetsProps {
+interface DifficultyPresetSelectorProps {
   title: string;
   description?: string;
-  presets: DifficultyPreset[];
+  presets: DifficultyPresetOption[];
   selected?: number;
   recommended?: number;
   onSelect(value: number): void;
 }
 
-export function GameDifficultyPresets({
+export function DifficultyPresetSelector({
   title,
   description,
   presets,
   selected,
   recommended,
   onSelect,
-}: GameDifficultyPresetsProps) {
+}: DifficultyPresetSelectorProps) {
   const highlightValue = useMemo(() => {
     if (typeof selected === "number" && Number.isFinite(selected)) {
       return selected;

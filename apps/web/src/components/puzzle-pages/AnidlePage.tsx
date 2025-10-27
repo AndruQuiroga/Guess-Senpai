@@ -7,7 +7,6 @@ import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { AnidleGame } from "../../types/puzzles";
-import { GameDifficultyPresets, type DifficultyPreset } from "./GameDifficultyPresets";
 
 interface Props {
   slug: string;
@@ -17,28 +16,9 @@ interface Props {
   dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
-  onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
-
-const ANIDLE_PRESETS: DifficultyPreset[] = [
-  {
-    value: 1,
-    label: "Warm-up mix",
-    description: "Kick off with the opening round and generous mashup hints.",
-  },
-  {
-    value: 2,
-    label: "Main stage",
-    description: "Skip ahead to richer layers while keeping a safety net of clues.",
-  },
-  {
-    value: 3,
-    label: "Encore challenge",
-    description: "Jump straight to the final remix for a blindfolded guess.",
-  },
-];
 
 export function AnidlePage({
   slug,
@@ -48,7 +28,6 @@ export function AnidlePage({
   dailyProgress,
   accountDifficulty,
   difficultyHint,
-  onDifficultyChange,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -88,15 +67,6 @@ export function AnidlePage({
     setDisplayRound(progress?.round ?? highlightDifficulty);
   }, [progress?.round, highlightDifficulty]);
 
-  const handlePresetSelect = useCallback(
-    (level: number) => {
-      const clamped = clampDifficulty(level) ?? 1;
-      onDifficultyChange?.(clamped);
-      controller.current?.(clamped);
-    },
-    [clampDifficulty, onDifficultyChange],
-  );
-
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
       setDisplayRound(state.round);
@@ -107,14 +77,6 @@ export function AnidlePage({
 
   return (
     <div className="space-y-6">
-      <GameDifficultyPresets
-        title="Pick your playlist difficulty"
-        description="Choose how many remix layers you want unlocked before committing to a guess."
-        presets={ANIDLE_PRESETS}
-        selected={selectedDifficulty}
-        recommended={recommendedDifficulty}
-        onSelect={handlePresetSelect}
-      />
       <GameShell
         title="Anidle"
         round={displayRound}

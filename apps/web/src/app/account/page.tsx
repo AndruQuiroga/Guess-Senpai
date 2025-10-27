@@ -5,6 +5,7 @@ import { GlassSection } from "../../components/GlassSection";
 import { RecentMediaList } from "../../components/account/RecentMediaList";
 import { SharePanel } from "../../components/account/SharePanel";
 import { StreakHistoryCard } from "../../components/account/StreakHistoryCard";
+import { DifficultyPreferenceCard } from "../../components/account/DifficultyPreferenceCard";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
@@ -113,8 +114,10 @@ export default async function AccountPage() {
         </GlassSection>
       </header>
 
+      <DifficultyPreferenceCard />
+
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1">
+        <div className="space-y-6 lg:col-span-1">
           <StreakHistoryCard
             streakCount={stats.streak.count}
             lastCompleted={stats.streak.last_completed}

@@ -7,7 +7,6 @@ import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { RedactedSynopsisGame } from "../../types/puzzles";
-import { GameDifficultyPresets, type DifficultyPreset } from "./GameDifficultyPresets";
 
 interface Props {
   slug: string;
@@ -17,28 +16,9 @@ interface Props {
   dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
-  onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
-
-const SYNOPSIS_PRESETS: DifficultyPreset[] = [
-  {
-    value: 1,
-    label: "Light blackout",
-    description: "Reveal the synopsis with minimal redactions for a gentle intro.",
-  },
-  {
-    value: 2,
-    label: "Partial reveal",
-    description: "Unmask a few more keywords while keeping the mystery intact.",
-  },
-  {
-    value: 3,
-    label: "Hard mode",
-    description: "Start with heavy censorship and decipher the story from scraps.",
-  },
-];
 
 export function RedactedSynopsisPage({
   slug,
@@ -48,7 +28,6 @@ export function RedactedSynopsisPage({
   dailyProgress,
   accountDifficulty,
   difficultyHint,
-  onDifficultyChange,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -82,25 +61,8 @@ export function RedactedSynopsisPage({
     controller.current?.(highlightDifficulty);
   }, [controllerReady, highlightDifficulty, progress?.completed]);
 
-  const handlePresetSelect = useCallback(
-    (level: number) => {
-      const clamped = clampDifficulty(level) ?? 1;
-      onDifficultyChange?.(clamped);
-      controller.current?.(clamped);
-    },
-    [clampDifficulty, onDifficultyChange],
-  );
-
   return (
     <div className="space-y-6">
-      <GameDifficultyPresets
-        title="Tune the censorship"
-        description="Decide how many blanks to fill before you craft your first theory."
-        presets={SYNOPSIS_PRESETS}
-        selected={selectedDifficulty}
-        recommended={recommendedDifficulty}
-        onSelect={handlePresetSelect}
-      />
       <GameShell
         title="Redacted Synopsis"
         round={progress?.round ?? highlightDifficulty}

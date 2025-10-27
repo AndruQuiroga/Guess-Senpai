@@ -7,7 +7,6 @@ import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { GuessOpeningGame } from "../../types/puzzles";
-import { GameDifficultyPresets, type DifficultyPreset } from "./GameDifficultyPresets";
 
 interface Props {
   slug: string;
@@ -17,28 +16,9 @@ interface Props {
   dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
-  onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
-
-const OPENING_PRESETS: DifficultyPreset[] = [
-  {
-    value: 1,
-    label: "Tempo check",
-    description: "Start with generous clip length and seasonal hints to warm up.",
-  },
-  {
-    value: 2,
-    label: "Hook spotlight",
-    description: "Jump ahead to focus on artist clues with tighter timing.",
-  },
-  {
-    value: 3,
-    label: "Blind intro",
-    description: "Skip straight to the toughest cut and guess before the chorus hits.",
-  },
-];
 
 export function GuessOpeningPage({
   slug,
@@ -48,7 +28,6 @@ export function GuessOpeningPage({
   dailyProgress,
   accountDifficulty,
   difficultyHint,
-  onDifficultyChange,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -87,15 +66,6 @@ export function GuessOpeningPage({
     setDisplayRound(progress?.round ?? highlightDifficulty);
   }, [progress?.round, highlightDifficulty]);
 
-  const handlePresetSelect = useCallback(
-    (level: number) => {
-      const clamped = clampDifficulty(level) ?? 1;
-      onDifficultyChange?.(clamped);
-      controller.current?.(clamped);
-    },
-    [clampDifficulty, onDifficultyChange],
-  );
-
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
       setDisplayRound(state.round);
@@ -106,14 +76,6 @@ export function GuessOpeningPage({
 
   return (
     <div className="space-y-6">
-      <GameDifficultyPresets
-        title="Choose your listening challenge"
-        description="Control how much of the OP you hear before locking in your answer."
-        presets={OPENING_PRESETS}
-        selected={selectedDifficulty}
-        recommended={recommendedDifficulty}
-        onSelect={handlePresetSelect}
-      />
       <GameShell
         title="Guess the Opening"
         round={displayRound}
