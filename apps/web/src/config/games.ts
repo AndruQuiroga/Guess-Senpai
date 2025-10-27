@@ -11,8 +11,9 @@ export type GamePreviewMedia =
       src: string;
       alt: string;
       loop?: boolean;
-      autoPlay?: boolean;
       muted?: boolean;
+      requiresAutoplay?: boolean;
+      autoPlay?: boolean;
     };
 
 export interface GamePreviewPlaceholder {

@@ -83,7 +83,7 @@ function renderPreviewBackground(
 ): JSX.Element {
   return (
     <div className="absolute inset-0 overflow-hidden">
-      <div className={`absolute inset-0 bg-gradient-to-br ${accentColor}`} />
+      <div className="absolute inset-0 bg-neutral-950/70" aria-hidden />
       {media ? (
         media.type === "image" ? (
           <div className="absolute inset-0">
@@ -101,15 +101,15 @@ function renderPreviewBackground(
           <video
             className="absolute inset-0 h-full w-full object-cover"
             src={media.src}
-            autoPlay={media.autoPlay ?? true}
+            autoPlay={media.requiresAutoplay ?? media.autoPlay ?? false}
             loop={media.loop ?? true}
             muted={media.muted ?? true}
             playsInline
             aria-label={media.alt}
+            preload="metadata"
           />
         )
       ) : null}
-      <div className="pointer-events-none absolute inset-0 bg-neutral-950/40" />
       <div
         className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentColor} ${overlayClasses}`}
       />
@@ -479,7 +479,8 @@ export default function HomePage() {
                     : game.comingSoon
                       ? "Coming soon"
                       : "Unavailable";
-                const overlayClasses = "opacity-60";
+                const overlayClasses =
+                  "opacity-75 mix-blend-multiply saturate-150";
                 const cardClasses =
                   "relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/70 p-6 text-white shadow-ambient backdrop-blur-xl transition hover:border-white/20 focus-within:border-white/25";
 
@@ -547,13 +548,13 @@ export default function HomePage() {
                       overlayClasses,
                     )}
                     <div className="relative z-10 flex flex-1 flex-col gap-4">
-                      <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
+                      <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-white/80">
                         {eyebrow}
                       </span>
                       <h3 className="text-xl font-display font-semibold tracking-tight">
                         {game.title}
                       </h3>
-                      <p className="text-sm leading-relaxed text-neutral-200">
+                      <p className="text-sm leading-relaxed text-neutral-100/90">
                         {game.tagline}
                       </p>
                       <div className="mt-auto flex flex-col gap-4">
@@ -613,9 +614,10 @@ export default function HomePage() {
                     : "Unavailable";
                 const statusLabel =
                   upcomingUnlockLabels[game.slug] ?? "Unlocking soon.";
-                const overlayClasses = "opacity-70";
+                const overlayClasses =
+                  "opacity-85 mix-blend-multiply saturate-150";
                 const cardClasses =
-                  "group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/5 bg-surface-raised/60 p-6 text-white/80 shadow-ambient backdrop-blur-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60";
+                  "group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/5 bg-surface-raised/65 p-6 text-white shadow-ambient backdrop-blur-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60";
 
                 const progressForGame = game.gameKey
                   ? progress[game.gameKey]
@@ -637,20 +639,20 @@ export default function HomePage() {
                       overlayClasses,
                     )}
                     <div className="relative z-10 flex flex-1 flex-col gap-4">
-                      <span className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-300">
+                      <span className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-white/80">
                         {eyebrow}
                       </span>
                       <h3 className="text-xl font-display font-semibold tracking-tight text-white">
                         {game.title}
                       </h3>
-                      <p className="text-sm leading-relaxed text-neutral-200/80">
+                      <p className="text-sm leading-relaxed text-neutral-100/85">
                         {game.tagline}
                       </p>
-                      <div className="mt-auto space-y-3 text-sm text-neutral-400/90">
-                        <span className="font-medium text-neutral-200/90">
+                      <div className="mt-auto space-y-3 text-sm text-neutral-200/90">
+                        <span className="font-medium text-neutral-100">
                           {statusLabel}
                         </span>
-                        <span className="inline-flex items-center gap-2 text-neutral-300/80">
+                        <span className="inline-flex items-center gap-2 text-neutral-100/80">
                           Preview details
                           <svg
                             aria-hidden

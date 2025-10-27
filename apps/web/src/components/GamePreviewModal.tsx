@@ -247,9 +247,10 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
                 src={media.src}
                 aria-label={media.alt}
                 loop={media.loop ?? true}
-                autoPlay={media.autoPlay ?? true}
+                autoPlay={media.requiresAutoplay ?? media.autoPlay ?? false}
                 muted={media.muted ?? true}
                 playsInline
+                preload="metadata"
               />
             ) : (
               <div
