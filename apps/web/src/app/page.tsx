@@ -345,17 +345,17 @@ export default function HomePage() {
 
   const showCompletionBanner = allCompleted;
 
-  const primaryCta: HeroCta | undefined = !showCompletionBanner
-    ? hasIncompleteGame && nextIncompleteGame
+  const primaryCta: HeroCta | undefined = allCompleted
+    ? { href: "/archive", label: "Dive into the archive" }
+    : hasIncompleteGame && nextIncompleteGame
       ? {
           href: `/games/${nextIncompleteGame.slug}`,
           label: `Resume ${nextIncompleteGame.title}`,
         }
-      : { href: "/games/daily", label: "Play today’s lineup" }
-    : undefined;
+      : { href: "/games/daily", label: "Play today’s lineup" };
 
   const secondaryCta: HeroCta | undefined =
-    !showCompletionBanner && hasIncompleteGame
+    !allCompleted && hasIncompleteGame
       ? { href: "/games/daily", label: "Continue" }
       : undefined;
 
