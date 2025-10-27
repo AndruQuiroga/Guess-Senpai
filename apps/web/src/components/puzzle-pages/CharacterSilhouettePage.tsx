@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import CharacterSilhouette from "../CharacterSilhouette";
 import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import type { CharacterSilhouetteGame } from "../../types/puzzles";
+import { GameDifficultyPresets, type DifficultyPreset } from "./GameDifficultyPresets";
 
 interface Props {
   slug: string;
@@ -14,9 +15,30 @@ interface Props {
   payload: CharacterSilhouetteGame;
   progress?: GameProgress;
   dailyProgress?: DailyProgress;
+  difficultyChoice?: number;
+  difficultyHint?: number;
+  onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
+
+const SILHOUETTE_PRESETS: DifficultyPreset[] = [
+  {
+    value: 1,
+    label: "Shadow outline",
+    description: "Begin with the dramatic silhouette and clear shape cues.",
+  },
+  {
+    value: 2,
+    label: "Stage lights",
+    description: "Fade in more lighting to sharpen the character details.",
+  },
+  {
+    value: 3,
+    label: "Full reveal",
+    description: "Crank the lights to maximum and guess from the final portrait.",
+  },
+];
 
 export function CharacterSilhouettePage({
   slug,
@@ -24,30 +46,80 @@ export function CharacterSilhouettePage({
   payload,
   progress,
   dailyProgress,
+  difficultyChoice,
+  difficultyHint,
+  onDifficultyChange,
   onProgressChange,
   nextSlug,
 }: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
-  const totalRounds = Math.max(payload.spec.length, 1);
+  const [controllerReady, setControllerReady] = useState(false);
+  const totalRounds = useMemo(() => Math.max(payload.spec.length, 1), [payload.spec.length]);
+
+  const clampDifficulty = useCallback(
+    (value: number | undefined | null) => {
+      if (typeof value !== "number" || Number.isNaN(value)) {
+        return undefined;
+      }
+      const rounded = Math.round(value);
+      return Math.max(1, Math.min(totalRounds, rounded));
+    },
+    [totalRounds],
+  );
+
+  const selectedDifficulty = clampDifficulty(difficultyChoice);
+  const recommendedDifficulty = clampDifficulty(difficultyHint);
+  const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
+
+  useEffect(() => {
+    controller.current = null;
+    setControllerReady(false);
+  }, [mediaId]);
+
+  useEffect(() => {
+    if (!controllerReady) return;
+    if (progress?.completed) return;
+    controller.current?.(highlightDifficulty);
+  }, [controllerReady, highlightDifficulty, progress?.completed]);
+
+  const handlePresetSelect = useCallback(
+    (level: number) => {
+      const clamped = clampDifficulty(level) ?? 1;
+      onDifficultyChange?.(clamped);
+      controller.current?.(clamped);
+    },
+    [clampDifficulty, onDifficultyChange],
+  );
 
   return (
-    <GameShell
-      title="Character Silhouette"
-      round={progress?.round ?? 1}
-      totalRounds={totalRounds}
-      onJumpRound={(target) => controller.current?.(target)}
-      actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
-    >
-      <CharacterSilhouette
-        mediaId={mediaId}
-        payload={payload}
-        initialProgress={progress}
-        onProgressChange={onProgressChange}
-        registerRoundController={(fn) => {
-          controller.current = fn;
-        }}
-        nextSlug={nextSlug}
+    <div className="space-y-6">
+      <GameDifficultyPresets
+        title="Adjust the reveal"
+        description="Decide how much lighting to start with before the silhouette steps into frame."
+        presets={SILHOUETTE_PRESETS}
+        selected={selectedDifficulty}
+        recommended={recommendedDifficulty}
+        onSelect={handlePresetSelect}
       />
-    </GameShell>
+      <GameShell
+        title="Character Silhouette"
+        round={progress?.round ?? highlightDifficulty}
+        totalRounds={totalRounds}
+        onJumpRound={(target) => controller.current?.(target)}
+        actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
+      >
+        <CharacterSilhouette
+          mediaId={mediaId}
+          payload={payload}
+          initialProgress={progress}
+          onProgressChange={onProgressChange}
+          registerRoundController={(fn) => {
+            controller.current = fn;
+            setControllerReady(true);
+          }}
+          nextSlug={nextSlug}
+        />
+      </GameShell>
+    </div>
   );
 }

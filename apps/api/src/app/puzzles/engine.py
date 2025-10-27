@@ -16,6 +16,7 @@ from ..services.history_repository import (
     list_recent_media as repo_list_recent_media,
     record_recent_media as repo_record_recent_media,
 )
+from ..services.preferences import load_user_preferences
 from .models import (
     AnidleGame,
     AnidleHints,
@@ -665,12 +666,30 @@ async def _assemble_daily_puzzle(
             )
             break
 
+    difficulty_hint: dict[str, int] = {}
+    if user:
+        preferences = await load_user_preferences(user.user_id)
+        allowed_keys = {
+            "anidle",
+            "poster_zoomed",
+            "redacted_synopsis",
+            "character_silhouette",
+        }
+        if guess_bundle:
+            allowed_keys.add("guess_the_opening")
+        difficulty_hint = {
+            key: value
+            for key, value in preferences.difficulty.items()
+            if key in allowed_keys
+        }
+
     games = GamesPayload(
         anidle=anidle_bundle,
         poster_zoomed=poster_bundle,
         redacted_synopsis=synopsis_bundle,
         character_silhouette=character_bundle,
         guess_the_opening=guess_bundle,
+        difficulty=difficulty_hint,
     )
 
     if user:
