@@ -6,6 +6,7 @@ import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { DailyCompletionBanner } from "../components/DailyCompletionBanner";
 import { GamePreviewModal } from "../components/GamePreviewModal";
+import { DailyRestNotice } from "../components/DailyRestNotice";
 import {
   HomeHero,
   type HeroCta,
@@ -549,7 +550,9 @@ export default function HomePage() {
               })}
             </div>
           </div>
-        ) : null}
+        ) : (
+          <DailyRestNotice />
+        )}
         {upcomingGames.length > 0 ? (
           <div className="space-y-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
