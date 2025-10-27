@@ -95,18 +95,18 @@ export interface GuessOpeningMeta {
   roundTotal?: number | null;
 }
 
-export interface GuessOpeningGame {
+export interface GuessOpeningRound {
+  order: number;
+  mediaId: number;
   spec: RoundSpec[];
   answer: string;
   clip: OpeningClip;
   meta: GuessOpeningMeta;
+  solution: SolutionPayload;
 }
 
-export interface GuessOpeningRound {
-  order: number;
-  mediaId: number;
-  puzzle: GuessOpeningGame;
-  solution: SolutionPayload;
+export interface GuessOpeningGame {
+  rounds: GuessOpeningRound[];
 }
 
 export interface SolutionTitles {
@@ -157,7 +157,6 @@ export interface GuessOpeningPuzzleBundle {
   mediaId: number;
   puzzle: GuessOpeningGame;
   solution: SolutionPayload;
-  rounds?: GuessOpeningRound[] | null;
 }
 
 export interface GamesPayload {

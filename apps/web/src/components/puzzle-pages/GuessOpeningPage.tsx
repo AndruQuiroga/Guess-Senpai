@@ -6,7 +6,7 @@ import GuessOpening from "../GuessOpening";
 import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
-import { GuessOpeningGame } from "../../types/puzzles";
+import { GuessOpeningGame, GuessOpeningRound } from "../../types/puzzles";
 
 interface Props {
   slug: string;
@@ -33,7 +33,8 @@ export function GuessOpeningPage({
 }: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
   const [controllerReady, setControllerReady] = useState(false);
-  const totalRounds = 3;
+  const primaryRound: GuessOpeningRound | undefined = payload.rounds?.[0];
+  const totalRounds = Math.max(primaryRound?.spec.length ?? 3, 1);
 
   const clampDifficulty = useCallback(
     (value: number | undefined | null) => {
@@ -54,7 +55,7 @@ export function GuessOpeningPage({
   useEffect(() => {
     controller.current = null;
     setControllerReady(false);
-  }, [mediaId]);
+  }, [mediaId, primaryRound?.mediaId]);
 
   useEffect(() => {
     if (!controllerReady) return;
@@ -65,6 +66,14 @@ export function GuessOpeningPage({
   useEffect(() => {
     setDisplayRound(progress?.round ?? highlightDifficulty);
   }, [progress?.round, highlightDifficulty]);
+
+  if (!primaryRound) {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-surface-raised p-6 text-neutral-100 shadow-ambient">
+        Unable to load Guess the Opening for today. Please try again later.
+      </div>
+    );
+  }
 
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
@@ -84,8 +93,7 @@ export function GuessOpeningPage({
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <GuessOpening
-          mediaId={mediaId}
-          payload={payload}
+          payload={primaryRound}
           initialProgress={progress}
           onProgressChange={handleProgressChange}
           registerRoundController={(fn) => {

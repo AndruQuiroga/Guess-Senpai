@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
-import { GuessOpeningGame as GuessOpeningPayload } from "../types/puzzles";
+import { GuessOpeningRound } from "../types/puzzles";
 import { resolveHintRound } from "../utils/difficulty";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
@@ -14,8 +14,7 @@ import {
 } from "./games/TitleGuessField";
 
 interface Props {
-  mediaId: number;
-  payload: GuessOpeningPayload;
+  payload: GuessOpeningRound;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
@@ -29,7 +28,6 @@ type FeedbackState =
   | null;
 
 export default function GuessOpening({
-  mediaId,
   payload,
   initialProgress,
   onProgressChange,
@@ -79,7 +77,7 @@ export default function GuessOpening({
     } else {
       setFeedback(null);
     }
-  }, [initialProgress, payload.answer]);
+  }, [initialProgress, payload.answer, payload.mediaId]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -154,7 +152,7 @@ export default function GuessOpening({
       setSubmitting(true);
       setFeedback(null);
       try {
-        const result = await verifyGuess(mediaId, trimmed, suggestionId);
+        const result = await verifyGuess(payload.mediaId, trimmed, suggestionId);
         setGuesses((prev) => [...prev, trimmed]);
         if (result.correct) {
           const matchTitle = result.match?.trim()
@@ -184,13 +182,7 @@ export default function GuessOpening({
         setSubmitting(false);
       }
     },
-    [
-      completed,
-      mediaId,
-      payload.answer,
-      submitting,
-      totalRounds,
-    ],
+    [completed, payload.answer, payload.mediaId, submitting, totalRounds],
   );
 
   const handleFieldSubmit = useCallback(

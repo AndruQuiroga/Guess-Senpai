@@ -11,12 +11,13 @@ from app.puzzles.models import (
     CharacterSilhouetteCharacter,
     CharacterSilhouetteGame,
     CharacterSilhouetteRound,
-    GuessOpeningGame,
     GuessOpeningMeta,
+    GuessOpeningRound,
     OpeningClip,
     PosterZoomPuzzleBundle,
     RedactedSynopsisSegment,
     RoundSpec,
+    SolutionPayload,
 )
 from app.services.anilist import Media, Title
 
@@ -56,12 +57,29 @@ def make_media(media_id: int, title: str) -> Media:
     )
 
 
-def make_guess_opening(media: Media) -> GuessOpeningGame:
-    return GuessOpeningGame(
+def make_guess_opening(media: Media, *, order: int = 1, total_rounds: int = 3) -> GuessOpeningRound:
+    return GuessOpeningRound(
+        order=order,
+        mediaId=media.id,
         spec=[RoundSpec(difficulty=1, hints=["length"])],
         answer=media.title.english or "Unknown",
-        clip=OpeningClip(audioUrl="https://cdn.example.com/opening.mp3", lengthSeconds=90),
-        meta=GuessOpeningMeta(songTitle="Theme", artist="Singer"),
+        clip=OpeningClip(
+            audioUrl="https://cdn.example.com/opening.mp3",
+            lengthSeconds=90,
+        ),
+        meta=GuessOpeningMeta(
+            songTitle="Theme",
+            artist="Singer",
+            roundOrder=order,
+            roundTotal=total_rounds,
+        ),
+        solution=SolutionPayload(
+            titles=media.title,
+            coverImage=None,
+            synopsis=None,
+            aniListUrl=f"https://anilist.co/anime/{media.id}",
+            streamingLinks=[],
+        ),
     )
 
 
@@ -170,12 +188,12 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
     async def fake_load_media_details(media_id: int, cache, settings):
         return media_by_id[media_id]
 
-    async def fake_build_guess_opening(media: Media, cache, **kwargs):
-        return make_guess_opening(media)
+    async def fake_build_guess_opening_round(media: Media, cache, **kwargs):
+        return make_guess_opening(media, **kwargs)
 
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
     monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
-    monkeypatch.setattr(engine, "_build_guess_opening", fake_build_guess_opening)
+    monkeypatch.setattr(engine, "_build_guess_opening_round", fake_build_guess_opening_round)
     monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
 
     cache = DummyCache()
@@ -196,7 +214,7 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
         result.games.character_silhouette.mediaId,
     ]
     if result.games.guess_the_opening:
-        rounds = result.games.guess_the_opening.rounds or []
+        rounds = result.games.guess_the_opening.puzzle.rounds
         assert len(rounds) == 3
         bundle_ids.extend(round.mediaId for round in rounds)
 
@@ -225,11 +243,11 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
 
     attempts: list[int] = []
 
-    async def fake_build_guess_opening(media: Media, cache, **kwargs):
+    async def fake_build_guess_opening_round(media: Media, cache, **kwargs):
         attempts.append(media.id)
         if len(attempts) == 1:
             return None
-        return make_guess_opening(media)
+        return make_guess_opening(media, **kwargs)
 
     recorded: list[int] = []
 
@@ -244,7 +262,7 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
     monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
-    monkeypatch.setattr(engine, "_build_guess_opening", fake_build_guess_opening)
+    monkeypatch.setattr(engine, "_build_guess_opening_round", fake_build_guess_opening_round)
     monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
     monkeypatch.setattr(engine, "_record_recent_media", fake_record_recent_media)
     monkeypatch.setattr(engine, "_fetch_user_lists", fake_fetch_user_lists)
@@ -266,7 +284,7 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
         result.games.character_silhouette.mediaId,
     ]
     if result.games.guess_the_opening:
-        rounds = result.games.guess_the_opening.rounds or []
+        rounds = result.games.guess_the_opening.puzzle.rounds
         assert len(rounds) == 3
         bundle_ids.extend(round.mediaId for round in rounds)
         assert attempts[-3:] == [round.mediaId for round in rounds]

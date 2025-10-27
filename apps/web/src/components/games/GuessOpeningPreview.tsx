@@ -14,8 +14,11 @@ function formatLength(lengthSeconds?: number | null) {
 export function GuessOpeningPreview({ bundle }: GuessOpeningPreviewProps) {
   if (!bundle) return null;
 
-  const roundHints = bundle.puzzle.spec?.[0]?.hints ?? [];
-  const { meta, clip } = bundle.puzzle;
+  const primaryRound = bundle.puzzle.rounds?.[0];
+  if (!primaryRound) return null;
+
+  const roundHints = primaryRound.spec?.[0]?.hints ?? [];
+  const { meta, clip } = primaryRound;
 
   return (
     <div className="space-y-3">

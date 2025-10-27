@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 import GuessOpening from "../GuessOpening";
-import type { GuessOpeningGame } from "../../types/puzzles";
+import type { GuessOpeningRound } from "../../types/puzzles";
 
 const useTitleSuggestionsMock = vi.hoisted(() => vi.fn());
 
@@ -36,21 +36,31 @@ describe("GuessOpening autocomplete", () => {
   });
 
   it("submits the highlighted suggestion when confirming with enter", async () => {
-    const payload: GuessOpeningGame = {
+    const payload: GuessOpeningRound = {
+      order: 1,
+      mediaId: 84,
       spec: [{ difficulty: 1, hints: [] }],
       answer: "Neon Genesis Evangelion",
-      clip: { audioUrl: null, videoUrl: null, mimeType: null, lengthSeconds: 90 },
+      clip: {
+        audioUrl: null,
+        videoUrl: null,
+        mimeType: null,
+        lengthSeconds: 90,
+      },
       meta: { artist: null, songTitle: null, sequence: 1, season: null },
+      solution: {
+        titles: { english: "Neon Genesis Evangelion" },
+        coverImage: null,
+        synopsis: null,
+        aniListUrl: "https://anilist.co/anime/84",
+        streamingLinks: [],
+      },
     };
 
     const user = userEvent.setup();
 
     render(
-      <GuessOpening
-        mediaId={84}
-        payload={payload}
-        onProgressChange={() => {}}
-      />,
+      <GuessOpening payload={payload} onProgressChange={() => {}} />,
     );
 
     const input = screen.getByLabelText("Guess the opening");
