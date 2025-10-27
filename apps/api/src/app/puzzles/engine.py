@@ -183,21 +183,18 @@ def _extract_top_tags(media: Media, limit: int = 6) -> List[str]:
 
 
 def _generate_synopsis_levels(
-    text: str, seed: int, reveal_levels: Sequence[float]
+    segments: Sequence[RedactedSynopsisSegment],
+    masked_word_indices: Sequence[int],
+    reveal_levels: Sequence[float],
 ) -> List[SynopsisHint]:
-    if not text:
+    if not segments:
         return []
 
-    word_matches = list(re.finditer(r"\b[\w']+\b", text))
-    candidates = [match for match in word_matches if match.group(0).upper() != "REDACTED"]
+    total_masked = len(masked_word_indices)
+    base_text = "".join(segment.text for segment in segments).strip()
 
-    if not candidates:
-        return [SynopsisHint(ratio=max(0.0, min(level, 1.0)), text=text.strip()) for level in reveal_levels]
-
-    rng = random.Random(seed)
-    ordering = list(range(len(candidates)))
-    rng.shuffle(ordering)
-    shuffled = [candidates[index] for index in ordering]
+    if total_masked <= 0:
+        return [SynopsisHint(ratio=max(0.0, min(level, 1.0)), text=base_text) for level in reveal_levels]
 
     hints: List[SynopsisHint] = []
     for level in reveal_levels:
@@ -205,27 +202,18 @@ def _generate_synopsis_levels(
         if ratio <= 0.0:
             reveal_count = 0
         elif ratio >= 1.0:
-            reveal_count = len(candidates)
+            reveal_count = total_masked
         else:
-            reveal_count = max(1, int(round(len(candidates) * ratio)))
+            reveal_count = max(1, int(round(total_masked * ratio)))
 
-        visible_spans = {
-            shuffled[index].span()
-            for index in range(min(reveal_count, len(shuffled)))
-        }
+        revealed = set(masked_word_indices[: min(reveal_count, total_masked)])
 
         pieces: List[str] = []
-        cursor = 0
-        for match in word_matches:
-            start, end = match.span()
-            pieces.append(text[cursor:start])
-            token = match.group(0)
-            if token.upper() == "REDACTED" or (start, end) in visible_spans:
-                pieces.append(token)
-            else:
+        for index, segment in enumerate(segments):
+            if segment.masked and index not in revealed:
                 pieces.append("[REDACTED]")
-            cursor = end
-        pieces.append(text[cursor:])
+            else:
+                pieces.append(segment.text)
 
         redacted_text = "".join(pieces).strip()
         hints.append(SynopsisHint(ratio=ratio, text=redacted_text))
@@ -234,8 +222,8 @@ def _generate_synopsis_levels(
 
 
 def _build_anidle_synopsis(media: Media) -> List[SynopsisHint]:
-    text, _ = _redact_description(media)
-    return _generate_synopsis_levels(text, media.id, ANIDLE_SYNOPSIS_REVEAL_LEVELS)
+    _, segments, masked_indices, _ = _redact_description(media)
+    return _generate_synopsis_levels(segments, masked_indices, ANIDLE_SYNOPSIS_REVEAL_LEVELS)
 
 
 def _build_anidle(media: Media) -> AnidleGame:
@@ -345,8 +333,6 @@ def _mask_title_variants(tokens: List[str], word_indices: List[int], variants: S
                 start += 1
     return masked
 
-
-def _redact_description(media: Media) -> tuple[str, List[RedactedSynopsisSegment], List[int], List[str]]:
 def _deserialize_cached_image(payload: Any) -> Optional[Tuple[bytes, str]]:
     if not isinstance(payload, dict):
         return None
@@ -452,7 +438,9 @@ async def generate_poster_image(media_id: int, clarity: float) -> Tuple[bytes, s
     return variant_bytes, mime
 
 
-def _redact_description(media: Media) -> tuple[str, List[str]]:
+def _redact_description(
+    media: Media,
+) -> tuple[str, List[RedactedSynopsisSegment], List[int], List[str]]:
     if not media.description:
         return "", [], [], []
 
