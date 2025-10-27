@@ -411,13 +411,10 @@ export default function HomePage() {
                     : game.comingSoon
                       ? "Coming soon"
                       : "Unavailable";
-                const statusLabel = "Start playing";
-                const statusClasses =
-                  "text-brand-200 transition group-hover:text-brand-100 group-focus-visible:text-brand-50";
                 const overlayClasses =
-                  "opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100";
+                  "opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100";
                 const cardClasses =
-                  "group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 hover:border-brand-400/50 hover:shadow-[0_0_40px_rgba(59,130,246,0.35)] focus-visible:outline-white/80";
+                  "relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-6 text-white shadow-ambient backdrop-blur-xl transition group-hover:border-brand-400/50 group-hover:shadow-[0_0_40px_rgba(59,130,246,0.35)] group-focus-within:border-brand-400/50 group-focus-within:shadow-[0_0_40px_rgba(59,130,246,0.35)]";
 
                 const progressForGame = game.gameKey
                   ? progress[game.gameKey]
@@ -453,7 +450,7 @@ export default function HomePage() {
                       </p>
                     </div>
                     {showAvailabilityError ? (
-                      <div className="relative z-10 mt-6 flex flex-wrap items-center gap-3">
+                      <div className="relative z-20 mt-6 flex flex-wrap items-center gap-3">
                         <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
                           ⚠️ Unable to load today&apos;s availability
                         </span>
@@ -466,37 +463,42 @@ export default function HomePage() {
                           Retry
                         </button>
                       </div>
-                    ) : (
-                      <span
-                        className={`relative z-10 mt-6 inline-flex items-center gap-2 text-sm font-semibold ${statusClasses}`}
-                      >
-                        {statusLabel}
-                        <svg
-                          aria-hidden
-                          className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
-                        </svg>
-                      </span>
-                    )}
+                    ) : null}
                   </>
                 );
 
                 return (
                   <div key={game.slug} className="flex h-full flex-col gap-3">
-                    <div className="relative">
+                    <div className="group relative">
+                      <div className={`${cardClasses} flex-1 text-left`}>
+                        {content}
+                      </div>
                       <Link
                         href={`/games/${game.slug}`}
-                        className={`${cardClasses} flex-1 text-left`}
-                      >
-                        {content}
-                      </Link>
+                        aria-hidden="true"
+                        tabIndex={-1}
+                        className="absolute inset-0 z-10 rounded-3xl"
+                      />
+                      {!showAvailabilityError ? (
+                        <Link
+                          href={`/games/${game.slug}`}
+                          className="pointer-events-auto absolute bottom-6 left-6 z-30 inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                        >
+                          {canResume ? "Resume" : "Start playing"}
+                          <svg
+                            aria-hidden
+                            className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-within:translate-x-1"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
+                          </svg>
+                        </Link>
+                      ) : null}
                       <button
                         type="button"
                         onClick={handlePreviewClick}
-                        className="absolute right-4 top-4 inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-black/40 px-4 text-sm font-semibold text-white/90 shadow-ambient backdrop-blur transition hover:border-white/40 hover:bg-black/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                        className="absolute right-4 top-4 z-40 inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-black/40 px-4 text-sm font-semibold text-white/90 shadow-ambient backdrop-blur transition hover:border-white/40 hover:bg-black/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                       >
                         <svg
                           aria-hidden
@@ -515,12 +517,9 @@ export default function HomePage() {
                       </button>
                     </div>
                     {game.playable && canResume ? (
-                      <Link
-                        href={`/games/${game.slug}`}
-                        className="inline-flex items-center justify-center rounded-2xl border border-brand-400/40 bg-brand-400/10 px-4 py-2 text-sm font-semibold text-brand-100 transition hover:border-brand-300/60 hover:bg-brand-400/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-                      >
-                        Resume
-                      </Link>
+                      <span className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/70">
+                        Progress carries over when this mode launches
+                      </span>
                     ) : null}
                   </div>
                 );
