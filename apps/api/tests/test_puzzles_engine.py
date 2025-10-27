@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from datetime import date
 from typing import Any
 
 import pytest
@@ -105,6 +104,28 @@ def test_build_poster_bundle_without_cover_image() -> None:
 
     assert bundle.puzzle.image is None
 
+
+def test_redacted_synopsis_masks_majority_of_words() -> None:
+    media = make_media(777, "Mystery Story")
+    media.description = (
+        "Mystery Story follows a clever detective and an enigmatic partner as they chase impossible clues across the city."
+    )
+
+    text, segments, masked_indices, masked_words = engine._redact_description(media)
+
+    assert text == media.description.strip()
+    assert segments
+    assert len(masked_indices) == len(masked_words)
+
+    total_words = sum(1 for segment in segments if engine.WORD_PATTERN.fullmatch(segment.text))
+    assert total_words > 0
+
+    masked_ratio = len(masked_indices) / total_words
+    assert masked_ratio >= 0.65
+
+    masked_text = {segments[index].text.casefold() for index in masked_indices}
+    assert "mystery" in masked_text
+    assert "story" in masked_text
 
 @pytest.mark.asyncio
 async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPatch) -> None:

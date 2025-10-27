@@ -49,11 +49,18 @@ class PosterZoomGame(BaseModel):
     cropStages: List[PosterCropStage] = Field(default_factory=list)
 
 
+class RedactedSynopsisSegment(BaseModel):
+    text: str
+    masked: bool = False
+
+
 class RedactedSynopsisGame(BaseModel):
     spec: List[RoundSpec]
     answer: str
     text: str
-    masked_tokens: List[str] = Field(default_factory=list)
+    segments: List[RedactedSynopsisSegment] = Field(default_factory=list)
+    masked_word_indices: List[int] = Field(default_factory=list)
+    masked_words: List[str] = Field(default_factory=list)
 
 
 class CharacterSilhouetteRound(BaseModel):
