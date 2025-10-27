@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { RedactedSynopsisGame as SynopsisPayload } from "../types/puzzles";
+import { resolveHintRound } from "../utils/difficulty";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
 
@@ -15,6 +16,7 @@ interface Props {
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
+  accountDifficulty?: number;
 }
 
 const TOTAL_ROUNDS = 3;
@@ -31,6 +33,7 @@ export default function SynopsisRedacted({
   onProgressChange,
   registerRoundController,
   nextSlug,
+  accountDifficulty,
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [guess, setGuess] = useState("");
@@ -69,12 +72,20 @@ export default function SynopsisRedacted({
     });
   }, [registerRoundController]);
 
+  const hintRound = useMemo(
+    () =>
+      completed
+        ? TOTAL_ROUNDS
+        : resolveHintRound(round, TOTAL_ROUNDS, accountDifficulty),
+    [accountDifficulty, completed, round],
+  );
+
   const tokensToReveal = useMemo(() => {
     if (completed) {
       return payload.masked_tokens.length;
     }
 
-    const activeSpecs = payload.spec.filter((spec) => spec.difficulty <= round);
+    const activeSpecs = payload.spec.filter((spec) => spec.difficulty <= hintRound);
     let maxTokens = 0;
     activeSpecs.forEach((spec) => {
       spec.hints.forEach((hint) => {
@@ -87,7 +98,7 @@ export default function SynopsisRedacted({
       });
     });
     return maxTokens;
-  }, [completed, payload.masked_tokens.length, payload.spec, round]);
+  }, [completed, hintRound, payload.masked_tokens.length, payload.spec]);
 
   const revealedText = useMemo<ReactNode>(() => {
     if (tokensToReveal <= 0) return payload.text;

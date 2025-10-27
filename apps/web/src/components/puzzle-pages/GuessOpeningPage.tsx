@@ -131,6 +131,7 @@ export function GuessOpeningPage({
             setControllerReady(true);
           }}
           nextSlug={nextSlug}
+          accountDifficulty={selectedDifficulty}
         />
       </GameShell>
     </div>

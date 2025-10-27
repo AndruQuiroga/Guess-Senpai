@@ -118,6 +118,7 @@ export function RedactedSynopsisPage({
             setControllerReady(true);
           }}
           nextSlug={nextSlug}
+          accountDifficulty={selectedDifficulty}
         />
       </GameShell>
     </div>

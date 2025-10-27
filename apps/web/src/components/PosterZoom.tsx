@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState, type ChangeEvent 
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { PosterZoomGame as PosterPayload } from "../types/puzzles";
+import { resolveHintRound } from "../utils/difficulty";
 import { formatMediaFormatLabel } from "../utils/formatMediaFormatLabel";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
@@ -15,6 +16,7 @@ interface Props {
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
+  accountDifficulty?: number;
 }
 
 type FeedbackState =
@@ -29,6 +31,7 @@ export default function PosterZoom({
   onProgressChange,
   registerRoundController,
   nextSlug,
+  accountDifficulty,
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [completed, setCompleted] = useState(
@@ -87,16 +90,23 @@ export default function PosterZoom({
 
   const cropStages = payload.cropStages ?? [];
 
+  const hintRound = useMemo(
+    () =>
+      completed
+        ? totalRounds
+        : resolveHintRound(round, totalRounds, accountDifficulty),
+    [accountDifficulty, completed, round, totalRounds],
+  );
+
   const fallbackZoom = useMemo(() => {
     if (completed) return 1;
     const initialScale = 1.35;
     if (totalRounds <= 1) {
       return 1;
     }
-    const clampedRound = Math.max(1, Math.min(totalRounds, round));
-    const progress = (clampedRound - 1) / (totalRounds - 1);
+    const progress = (hintRound - 1) / (totalRounds - 1);
     return initialScale + (1 - initialScale) * progress;
-  }, [completed, round, totalRounds]);
+  }, [completed, hintRound, totalRounds]);
 
   const activeCropStage = useMemo(() => {
     if (!cropStages.length) {
@@ -105,9 +115,9 @@ export default function PosterZoom({
     if (completed) {
       return cropStages[cropStages.length - 1];
     }
-    const index = Math.max(0, Math.min(cropStages.length - 1, round - 1));
+    const index = Math.max(0, Math.min(cropStages.length - 1, hintRound - 1));
     return cropStages[index];
-  }, [completed, cropStages, round]);
+  }, [completed, cropStages, hintRound]);
 
   const imageTransform = useMemo(() => {
     if (!activeCropStage) {
@@ -132,17 +142,16 @@ export default function PosterZoom({
     if (totalRounds <= 1) {
       return 0;
     }
-    const clampedRound = Math.max(1, Math.min(totalRounds, round));
-    const progress = (clampedRound - 1) / (totalRounds - 1);
+    const progress = (hintRound - 1) / (totalRounds - 1);
     const maxBlur = 14;
     const remaining = 1 - progress;
     return Number((remaining * maxBlur).toFixed(2));
-  }, [completed, round, totalRounds]);
+  }, [completed, hintRound, totalRounds]);
 
   const activeHints = useMemo(() => {
     const hints: string[] = [];
     payload.spec
-      .filter((spec) => spec.difficulty <= round || completed)
+      .filter((spec) => spec.difficulty <= hintRound)
       .forEach((spec) => {
         spec.hints.forEach((hint) => {
           if (hint === "genres" && payload.meta.genres.length) {
@@ -167,7 +176,7 @@ export default function PosterZoom({
       hints.push(`Answer: ${payload.answer}`);
     }
     return Array.from(new Set(hints));
-  }, [completed, payload, round]);
+  }, [completed, hintRound, payload]);
 
   const handleGuessSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {

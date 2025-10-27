@@ -131,6 +131,7 @@ export function CharacterSilhouettePage({
             setControllerReady(true);
           }}
           nextSlug={nextSlug}
+          accountDifficulty={selectedDifficulty}
         />
       </GameShell>
     </div>

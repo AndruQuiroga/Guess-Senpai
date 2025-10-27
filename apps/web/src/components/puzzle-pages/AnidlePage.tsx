@@ -132,6 +132,7 @@ export function AnidlePage({
             setControllerReady(true);
           }}
           nextSlug={nextSlug}
+          accountDifficulty={selectedDifficulty}
         />
       </GameShell>
     </div>

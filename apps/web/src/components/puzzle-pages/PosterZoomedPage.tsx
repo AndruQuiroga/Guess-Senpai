@@ -140,6 +140,7 @@ export function PosterZoomedPage({
             setControllerReady(true);
           }}
           nextSlug={nextSlug}
+          accountDifficulty={selectedDifficulty}
         />
       </GameShell>
     </div>
