@@ -96,8 +96,6 @@ interface HomeHeroProps {
   streakInfo: StreakSummary;
   progressChunks: ProgressSummaryChunk[];
   showLoginCallout: boolean;
-  shareLocked: boolean;
-  onShare: () => void;
   primaryCta: HeroCta;
   secondaryCta?: HeroCta;
   nextIncompleteGame: { slug: string; title: string } | null;
@@ -108,8 +106,6 @@ export function HomeHero({
   streakInfo,
   progressChunks,
   showLoginCallout,
-  shareLocked,
-  onShare,
   primaryCta,
   secondaryCta,
   nextIncompleteGame,
@@ -172,49 +168,6 @@ export function HomeHero({
               You left off on {nextIncompleteGame.title}
             </p>
           ) : null}
-          {shareLocked ? (
-            <button
-              type="button"
-              disabled
-              aria-disabled={true}
-              className="inline-flex items-center gap-3 rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/8 to-white/3 px-5 py-2.5 text-sm font-medium text-neutral-200/90 shadow-ambient"
-            >
-              <span
-                aria-hidden
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg text-white"
-              >
-                🔒
-              </span>
-              <span className="text-left">Play a round to unlock sharing.</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="group inline-flex items-center gap-3 overflow-hidden rounded-3xl border border-brand-400/30 bg-gradient-to-br from-brand-500 via-purple-500 to-amber-400 px-6 py-3 text-sm font-semibold text-white shadow-[0_20px_45px_-25px_rgba(168,85,247,0.75)] transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-[0_25px_55px_-25px_rgba(236,72,153,0.7)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-              onClick={onShare}
-            >
-              <span
-                aria-hidden
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-base text-white transition-colors duration-200 group-hover:bg-white/20"
-              >
-                <svg
-                  aria-hidden
-                  className="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
-                  <path d="M16 6l-4-4-4 4" />
-                  <path d="M12 2v14" />
-                </svg>
-              </span>
-              <span className="relative z-10">Share progress</span>
-            </button>
-          )}
         </div>
       </div>
       <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-brand-500/40 via-purple-500/20 to-transparent blur-3xl sm:block" />
