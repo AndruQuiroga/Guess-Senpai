@@ -1,7 +1,9 @@
 import Link from "next/link";
 
+import DailyResetTimer from "./DailyResetTimer";
+
 export type ProgressSummaryChunk = {
-  id: "streak" | "reset" | "completion";
+  id: "streak" | "completion";
   icon: string;
   text: string;
   textClassName?: string;
@@ -99,6 +101,7 @@ interface HomeHeroProps {
   primaryCta: HeroCta;
   secondaryCta?: HeroCta;
   nextIncompleteGame: { slug: string; title: string } | null;
+  timeRemaining: string | null;
 }
 
 export function HomeHero({
@@ -109,6 +112,7 @@ export function HomeHero({
   primaryCta,
   secondaryCta,
   nextIncompleteGame,
+  timeRemaining,
 }: HomeHeroProps): JSX.Element {
   return (
     <section className="relative overflow-hidden rounded-4xl border border-white/10 bg-surface-raised p-10 text-white shadow-ambient backdrop-blur-2xl sm:p-14">
@@ -153,7 +157,7 @@ export function HomeHero({
             ) : null}
           </div>
         </div>
-        <div className="flex w-full max-w-lg flex-col gap-5 rounded-4xl border border-white/15 bg-white/5 p-6 text-sm text-neutral-200/90 shadow-ambient backdrop-blur-xl">
+        <div className="flex w-full max-w-lg flex-col gap-6 rounded-4xl border border-white/15 bg-white/5 p-6 text-sm text-neutral-200/90 shadow-ambient backdrop-blur-xl">
           <div className="space-y-1 text-white/85">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">
               Today&apos;s progress
@@ -162,6 +166,7 @@ export function HomeHero({
               Streak {streakInfo.count} • {formattedDate}
             </p>
           </div>
+          <DailyResetTimer timeRemaining={timeRemaining} />
           <ProgressSummary chunks={progressChunks} layout="pill" />
           {nextIncompleteGame ? (
             <p className="text-sm text-neutral-100/80">

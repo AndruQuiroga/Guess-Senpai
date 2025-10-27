@@ -84,31 +84,19 @@ function classNames(
 
 function createProgressSummaryChunks({
   streakCount,
-  timeRemaining,
   completedCount,
   totalAvailable,
 }: {
   streakCount: number;
-  timeRemaining: string | null;
   completedCount: number;
   totalAvailable: number;
 }): ProgressSummaryChunk[] {
-  const resetLabel = timeRemaining
-    ? `Resets in ${timeRemaining}`
-    : "Resets soon";
-
   return [
     {
       id: "streak",
       icon: "🔥",
       text: `Streak ${streakCount}`,
       accent: "highlight",
-    },
-    {
-      id: "reset",
-      icon: "⏱️",
-      text: resetLabel,
-      textClassName: "sm:max-w-[16ch]",
     },
     {
       id: "completion",
@@ -347,11 +335,10 @@ export default function HomePage() {
     () =>
       createProgressSummaryChunks({
         streakCount,
-        timeRemaining,
         completedCount,
         totalAvailable,
       }),
-    [streakCount, timeRemaining, completedCount, totalAvailable],
+    [streakCount, completedCount, totalAvailable],
   );
 
   const primaryCta: HeroCta =
@@ -376,6 +363,7 @@ export default function HomePage() {
         primaryCta={primaryCta}
         secondaryCta={secondaryCta}
         nextIncompleteGame={nextIncompleteGame}
+        timeRemaining={timeRemaining}
       />
 
       {allCompleted ? (
