@@ -11,6 +11,7 @@ import {
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { GuessOpeningGame as GuessOpeningPayload } from "../types/puzzles";
+import { resolveHintRound } from "../utils/difficulty";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
 
@@ -21,6 +22,7 @@ interface Props {
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
+  accountDifficulty?: number;
 }
 
 type FeedbackState =
@@ -35,6 +37,7 @@ export default function GuessOpening({
   onProgressChange,
   registerRoundController,
   nextSlug,
+  accountDifficulty,
 }: Props) {
   const totalRounds = useMemo(() => {
     const specLength = payload.spec.length;
@@ -90,10 +93,18 @@ export default function GuessOpening({
     onProgressChange({ completed, round, guesses });
   }, [completed, round, guesses, onProgressChange]);
 
+  const hintRound = useMemo(
+    () =>
+      completed
+        ? totalRounds
+        : resolveHintRound(round, totalRounds, accountDifficulty),
+    [accountDifficulty, completed, round, totalRounds],
+  );
+
   const hints = useMemo(() => {
     const badges: string[] = [];
     payload.spec
-      .filter((spec) => spec.difficulty <= round || completed)
+      .filter((spec) => spec.difficulty <= hintRound)
       .forEach((spec) => {
         spec.hints.forEach((hint) => {
           if (hint === "length" && payload.clip.lengthSeconds) {
@@ -117,7 +128,7 @@ export default function GuessOpening({
       badges.push(`Answer: ${canonicalTitle}`);
     }
     return Array.from(new Set(badges));
-  }, [payload, round, completed, canonicalTitle]);
+  }, [canonicalTitle, completed, hintRound, payload]);
 
   const clip = payload.clip;
   const clipMimeType = clip.mimeType ?? undefined;

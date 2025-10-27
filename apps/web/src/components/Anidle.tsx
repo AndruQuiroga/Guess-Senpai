@@ -13,6 +13,7 @@ import {
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { useTitleSuggestions } from "../hooks/useTitleSuggestions";
 import { AnidleGame as AnidlePayload } from "../types/puzzles";
+import { resolveHintRound } from "../utils/difficulty";
 import {
   evaluateAnidleGuess,
   type AnidleGuessEvaluation,
@@ -30,6 +31,7 @@ interface Props {
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
+  accountDifficulty?: number;
 }
 
 const TOTAL_ROUNDS = 3;
@@ -81,6 +83,7 @@ export default function Anidle({
   onProgressChange,
   registerRoundController,
   nextSlug,
+  accountDifficulty,
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [guess, setGuess] = useState("");
@@ -148,11 +151,18 @@ export default function Anidle({
     },
   );
 
+  const hintRound = useMemo(
+    () =>
+      completed
+        ? TOTAL_ROUNDS
+        : resolveHintRound(round, TOTAL_ROUNDS, accountDifficulty),
+    [accountDifficulty, completed, round],
+  );
+
   const aggregatedHints = useMemo<AggregatedHint[]>(() => {
     const hints: AggregatedHint[] = [];
-    const effectiveRound = completed ? TOTAL_ROUNDS : round;
     const activeSpecs = payload.spec.filter(
-      (spec) => spec.difficulty <= effectiveRound,
+      (spec) => spec.difficulty <= hintRound,
     );
     let genresAdded = false;
     let tagsAdded = false;
@@ -225,7 +235,7 @@ export default function Anidle({
       }
     }
     return hints;
-  }, [completed, payload, round]);
+  }, [hintRound, payload]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });

@@ -11,6 +11,7 @@ import {
 
 import type { GameProgress } from "../hooks/usePuzzleProgress";
 import type { CharacterSilhouetteGame } from "../types/puzzles";
+import { resolveHintRound } from "../utils/difficulty";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
 
@@ -21,6 +22,7 @@ interface Props {
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
+  accountDifficulty?: number;
 }
 
 type FeedbackState =
@@ -41,6 +43,7 @@ export default function CharacterSilhouette({
   onProgressChange,
   registerRoundController,
   nextSlug,
+  accountDifficulty,
 }: Props) {
   const sortedSpec = useMemo(
     () => [...payload.spec].sort((a, b) => a.difficulty - b.difficulty),
@@ -103,6 +106,14 @@ export default function CharacterSilhouette({
     onProgressChange({ completed, round, guesses });
   }, [completed, round, guesses, onProgressChange]);
 
+  const hintRound = useMemo(
+    () =>
+      completed
+        ? totalRounds
+        : resolveHintRound(round, totalRounds, accountDifficulty),
+    [accountDifficulty, completed, round, totalRounds],
+  );
+
   const currentStage = useMemo(() => {
     if (sortedSpec.length === 0) {
       return null;
@@ -111,12 +122,12 @@ export default function CharacterSilhouette({
       return sortedSpec[sortedSpec.length - 1];
     }
     return sortedSpec.reduce((acc, spec) => {
-      if (spec.difficulty <= round) {
+      if (spec.difficulty <= hintRound) {
         return spec;
       }
       return acc;
     }, sortedSpec[0]);
-  }, [sortedSpec, round, completed]);
+  }, [completed, hintRound, sortedSpec]);
 
   const filterStyle = useMemo(() => {
     if (!currentStage) {
@@ -132,9 +143,9 @@ export default function CharacterSilhouette({
     () =>
       sortedSpec.filter((stage) => {
         if (completed) return true;
-        return stage.difficulty <= round;
+        return stage.difficulty <= hintRound;
       }),
-    [sortedSpec, completed, round],
+    [sortedSpec, completed, hintRound],
   );
 
   const handleRevealMore = useCallback(() => {
@@ -280,7 +291,8 @@ export default function CharacterSilhouette({
             {stage.description ?? stage.label}
           </span>
         ))}
-        {payload.character.role && (completed || round >= Math.min(2, totalRounds)) ? (
+        {payload.character.role &&
+        (completed || hintRound >= Math.min(2, totalRounds)) ? (
           <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-semibold text-white/90">
             Role: {payload.character.role}
           </span>
