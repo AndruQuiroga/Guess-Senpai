@@ -34,6 +34,10 @@ export default function HomePage() {
 
     return { playableGames: playable, upcomingGames: upcoming };
   }, [games]);
+  const firstPlayableGame = useMemo(
+    () => playableGames.find((game) => game.playable) ?? null,
+    [playableGames],
+  );
   const {
     error: availabilityError,
     refresh: refreshAvailability,
@@ -186,6 +190,18 @@ export default function HomePage() {
                   ? "Continue today’s run"
                   : "Play today's puzzles"}
               </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  if (firstPlayableGame) {
+                    handleOpenPreview(firstPlayableGame);
+                  }
+                }}
+                disabled={!firstPlayableGame}
+                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              >
+                Watch a demo
+              </button>
               <Link
                 href="/how-to-play"
                 className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"

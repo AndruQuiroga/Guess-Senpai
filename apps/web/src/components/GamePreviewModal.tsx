@@ -115,6 +115,7 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
     }
     return { label: "Start playing", href, disabled: false };
   }, [progress, runtimeGame, showAvailabilityError]);
+  const showDemoNotice = runtimeGame?.playable && !progress && !showAvailabilityError;
 
   if (!mounted || !open || !runtimeGame) {
     return null;
@@ -221,6 +222,11 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
               {!showAvailabilityError && !runtimeGame.playable ? (
                 <span className="text-sm text-neutral-300">
                   We&apos;re polishing assets and gameplay details—thanks for your patience!
+                </span>
+              ) : null}
+              {showDemoNotice ? (
+                <span className="text-sm text-neutral-300">
+                  This preview is a read-only demo. Start a round to track your guesses.
                 </span>
               ) : null}
             </div>
