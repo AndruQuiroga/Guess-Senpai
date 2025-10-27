@@ -3,6 +3,11 @@ export interface RoundSpec {
   hints: string[];
 }
 
+export interface SynopsisHintLevel {
+  ratio: number;
+  text: string;
+}
+
 export interface AnidleHints {
   genres: string[];
   tags: string[];
@@ -11,6 +16,7 @@ export interface AnidleHints {
   duration?: number | null;
   popularity?: number | null;
   average_score?: number | null;
+  synopsis: SynopsisHintLevel[];
 }
 
 export interface AnidleGame {

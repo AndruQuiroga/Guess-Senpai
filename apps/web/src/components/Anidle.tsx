@@ -49,6 +49,12 @@ type AggregatedHint =
       type: "tags";
       label: string;
       values: string[];
+    }
+  | {
+      type: "synopsis";
+      label: string;
+      ratio: number;
+      text: string;
     };
 
 const SCALAR_TONES: Record<ScalarStatus, { className: string; icon: string; description: string }> = {
@@ -154,78 +160,138 @@ export default function Anidle({
     const activeSpecs = payload.spec.filter(
       (spec) => spec.difficulty <= hintRound,
     );
-    let genresAdded = false;
-    let tagsAdded = false;
+
+    let synopsisHint: AggregatedHint | null = null;
+    const fallbackHints: AggregatedHint[] = [];
+    const synopsisEntries = payload.hints.synopsis ?? [];
+
     for (const spec of activeSpecs) {
-      for (const hint of spec.hints) {
-        switch (hint) {
+      for (const hintKey of spec.hints) {
+        if (hintKey.startsWith("synopsis:")) {
+          const index = Number.parseInt(hintKey.split(":")[1] ?? "", 10);
+          const entry =
+            Number.isFinite(index) && index >= 0
+              ? synopsisEntries[index]
+              : undefined;
+          if (entry && entry.text.trim().length > 0) {
+            synopsisHint = {
+              type: "synopsis",
+              label: "Redacted Synopsis",
+              ratio: entry.ratio,
+              text: entry.text,
+            };
+          }
+          continue;
+        }
+
+        switch (hintKey) {
           case "genres":
-            if (!genresAdded && payload.hints.genres.length > 0) {
-              hints.push({
+            if (payload.hints.genres.length > 0) {
+              fallbackHints.push({
                 type: "text",
                 label: "Genres",
                 value: payload.hints.genres.slice(0, 3).join(", "),
               });
-              genresAdded = true;
             }
             break;
           case "tags":
-            if (!tagsAdded && payload.hints.tags.length > 0) {
-              hints.push({
+            if (payload.hints.tags.length > 0) {
+              fallbackHints.push({
                 type: "tags",
                 label: "Tag hints",
                 values: payload.hints.tags.slice(0, 4),
               });
-              tagsAdded = true;
             }
             break;
           case "year":
-            if (payload.hints.year != null)
-              hints.push({
+            if (payload.hints.year != null) {
+              fallbackHints.push({
                 type: "text",
                 label: "Year",
                 value: String(payload.hints.year),
               });
+            }
             break;
           case "episodes":
-            if (payload.hints.episodes != null)
-              hints.push({
+            if (payload.hints.episodes != null) {
+              fallbackHints.push({
                 type: "text",
                 label: "Episodes",
                 value: String(payload.hints.episodes),
               });
+            }
             break;
           case "duration":
-            if (payload.hints.duration)
-              hints.push({
+            if (payload.hints.duration) {
+              fallbackHints.push({
                 type: "text",
                 label: "Duration",
                 value: `${payload.hints.duration} min`,
               });
+            }
             break;
           case "popularity":
-            if (payload.hints.popularity)
-              hints.push({
+            if (payload.hints.popularity) {
+              fallbackHints.push({
                 type: "text",
                 label: "Popularity",
                 value: payload.hints.popularity.toLocaleString(),
               });
+            }
             break;
           case "average_score":
-            if (payload.hints.average_score)
-              hints.push({
+            if (payload.hints.average_score) {
+              fallbackHints.push({
                 type: "text",
                 label: "Score",
                 value: `${payload.hints.average_score}%`,
               });
+            }
             break;
           default:
             break;
         }
       }
     }
+
+    if (!synopsisHint && synopsisEntries.length > 0) {
+      const lastEntry = synopsisEntries[synopsisEntries.length - 1];
+      if (lastEntry && lastEntry.text.trim().length > 0) {
+        synopsisHint = {
+          type: "synopsis",
+          label: "Redacted Synopsis",
+          ratio: lastEntry.ratio,
+          text: lastEntry.text,
+        };
+      }
+    }
+
+    if (synopsisHint) {
+      hints.push(synopsisHint);
+    } else {
+      hints.push(...fallbackHints);
+    }
+
     return hints;
   }, [hintRound, payload]);
+
+  const synopsisHints = useMemo(
+    () =>
+      aggregatedHints.filter(
+        (hint): hint is Extract<AggregatedHint, { type: "synopsis" }>
+          => hint.type === "synopsis",
+      ),
+    [aggregatedHints],
+  );
+
+  const chipHints = useMemo(
+    () =>
+      aggregatedHints.filter(
+        (hint): hint is Extract<AggregatedHint, { type: "text" | "tags" }>
+          => hint.type === "text" || hint.type === "tags",
+      ),
+    [aggregatedHints],
+  );
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });
@@ -450,39 +516,66 @@ export default function Anidle({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
-        {aggregatedHints.map((hint) => {
-          if (hint.type === "tags") {
+      {synopsisHints.length > 0 || chipHints.length > 0 ? (
+        <div className="space-y-3">
+          {synopsisHints.map((hint) => {
+            const percentage = Math.round(hint.ratio * 100);
             return (
               <div
-                key={`${hint.label}-${hint.values.join("|")}`}
-                className="flex flex-wrap items-center gap-2 rounded-2xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-3 py-1 font-semibold text-[0.7rem] text-fuchsia-100 backdrop-blur"
+                key={`synopsis-${percentage}`}
+                className="rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-left backdrop-blur"
               >
-                <span className="text-fuchsia-200/80">{hint.label}:</span>
-                <div className="flex flex-wrap gap-1 normal-case text-[0.65rem] text-fuchsia-50">
-                  {hint.values.map((value) => (
-                    <span
-                      key={`${hint.label}-${value}`}
-                      className="rounded-full border border-fuchsia-300/40 bg-fuchsia-400/20 px-2 py-0.5 font-medium"
-                    >
-                      {value}
-                    </span>
-                  ))}
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-200/80">
+                    {hint.label}
+                  </span>
+                  <span className="text-[0.65rem] uppercase tracking-[0.3em] text-brand-200/60">
+                    {percentage}% revealed
+                  </span>
                 </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-neutral-100/90">
+                  {hint.text}
+                </p>
               </div>
             );
-          }
-          return (
-            <span
-              key={`${hint.label}-${hint.value}`}
-              className="rounded-full border border-brand-400/30 bg-brand-500/10 px-3 py-1 font-semibold text-[0.7rem] backdrop-blur"
-            >
-              <span className="text-brand-200/80">{hint.label}:</span>{" "}
-              <span className="text-white/90">{hint.value}</span>
-            </span>
-          );
-        })}
-      </div>
+          })}
+          {chipHints.length > 0 ? (
+            <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
+              {chipHints.map((hint) => {
+                if (hint.type === "tags") {
+                  return (
+                    <div
+                      key={`${hint.label}-${hint.values.join("|")}`}
+                      className="flex flex-wrap items-center gap-2 rounded-2xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-3 py-1 font-semibold text-[0.7rem] text-fuchsia-100 backdrop-blur"
+                    >
+                      <span className="text-fuchsia-200/80">{hint.label}:</span>
+                      <div className="flex flex-wrap gap-1 normal-case text-[0.65rem] text-fuchsia-50">
+                        {hint.values.map((value) => (
+                          <span
+                            key={`${hint.label}-${value}`}
+                            className="rounded-full border border-fuchsia-300/40 bg-fuchsia-400/20 px-2 py-0.5 font-medium"
+                          >
+                            {value}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <span
+                    key={`${hint.label}-${hint.value}`}
+                    className="rounded-full border border-brand-400/30 bg-brand-500/10 px-3 py-1 font-semibold text-[0.7rem] backdrop-blur"
+                  >
+                    <span className="text-brand-200/80">{hint.label}:</span>{" "}
+                    <span className="text-white/90">{hint.value}</span>
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative w-full">
           <TitleGuessField
