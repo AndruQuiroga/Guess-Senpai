@@ -35,7 +35,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
     return data.games[gameKey as keyof GamesPayload] ?? null;
   }, [data, gameKey]);
 
-  const { progress, recordGame } = usePuzzleProgress(data?.date ?? "");
+  const { progress, difficulty, recordGame, recordDifficulty } = usePuzzleProgress(
+    data?.date ?? "",
+  );
 
   const availablePuzzles = useMemo(() => {
     if (!data) return [];
@@ -63,6 +65,17 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       guess_the_opening: (state) => recordGame("guess_the_opening", state),
     }),
     [recordGame],
+  );
+
+  const difficultyHandlers = useMemo<Record<GameKey, (level: number) => void>>(
+    () => ({
+      anidle: (level) => recordDifficulty("anidle", level),
+      poster_zoomed: (level) => recordDifficulty("poster_zoomed", level),
+      redacted_synopsis: (level) => recordDifficulty("redacted_synopsis", level),
+      character_silhouette: (level) => recordDifficulty("character_silhouette", level),
+      guess_the_opening: (level) => recordDifficulty("guess_the_opening", level),
+    }),
+    [recordDifficulty],
   );
 
   const nextSlug = useMemo(() => {
@@ -123,6 +136,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={anidleBundle.puzzle}
             progress={progress.anidle}
             dailyProgress={progress}
+            difficultyChoice={difficulty.anidle}
+            difficultyHint={data.games.difficulty?.anidle}
+            onDifficultyChange={difficultyHandlers.anidle}
             onProgressChange={progressHandlers.anidle}
             nextSlug={nextSlug}
           />
@@ -148,6 +164,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
             dailyProgress={progress}
+            difficultyChoice={difficulty.poster_zoomed}
+            difficultyHint={data.games.difficulty?.poster_zoomed}
+            onDifficultyChange={difficultyHandlers.poster_zoomed}
             onProgressChange={progressHandlers.poster_zoomed}
             nextSlug={nextSlug}
           />
@@ -176,6 +195,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={silhouetteBundle.puzzle}
             progress={progress.character_silhouette}
             dailyProgress={progress}
+            difficultyChoice={difficulty.character_silhouette}
+            difficultyHint={data.games.difficulty?.character_silhouette}
+            onDifficultyChange={difficultyHandlers.character_silhouette}
             onProgressChange={progressHandlers.character_silhouette}
             nextSlug={nextSlug}
           />
@@ -204,6 +226,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={synopsisBundle.puzzle}
             progress={progress.redacted_synopsis}
             dailyProgress={progress}
+            difficultyChoice={difficulty.redacted_synopsis}
+            difficultyHint={data.games.difficulty?.redacted_synopsis}
+            onDifficultyChange={difficultyHandlers.redacted_synopsis}
             onProgressChange={progressHandlers.redacted_synopsis}
             nextSlug={nextSlug}
           />
@@ -229,6 +254,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             payload={openingBundle.puzzle}
             progress={progress.guess_the_opening}
             dailyProgress={progress}
+            difficultyChoice={difficulty.guess_the_opening}
+            difficultyHint={data.games.difficulty?.guess_the_opening}
+            onDifficultyChange={difficultyHandlers.guess_the_opening}
             onProgressChange={progressHandlers.guess_the_opening}
             nextSlug={nextSlug}
           />

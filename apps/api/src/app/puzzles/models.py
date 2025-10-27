@@ -133,6 +133,7 @@ class GamesPayload(BaseModel):
     redacted_synopsis: RedactedSynopsisPuzzleBundle
     character_silhouette: CharacterSilhouettePuzzleBundle
     guess_the_opening: Optional[GuessOpeningPuzzleBundle] = None
+    difficulty: Dict[str, Optional[int]] = Field(default_factory=dict)
 
 
 class SolutionStreamingLink(BaseModel):

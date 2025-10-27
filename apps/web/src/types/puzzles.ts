@@ -137,12 +137,17 @@ export interface GuessOpeningPuzzleBundle {
   solution: SolutionPayload;
 }
 
+import type { GameKey } from "./progress";
+
+export type GameDifficultyHint = Partial<Record<GameKey, number>>;
+
 export interface GamesPayload {
   anidle: AnidlePuzzleBundle;
   poster_zoomed: PosterZoomPuzzleBundle;
   redacted_synopsis: RedactedSynopsisPuzzleBundle;
   character_silhouette: CharacterSilhouettePuzzleBundle;
   guess_the_opening?: GuessOpeningPuzzleBundle | null;
+  difficulty?: GameDifficultyHint;
 }
 
 export interface DailyPuzzleResponse {
