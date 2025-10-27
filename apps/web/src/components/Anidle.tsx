@@ -125,8 +125,6 @@ export default function Anidle({
       setCompleted(initialProgress.completed ?? false);
     }
     setGuess("");
-    setIsMenuOpen(false);
-    setHighlightedIndex(-1);
     if (puzzleChanged || noStoredGuesses) {
       setEvaluations([]);
     }
@@ -487,8 +485,6 @@ export default function Anidle({
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative w-full">
-          <input
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:opacity-70"
           <TitleGuessField
             ref={guessFieldRef}
             className="w-full"
