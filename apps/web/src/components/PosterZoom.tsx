@@ -1,6 +1,14 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { PosterZoomGame as PosterPayload } from "../types/puzzles";
@@ -154,6 +162,18 @@ export default function PosterZoom({
     return Number((remaining * maxBlur).toFixed(2));
   }, [completed, hintRound, totalRounds]);
 
+  const imageStyles = useMemo<CSSProperties>(() => {
+    return {
+      transform: `scale(${imageTransform.scale})`,
+      transformOrigin: imageTransform.transformOrigin,
+      objectPosition: imageTransform.objectPosition,
+      filter: `blur(${blurRadius}px)`,
+      transition:
+        "transform 700ms ease-out, filter 450ms ease-out, object-position 700ms ease-out",
+      willChange: "transform, filter, object-position",
+    };
+  }, [blurRadius, imageTransform.objectPosition, imageTransform.scale, imageTransform.transformOrigin]);
+
   const activeHints = useMemo(() => {
     const hints: string[] = [];
     payload.spec
@@ -258,13 +278,10 @@ export default function PosterZoom({
           <img
             src={payload.image}
             alt="Anime poster"
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
-            style={{
-              transform: `scale(${imageTransform.scale})`,
-              transformOrigin: imageTransform.transformOrigin,
-              objectPosition: imageTransform.objectPosition,
-              filter: `blur(${blurRadius}px)`,
-            }}
+            style={imageStyles}
           />
         ) : (
           <div className="text-neutral-600">Poster unavailable</div>
