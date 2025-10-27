@@ -39,6 +39,7 @@ from .models import (
     GuessOpeningGame,
     GuessOpeningMeta,
     GuessOpeningPuzzleBundle,
+    GuessOpeningRound,
     OpeningClip,
     PosterCropStage,
     PosterZoomGame,
@@ -600,7 +601,13 @@ def _build_solution(media: Media) -> SolutionPayload:
     )
 
 
-async def _build_guess_opening(media: Media, cache: CacheBackend) -> Optional[GuessOpeningGame]:
+async def _build_guess_opening(
+    media: Media,
+    cache: CacheBackend,
+    *,
+    order: Optional[int] = None,
+    total_rounds: Optional[int] = None,
+) -> Optional[GuessOpeningGame]:
     cache_key = f"animethemes:clip:{media.id}"
 
     async def creator() -> dict:
@@ -620,6 +627,8 @@ async def _build_guess_opening(media: Media, cache: CacheBackend) -> Optional[Gu
         artist=clip_model.artist,
         sequence=clip_model.sequence,
         season=f"{media.season} {media.seasonYear}" if media.seasonYear and media.season else None,
+        roundOrder=order,
+        roundTotal=total_rounds,
     )
     clip_payload = OpeningClip(
         audioUrl=clip_model.audio_url or clip_model.video_url,
@@ -899,6 +908,7 @@ async def _assemble_daily_puzzle(
         raise ValueError("Unable to build character silhouette puzzle")
 
     guess_bundle: Optional[GuessOpeningPuzzleBundle] = None
+    opening_rounds: List[GuessOpeningRound] = []
     opening_pool: Optional[List[Media]] = None
     if include_guess_opening and settings.guess_opening_pool_enabled:
         try:
@@ -911,33 +921,52 @@ async def _assemble_daily_puzzle(
             logger.exception("Failed to load dedicated opening pool")
     if include_guess_opening:
         candidate_pool = opening_pool or pool
-        attempted_ids: set[int] = set()
-        max_attempts = max(len(candidate_pool), 1)
-        for attempt in range(max_attempts):
-            if not any(media.id not in selected_ids for media in candidate_pool):
-                if user is None:
-                    break
-            candidate = _choose_media_from_pool(
-                base_seed,
-                "guess_the_opening",
-                candidate_pool,
-                selected_ids,
-                attempt=attempt,
-                attempted_ids=attempted_ids,
-            )
-            opening_media = await _load_media_details(candidate.id, cache, settings)
-            attempted_ids.add(opening_media.id)
-            opening_game = await _build_guess_opening(opening_media, cache)
-            if not opening_game:
-                continue
-            selected_ids.add(opening_media.id)
-            recorded_ids.append(opening_media.id)
-            guess_bundle = GuessOpeningPuzzleBundle(
-                mediaId=opening_media.id,
-                puzzle=opening_game,
-                solution=_build_solution(opening_media),
-            )
-            break
+        if candidate_pool:
+            required_rounds = 3
+            attempted_ids: set[int] = set()
+            selected_for_opening: set[int] = set()
+            max_attempts = max(len(candidate_pool) * required_rounds, required_rounds * 3)
+            attempt_counter = 0
+            while len(opening_rounds) < required_rounds and attempt_counter < max_attempts:
+                candidate = _choose_media_from_pool(
+                    base_seed,
+                    f"guess_the_opening:{len(opening_rounds)}",
+                    candidate_pool,
+                    selected_ids.union(selected_for_opening),
+                    attempt=attempt_counter,
+                    attempted_ids=attempted_ids,
+                )
+                attempt_counter += 1
+                opening_media = await _load_media_details(candidate.id, cache, settings)
+                attempted_ids.add(opening_media.id)
+                opening_game = await _build_guess_opening(
+                    opening_media,
+                    cache,
+                    order=len(opening_rounds) + 1,
+                    total_rounds=required_rounds,
+                )
+                if not opening_game:
+                    continue
+                round_payload = GuessOpeningRound(
+                    order=len(opening_rounds) + 1,
+                    mediaId=opening_media.id,
+                    puzzle=opening_game,
+                    solution=_build_solution(opening_media),
+                )
+                opening_rounds.append(round_payload)
+                selected_for_opening.add(opening_media.id)
+            if len(opening_rounds) == required_rounds:
+                selected_ids.update(selected_for_opening)
+                for round_payload in opening_rounds:
+                    if round_payload.mediaId not in recorded_ids:
+                        recorded_ids.append(round_payload.mediaId)
+                primary_round = opening_rounds[0]
+                guess_bundle = GuessOpeningPuzzleBundle(
+                    mediaId=primary_round.mediaId,
+                    puzzle=primary_round.puzzle,
+                    solution=primary_round.solution,
+                    rounds=list(opening_rounds),
+                )
 
     difficulty_hint: Optional[int] = None
     if user:
@@ -957,7 +986,9 @@ async def _assemble_daily_puzzle(
         for media_id in recorded_ids:
             await _record_recent_media(cache, user.user_id, media_id)
 
-    guess_opening_enabled = bool(guess_bundle)
+    guess_opening_enabled = bool(
+        guess_bundle and guess_bundle.rounds and len(guess_bundle.rounds) >= 3
+    )
 
     return DailyPuzzleResponse(
         date=day,
