@@ -33,45 +33,115 @@ const BASE_GAME_KEYS: readonly GameKey[] = [
   "redacted_synopsis",
 ];
 
-type ProgressSummaryProps = {
-  streakCount: number;
-  timeRemaining: string | null;
-  completedCount: number;
-  totalAvailable: number;
+type ProgressSummaryChunk = {
+  id: "streak" | "reset" | "completion";
+  icon: string;
+  text: string;
+  textClassName?: string;
+  accent?: "highlight" | "neutral";
 };
 
-function ProgressSummary({
+type ProgressSummaryProps = {
+  chunks: ProgressSummaryChunk[];
+  className?: string;
+  layout?: "inline" | "pill";
+};
+
+function classNames(
+  ...classes: Array<string | false | null | undefined>
+): string {
+  return classes.filter(Boolean).join(" ");
+}
+
+function createProgressSummaryChunks({
   streakCount,
   timeRemaining,
   completedCount,
   totalAvailable,
-}: ProgressSummaryProps): JSX.Element {
+}: {
+  streakCount: number;
+  timeRemaining: string | null;
+  completedCount: number;
+  totalAvailable: number;
+}): ProgressSummaryChunk[] {
   const resetLabel = timeRemaining
     ? `Resets in ${timeRemaining}`
     : "Resets soon";
 
+  return [
+    {
+      id: "streak",
+      icon: "🔥",
+      text: `Streak ${streakCount}`,
+      accent: "highlight",
+    },
+    {
+      id: "reset",
+      icon: "⏱️",
+      text: resetLabel,
+      textClassName: "sm:max-w-[16ch]",
+    },
+    {
+      id: "completion",
+      icon: "✅",
+      text: `${completedCount}/${totalAvailable} completed`,
+    },
+  ];
+}
+
+function ProgressSummaryChip({
+  chunk,
+  layout = "inline",
+}: {
+  chunk: ProgressSummaryChunk;
+  layout?: "inline" | "pill";
+}): JSX.Element {
+  const wrapperClasses =
+    layout === "inline"
+      ? classNames(
+          "inline-flex min-w-0 items-center gap-2 whitespace-nowrap text-white/80",
+          chunk.accent === "highlight" && "font-medium text-amber-100",
+        )
+      : classNames(
+          "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-ambient backdrop-blur-sm sm:text-sm",
+          chunk.accent === "highlight"
+            ? "border border-amber-300/60 bg-amber-400/15 text-amber-50"
+            : "border border-white/15 bg-white/10 text-white/85",
+        );
+
+  const iconClasses =
+    layout === "inline" ? "text-base sm:text-lg" : "text-sm sm:text-base";
+
+  const labelClasses =
+    layout === "inline"
+      ? classNames("block truncate", chunk.textClassName)
+      : classNames("truncate", chunk.textClassName);
+
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/90 sm:text-base">
-      <span className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-amber-100">
-        <span aria-hidden className="text-base sm:text-lg">
-          🔥
-        </span>
-        <span className="block truncate">Streak {streakCount}</span>
+    <span className={wrapperClasses}>
+      <span aria-hidden className={iconClasses}>
+        {chunk.icon}
       </span>
-      <span className="inline-flex min-w-0 items-center gap-2 text-white/80">
-        <span aria-hidden className="text-base sm:text-lg">
-          ⏱️
-        </span>
-        <span className="block truncate sm:max-w-[16ch]">{resetLabel}</span>
-      </span>
-      <span className="inline-flex items-center gap-2 whitespace-nowrap text-white/80">
-        <span aria-hidden className="text-base sm:text-lg">
-          ✅
-        </span>
-        <span className="block truncate">
-          {completedCount}/{totalAvailable} completed
-        </span>
-      </span>
+      <span className={labelClasses}>{chunk.text}</span>
+    </span>
+  );
+}
+
+function ProgressSummary({
+  chunks,
+  className,
+  layout = "inline",
+}: ProgressSummaryProps): JSX.Element {
+  return (
+    <div
+      className={classNames(
+        "flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/90 sm:text-base",
+        className,
+      )}
+    >
+      {chunks.map((chunk) => (
+        <ProgressSummaryChip key={chunk.id} chunk={chunk} layout={layout} />
+      ))}
     </div>
   );
 }
@@ -293,9 +363,55 @@ export default function HomePage() {
   );
 
   const showLoginCallout = !accountLoading && !account.authenticated;
+  const progressChunks = useMemo(
+    () =>
+      createProgressSummaryChunks({
+        streakCount,
+        timeRemaining,
+        completedCount,
+        totalAvailable,
+      }),
+    [streakCount, timeRemaining, completedCount, totalAvailable],
+  );
 
   return (
     <div className="space-y-16">
+      <GlassSection
+        innerClassName="space-y-6 text-neutral-200"
+        hoverGlow={false}
+        borderIntensity="subtle"
+        showAccent={false}
+      >
+        <div className="space-y-2">
+          <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+            Today&apos;s progress
+          </h2>
+          <p className="text-sm text-neutral-300">
+            Track your streak and completed games for {formattedDate}. Share or
+            download a glossy recap card once you&apos;re done.
+          </p>
+        </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <ProgressSummary chunks={progressChunks} />
+          {shareLocked ? (
+            <p className="flex items-center gap-2 text-sm text-neutral-300/90">
+              <span aria-hidden className="text-base">
+                🔒
+              </span>
+              <span>Play a round to unlock sharing.</span>
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              onClick={handleShare}
+            >
+              Share progress
+            </button>
+          )}
+        </div>
+      </GlassSection>
+
       <section className="relative overflow-hidden rounded-4xl border border-white/10 bg-surface-raised p-10 text-white shadow-ambient backdrop-blur-2xl sm:p-14">
         <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
         <div className="relative z-10 max-w-2xl space-y-5">
@@ -343,13 +459,14 @@ export default function HomePage() {
                 </Link>
               ) : null}
             </div>
-            <div className="lg:hidden">
-              <ProgressSummary
-                streakCount={streakCount}
-                timeRemaining={timeRemaining}
-                completedCount={completedCount}
-                totalAvailable={totalAvailable}
-              />
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              {progressChunks.map((chunk) => (
+                <ProgressSummaryChip
+                  key={chunk.id}
+                  chunk={chunk}
+                  layout="pill"
+                />
+              ))}
             </div>
           </div>
           {hasIncompleteGame ? (
@@ -360,49 +477,6 @@ export default function HomePage() {
         </div>
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-brand-500/40 via-purple-500/20 to-transparent blur-3xl sm:block" />
       </section>
-
-      <GlassSection
-        innerClassName="space-y-6 text-neutral-200"
-        hoverGlow={false}
-        borderIntensity="subtle"
-        showAccent={false}
-      >
-        <div className="space-y-2">
-          <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
-            Today&apos;s progress
-          </h2>
-          <p className="text-sm text-neutral-300">
-            Track your streak and completed games for {formattedDate}. Share or
-            download a glossy recap card once you&apos;re done.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="hidden lg:block">
-            <ProgressSummary
-              streakCount={streakCount}
-              timeRemaining={timeRemaining}
-              completedCount={completedCount}
-              totalAvailable={totalAvailable}
-            />
-          </div>
-          {shareLocked ? (
-            <p className="flex items-center gap-2 text-sm text-neutral-300/90">
-              <span aria-hidden className="text-base">
-                🔒
-              </span>
-              <span>Play a round to unlock sharing.</span>
-            </p>
-          ) : (
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-              onClick={handleShare}
-            >
-              Share progress
-            </button>
-          )}
-        </div>
-      </GlassSection>
 
       <section className="space-y-6">
         <div className="space-y-2">
