@@ -6,7 +6,10 @@ import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { GamePreviewModal } from "../components/GamePreviewModal";
 import { GlassSection } from "../components/GlassSection";
-import { type GameDirectoryEntry, type GamePreviewMedia } from "../config/games";
+import {
+  type GameDirectoryEntry,
+  type GamePreviewMedia,
+} from "../config/games";
 import {
   useDailyAvailability,
   useRuntimeGamesDirectory,
@@ -295,11 +298,22 @@ export default function HomePage() {
             nostalgia. Compete with friends, maintain your streak, and share
             downloadable highlight cards that celebrate each win.
           </p>
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+          {showLoginCallout ? (
+            <p className="text-sm leading-relaxed text-neutral-200/80">
+              <Link
+                href="/login"
+                className="font-semibold text-white transition hover:text-brand-200"
+              >
+                Log in with AniList
+              </Link>{" "}
+              to sync your streaks and archive completions across every device.
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
             <div className="flex flex-wrap items-center gap-3 lg:hidden">
               {progressChipElements}
             </div>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
               <Link
                 href={
                   hasIncompleteGame && nextIncompleteGame
@@ -320,29 +334,10 @@ export default function HomePage() {
                   }
                 }}
                 disabled={!firstPlayableGame}
-                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white/95 shadow-ambient transition hover:border-brand-400/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                className="text-sm font-semibold text-white/80 underline decoration-white/40 underline-offset-4 transition hover:text-white hover:decoration-white disabled:cursor-not-allowed disabled:text-white/40"
               >
                 Watch a demo
               </button>
-              <Link
-                href="/how-to-play"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white/95 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-              >
-                Learn the rules
-              </Link>
-              {showLoginCallout ? (
-                <div className="flex max-w-xs flex-col gap-2">
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center justify-center rounded-2xl border border-brand-400/50 bg-brand-500/20 px-6 py-2.5 text-sm font-semibold text-brand-100 shadow-ambient transition hover:border-brand-300/70 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-200/80"
-                  >
-                    Log in with AniList
-                  </Link>
-                  <p className="text-xs leading-relaxed text-neutral-200/85">
-                    Logging in keeps your streaks and archive completions saved across devices.
-                  </p>
-                </div>
-              ) : null}
             </div>
           </div>
           <div className="mt-8 grid gap-3 text-sm text-neutral-200 sm:grid-cols-3">
