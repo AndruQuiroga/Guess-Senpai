@@ -37,7 +37,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
   }, [data, gameKey]);
 
   const { progress, recordGame } = usePuzzleProgress(data?.date ?? "");
-  const { difficultyLevel, updateDifficulty } = useUserPreferences();
+  const { difficultyLevel } = useUserPreferences();
 
   const availablePuzzles = useMemo(() => {
     if (!data) return [];
@@ -127,7 +127,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
-            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.anidle}
             nextSlug={nextSlug}
           />
@@ -155,7 +154,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
-            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.poster_zoomed}
             nextSlug={nextSlug}
           />
@@ -186,7 +184,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
-            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.character_silhouette}
             nextSlug={nextSlug}
           />
@@ -217,7 +214,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
-            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.redacted_synopsis}
             nextSlug={nextSlug}
           />
@@ -245,7 +241,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
-            onDifficultyChange={updateDifficulty}
             onProgressChange={progressHandlers.guess_the_opening}
             nextSlug={nextSlug}
           />

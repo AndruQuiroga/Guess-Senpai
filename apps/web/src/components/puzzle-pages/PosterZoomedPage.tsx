@@ -7,7 +7,6 @@ import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { PosterZoomGame } from "../../types/puzzles";
-import { GameDifficultyPresets, type DifficultyPreset } from "./GameDifficultyPresets";
 
 interface Props {
   slug: string;
@@ -17,28 +16,9 @@ interface Props {
   dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
-  onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
-
-const POSTER_PRESETS: DifficultyPreset[] = [
-  {
-    value: 1,
-    label: "Wide reveal",
-    description: "Start with the generous first crop and plenty of context clues.",
-  },
-  {
-    value: 2,
-    label: "Spotlight focus",
-    description: "Jump to the mid zoom for a sharper challenge without going blind.",
-  },
-  {
-    value: 3,
-    label: "Full mystery",
-    description: "Go straight to the tightest crop and trust your poster instincts.",
-  },
-];
 
 export function PosterZoomedPage({
   slug,
@@ -48,7 +28,6 @@ export function PosterZoomedPage({
   dailyProgress,
   accountDifficulty,
   difficultyHint,
-  onDifficultyChange,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -96,15 +75,6 @@ export function PosterZoomedPage({
     setDisplayRound(progress?.round ?? highlightDifficulty);
   }, [progress?.round, highlightDifficulty]);
 
-  const handlePresetSelect = useCallback(
-    (level: number) => {
-      const clamped = clampDifficulty(level) ?? 1;
-      onDifficultyChange?.(clamped);
-      controller.current?.(clamped);
-    },
-    [clampDifficulty, onDifficultyChange],
-  );
-
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
       setDisplayRound(state.round);
@@ -115,14 +85,6 @@ export function PosterZoomedPage({
 
   return (
     <div className="space-y-6">
-      <GameDifficultyPresets
-        title="Set your zoom difficulty"
-        description="Pick how tight the crop should be before you take your first swing."
-        presets={POSTER_PRESETS}
-        selected={selectedDifficulty}
-        recommended={recommendedDifficulty}
-        onSelect={handlePresetSelect}
-      />
       <GameShell
         title="Poster Zoomed"
         round={displayRound}

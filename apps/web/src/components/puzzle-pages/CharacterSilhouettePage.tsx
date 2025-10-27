@@ -7,7 +7,6 @@ import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import type { CharacterSilhouetteGame } from "../../types/puzzles";
-import { GameDifficultyPresets, type DifficultyPreset } from "./GameDifficultyPresets";
 
 interface Props {
   slug: string;
@@ -17,28 +16,9 @@ interface Props {
   dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
-  onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
-
-const SILHOUETTE_PRESETS: DifficultyPreset[] = [
-  {
-    value: 1,
-    label: "Shadow outline",
-    description: "Begin with the dramatic silhouette and clear shape cues.",
-  },
-  {
-    value: 2,
-    label: "Stage lights",
-    description: "Fade in more lighting to sharpen the character details.",
-  },
-  {
-    value: 3,
-    label: "Full reveal",
-    description: "Crank the lights to maximum and guess from the final portrait.",
-  },
-];
 
 export function CharacterSilhouettePage({
   slug,
@@ -48,7 +28,6 @@ export function CharacterSilhouettePage({
   dailyProgress,
   accountDifficulty,
   difficultyHint,
-  onDifficultyChange,
   onProgressChange,
   nextSlug,
 }: Props) {
@@ -87,15 +66,6 @@ export function CharacterSilhouettePage({
     setDisplayRound(progress?.round ?? highlightDifficulty);
   }, [progress?.round, highlightDifficulty]);
 
-  const handlePresetSelect = useCallback(
-    (level: number) => {
-      const clamped = clampDifficulty(level) ?? 1;
-      onDifficultyChange?.(clamped);
-      controller.current?.(clamped);
-    },
-    [clampDifficulty, onDifficultyChange],
-  );
-
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
       setDisplayRound(state.round);
@@ -106,14 +76,6 @@ export function CharacterSilhouettePage({
 
   return (
     <div className="space-y-6">
-      <GameDifficultyPresets
-        title="Adjust the reveal"
-        description="Decide how much lighting to start with before the silhouette steps into frame."
-        presets={SILHOUETTE_PRESETS}
-        selected={selectedDifficulty}
-        recommended={recommendedDifficulty}
-        onSelect={handlePresetSelect}
-      />
       <GameShell
         title="Character Silhouette"
         round={displayRound}
