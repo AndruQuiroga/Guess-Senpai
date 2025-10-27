@@ -105,18 +105,18 @@ class GuessOpeningMeta(BaseModel):
     roundTotal: Optional[int] = None
 
 
-class GuessOpeningGame(BaseModel):
+class GuessOpeningRound(BaseModel):
+    order: int
+    mediaId: int
     spec: List[RoundSpec]
     answer: str
     clip: OpeningClip
     meta: GuessOpeningMeta
-
-
-class GuessOpeningRound(BaseModel):
-    order: int
-    mediaId: int
-    puzzle: GuessOpeningGame
     solution: SolutionPayload
+
+
+class GuessOpeningGame(BaseModel):
+    rounds: List[GuessOpeningRound] = Field(default_factory=list)
 
 
 class AnidlePuzzleBundle(BaseModel):
@@ -147,7 +147,6 @@ class GuessOpeningPuzzleBundle(BaseModel):
     mediaId: int
     puzzle: GuessOpeningGame
     solution: SolutionPayload
-    rounds: Optional[List[GuessOpeningRound]] = None
 
 
 class GamesPayload(BaseModel):
