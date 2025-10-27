@@ -1,15 +1,55 @@
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+from alembic import command
+from alembic.config import Config
+
 from .config import settings
 
 _engine: Optional[AsyncEngine] = None
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+_migrations_ran = False
+
+logger = logging.getLogger(__name__)
+
+_BASE_DIR = Path(__file__).resolve().parents[3]
+
+
+def _resolve_project_path(path_value: str) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return _BASE_DIR / path
+
+
+def _get_alembic_config() -> Config:
+    config = Config(str(_resolve_project_path(settings.alembic_ini_path)))
+    config.set_main_option("script_location", str(_resolve_project_path(settings.alembic_migrations_path)))
+
+    sync_database_url = settings.database_url.replace("+asyncpg", "")
+    config.set_main_option("sqlalchemy.url", sync_database_url)
+    return config
+
+
+def run_migrations() -> None:
+    global _migrations_ran
+    if _migrations_ran:
+        return
+
+    try:
+        config = _get_alembic_config()
+        command.upgrade(config, "head")
+        _migrations_ran = True
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception("Failed to run database migrations: %s", exc)
+        raise
 
 
 def get_engine() -> AsyncEngine:
@@ -40,6 +80,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def connect_database() -> None:
     engine = get_engine()
+    run_migrations()
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
 
