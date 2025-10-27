@@ -16,6 +16,7 @@ import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
 import { buildShareText, formatShareDate } from "../utils/shareText";
+import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 
 const BASE_GAME_KEYS: readonly GameKey[] = [
   "anidle",
@@ -76,6 +77,7 @@ function todayIsoDate(): string {
 export default function HomePage() {
   const todayIso = useMemo(() => todayIsoDate(), []);
   const formattedDate = useMemo(() => formatShareDate(todayIso), [todayIso]);
+  const nextResetIso = useMemo(() => getNextResetIso(todayIso), [todayIso]);
   const { account, loading: accountLoading } = useAccount();
   const { progress } = usePuzzleProgress(todayIso);
   const games = useRuntimeGamesDirectory();
@@ -166,10 +168,45 @@ export default function HomePage() {
     [includeGuessTheOpening, progress, todayIso],
   );
 
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (!nextResetIso) {
+      setTimeRemaining(null);
+      return;
+    }
+
+    const targetTime = new Date(nextResetIso).getTime();
+    if (Number.isNaN(targetTime)) {
+      setTimeRemaining(null);
+      return;
+    }
+
+    const updateTimeRemaining = () => {
+      const diff = targetTime - Date.now();
+      if (diff <= 0) {
+        setTimeRemaining("00:00:00");
+        return;
+      }
+      setTimeRemaining(formatDurationFromMs(diff));
+    };
+
+    updateTimeRemaining();
+    const intervalId = window.setInterval(updateTimeRemaining, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [nextResetIso]);
+
   const progressChipElements = (
     <>
       <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
         🔥 Streak {streak}
+      </div>
+      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
+        {timeRemaining ? `⏱️ Resets in ${timeRemaining}` : "⏱️ Resets soon"}
       </div>
       <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
         {completedCount}/{totalAvailable} completed
