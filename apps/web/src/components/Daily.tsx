@@ -20,6 +20,7 @@ import { buildShareText, formatShareDate } from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
+import StreakWidget from "./StreakWidget";
 import {
   AnidlePreview,
   CharacterSilhouettePreview,
@@ -254,7 +255,8 @@ export default function Daily({ data }: Props) {
   const requiredGames: GameKey[] = timelineEntries.map((entry) => entry.gameKey);
 
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
-  const streak = useStreak(data.date, allCompleted);
+  const streakInfo = useStreak(data.date, allCompleted);
+  const streakCount = streakInfo.count;
 
   const shareText = useMemo(() => {
     return buildShareText(data.date, progress, {
@@ -281,7 +283,7 @@ export default function Daily({ data }: Props) {
     return {
       title: preferredTitle,
       date: data.date,
-      streak,
+      streak: streakCount,
       cover: primarySolution?.coverImage ?? null,
       includeGuessTheOpening,
       progress: {
@@ -327,7 +329,7 @@ export default function Daily({ data }: Props) {
     progress.guess_the_opening,
     progress.poster_zoomed,
     progress.redacted_synopsis,
-    streak,
+    streakCount,
   ]);
 
   const shareButtonLabel = supportsFileShare
@@ -484,7 +486,7 @@ export default function Daily({ data }: Props) {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:auto-cols-max sm:grid-flow-col sm:items-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
-              🔥 Streak {streak}
+              🔥 Streak {streakCount}
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
               {timeRemaining ? `⏱️ Resets in ${timeRemaining}` : "⏱️ Resets soon"}
@@ -518,6 +520,8 @@ export default function Daily({ data }: Props) {
           </p>
         )}
       </header>
+
+      <StreakWidget currentDateIso={data.date} completed={allCompleted} />
 
       {syncToast && (
         <div
@@ -586,7 +590,7 @@ export default function Daily({ data }: Props) {
       </section>
 
       {allCompleted && solutions.length > 0 && (
-        <SolutionReveal solutions={solutions} />
+        <SolutionReveal solutions={solutions} streak={streakInfo} />
       )}
     </div>
   );

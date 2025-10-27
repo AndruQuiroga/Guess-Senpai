@@ -140,7 +140,8 @@ export default function HomePage() {
     (key) => progress[key]?.completed,
   ).length;
   const allCompleted = keysToConsider.every((key) => progress[key]?.completed);
-  const streak = useStreak(todayIso, allCompleted);
+  const streakInfo = useStreak(todayIso, allCompleted);
+  const streakCount = streakInfo.count;
 
   const hasStartedAnyRounds = useMemo(() => {
     return keysToConsider.some((key) => {
@@ -203,7 +204,7 @@ export default function HomePage() {
   const progressChipElements = (
     <>
       <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 text-sm font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
-        🔥 Streak {streak}
+        🔥 Streak {streakCount}
       </div>
       <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm">
         {timeRemaining ? `⏱️ Resets in ${timeRemaining}` : "⏱️ Resets soon"}
