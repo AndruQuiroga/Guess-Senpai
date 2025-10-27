@@ -1,11 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { GamePreviewModal } from "../components/GamePreviewModal";
 import { GlassSection } from "../components/GlassSection";
-import { type GameDirectoryEntry } from "../config/games";
+import { type GameDirectoryEntry, type GamePreviewMedia } from "../config/games";
 import {
   useDailyAvailability,
   useRuntimeGamesDirectory,
@@ -21,6 +22,47 @@ const BASE_GAME_KEYS: readonly GameKey[] = [
   "character_silhouette",
   "redacted_synopsis",
 ];
+
+function renderPreviewBackground(
+  media: GamePreviewMedia | undefined,
+  accentColor: string,
+  overlayClasses: string,
+): JSX.Element {
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      <div className={`absolute inset-0 bg-gradient-to-br ${accentColor}`} />
+      {media ? (
+        media.type === "image" ? (
+          <div className="absolute inset-0">
+            <div className="relative h-full w-full">
+              <Image
+                src={media.src}
+                alt={media.alt}
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+              />
+            </div>
+          </div>
+        ) : (
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src={media.src}
+            autoPlay={media.autoPlay ?? true}
+            loop={media.loop ?? true}
+            muted={media.muted ?? true}
+            playsInline
+            aria-label={media.alt}
+          />
+        )
+      ) : null}
+      <div className="pointer-events-none absolute inset-0 bg-neutral-950/40" />
+      <div
+        className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentColor} ${overlayClasses}`}
+      />
+    </div>
+  );
+}
 
 function todayIsoDate(): string {
   const now = new Date();
@@ -394,9 +436,11 @@ export default function HomePage() {
 
                 const content = (
                   <>
-                    <div
-                      className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${game.accentColor} ${overlayClasses}`}
-                    />
+                    {renderPreviewBackground(
+                      game.preview.media,
+                      game.accentColor,
+                      overlayClasses,
+                    )}
                     <div className="relative z-10 flex flex-1 flex-col gap-4">
                       <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
                         {eyebrow}
@@ -515,9 +559,11 @@ export default function HomePage() {
 
                 const content = (
                   <>
-                    <div
-                      className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${game.accentColor} ${overlayClasses}`}
-                    />
+                    {renderPreviewBackground(
+                      game.preview.media,
+                      game.accentColor,
+                      overlayClasses,
+                    )}
                     <div className="relative z-10 flex flex-1 flex-col gap-4">
                       <span className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-300">
                         {eyebrow}

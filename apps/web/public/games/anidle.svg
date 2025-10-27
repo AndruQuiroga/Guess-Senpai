@@ -1,0 +1,35 @@
+<svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="40" x2="840" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#facc15" />
+      <stop offset="0.45" stop-color="#fb923c" />
+      <stop offset="1" stop-color="#f43f5e" />
+    </linearGradient>
+    <linearGradient id="wave" x1="0" y1="380" x2="960" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.2)" />
+      <stop offset="0.5" stop-color="rgba(255,255,255,0.45)" />
+      <stop offset="1" stop-color="rgba(255,255,255,0.2)" />
+    </linearGradient>
+    <radialGradient id="pulse" cx="0" cy="0" r="1" gradientTransform="translate(480 260) rotate(90) scale(260 520)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.35)" />
+      <stop offset="1" stop-color="rgba(255,255,255,0)" />
+    </radialGradient>
+  </defs>
+  <rect width="960" height="540" rx="36" fill="url(#bg)" />
+  <g opacity="0.75">
+    <path d="M-20 380C180 340 340 460 520 420C700 380 820 420 980 360" stroke="url(#wave)" stroke-width="18" stroke-linecap="round" />
+    <path d="M-40 430C160 390 360 510 520 470C680 430 820 480 1000 420" stroke="url(#wave)" stroke-width="12" stroke-linecap="round" />
+  </g>
+  <rect x="200" y="120" width="560" height="320" rx="32" fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.18)" stroke-width="2" />
+  <path d="M260 220h440" stroke="rgba(255,255,255,0.4)" stroke-width="4" stroke-linecap="round" stroke-dasharray="12 16" />
+  <circle cx="320" cy="280" r="68" fill="rgba(251, 191, 36, 0.9)" />
+  <path d="M286 254L354 280L286 306V254Z" fill="rgba(30, 41, 59, 0.85)" />
+  <g fill="rgba(255,255,255,0.75)">
+    <rect x="410" y="240" width="64" height="12" rx="6" />
+    <rect x="490" y="240" width="160" height="12" rx="6" opacity="0.6" />
+    <rect x="410" y="268" width="210" height="12" rx="6" opacity="0.8" />
+    <rect x="410" y="296" width="180" height="12" rx="6" opacity="0.65" />
+    <rect x="410" y="324" width="140" height="12" rx="6" opacity="0.45" />
+  </g>
+  <circle cx="480" cy="260" r="220" fill="url(#pulse)" />
+</svg>
