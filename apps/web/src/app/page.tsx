@@ -138,10 +138,6 @@ export default function HomePage() {
 
     return { playableGames: playable, upcomingGames: upcoming };
   }, [games]);
-  const firstPlayableGame = useMemo(
-    () => playableGames.find((game) => game.playable) ?? null,
-    [playableGames],
-  );
   const {
     error: availabilityError,
     refresh: refreshAvailability,
@@ -300,20 +296,18 @@ export default function HomePage() {
 
   return (
     <div className="space-y-16">
-      <section className="relative overflow-hidden rounded-4xl border border-white/10 bg-surface-raised p-10 text-white shadow-ambient backdrop-blur-2xl sm:p-16">
+      <section className="relative overflow-hidden rounded-4xl border border-white/10 bg-surface-raised p-10 text-white shadow-ambient backdrop-blur-2xl sm:p-14">
         <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
-        <div className="relative z-10 max-w-3xl space-y-6">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-neutral-100/80">
+        <div className="relative z-10 max-w-2xl space-y-5">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-neutral-100/80">
             GuessSenpai
           </span>
-          <h1 className="text-4xl font-display font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-            Anime guessing games with a glassy twist
+          <h1 className="text-3xl font-display font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem]">
+            Your daily anime guess sprint
           </h1>
-          <p className="text-lg leading-relaxed text-neutral-200">
-            Sharpen your encyclopedic knowledge of anime through daily rounds of
-            metadata, posters, synopsis reveals, and a dash of musical
-            nostalgia. Compete with friends, maintain your streak, and share
-            downloadable highlight cards that celebrate each win.
+          <p className="text-base leading-relaxed text-neutral-200/90 sm:text-lg">
+            Guess the series, flex your trivia brain, and keep the streak alive.
+            Tap in for fresh puzzles before the clock resets.
           </p>
           {showLoginCallout ? (
             <p className="text-sm leading-relaxed text-neutral-200/80">
@@ -326,7 +320,29 @@ export default function HomePage() {
               to sync your streaks and archive completions across every device.
             </p>
           ) : null}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+              <Link
+                href={
+                  hasIncompleteGame && nextIncompleteGame
+                    ? `/games/${nextIncompleteGame.slug}`
+                    : "/games/daily"
+                }
+                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-7 py-3 text-base font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_28px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              >
+                {hasIncompleteGame && nextIncompleteGame
+                  ? `Resume ${nextIncompleteGame.title}`
+                  : "Play today’s lineup"}
+              </Link>
+              {hasIncompleteGame ? (
+                <Link
+                  href="/games/daily"
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/85 transition hover:border-white/40 hover:text-white"
+                >
+                  Continue
+                </Link>
+              ) : null}
+            </div>
             <div className="lg:hidden">
               <ProgressSummary
                 streakCount={streakCount}
@@ -335,80 +351,7 @@ export default function HomePage() {
                 totalAvailable={totalAvailable}
               />
             </div>
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <Link
-                href={
-                  hasIncompleteGame && nextIncompleteGame
-                    ? `/games/${nextIncompleteGame.slug}`
-                    : "/games/daily"
-                }
-                className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-6 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_28px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-              >
-                {hasIncompleteGame
-                  ? "Continue today’s run"
-                  : "Play today's puzzles"}
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  if (firstPlayableGame) {
-                    handleOpenPreview(firstPlayableGame);
-                  }
-                }}
-                disabled={!firstPlayableGame}
-                className="text-sm font-semibold text-white/80 underline decoration-white/40 underline-offset-4 transition hover:text-white hover:decoration-white disabled:cursor-not-allowed disabled:text-white/40"
-              >
-                Watch a demo
-              </button>
-            </div>
           </div>
-          <ul className="mt-8 space-y-3 text-lg leading-relaxed text-neutral-200">
-            <li className="flex items-start gap-3">
-              <span aria-hidden className="mt-0.5 text-xl">
-                🎧
-              </span>
-              <span>
-                <Link
-                  href="/how-to-play"
-                  className="font-semibold text-white transition hover:text-brand-200"
-                >
-                  Listen &amp; guess
-                </Link>{" "}
-                Catch audio clues, spot the reference, and see how it works in
-                the full guide.
-              </span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span aria-hidden className="mt-0.5 text-xl">
-                🧩
-              </span>
-              <span>
-                <Link
-                  href="/how-to-play"
-                  className="font-semibold text-white transition hover:text-brand-200"
-                >
-                  Unlock hints
-                </Link>{" "}
-                Learn when to reveal extra clues and strategize your hint usage
-                step-by-step.
-              </span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span aria-hidden className="mt-0.5 text-xl">
-                📣
-              </span>
-              <span>
-                <Link
-                  href="/how-to-play"
-                  className="font-semibold text-white transition hover:text-brand-200"
-                >
-                  Share your streak
-                </Link>{" "}
-                See tips for exporting recap cards and celebrating wins with
-                your squad.
-              </span>
-            </li>
-          </ul>
           {hasIncompleteGame ? (
             <p className="text-sm text-neutral-200/90">
               You left off on {nextIncompleteGame?.title}
