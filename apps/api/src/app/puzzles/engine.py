@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import html
+import io
 import logging
 import re
 from dataclasses import asdict, dataclass
 from datetime import date
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Tuple
+
+import httpx
+from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
@@ -110,6 +116,14 @@ class UserContext:
     user_id: int
     username: Optional[str]
     access_token: str
+
+
+class PosterImageError(Exception):
+    """Raised when poster image generation fails."""
+
+    def __init__(self, message: str, *, status_code: int = 500) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 async def _get_cache() -> CacheBackend:
@@ -230,6 +244,111 @@ def _build_poster(media: Media) -> PosterZoomGame:
         meta=meta,
         cropStages=_build_poster_crop_stages(media),
     )
+
+
+def _deserialize_cached_image(payload: Any) -> Optional[Tuple[bytes, str]]:
+    if not isinstance(payload, dict):
+        return None
+    encoded = payload.get("data")
+    if not isinstance(encoded, str):
+        return None
+    try:
+        decoded = base64.b64decode(encoded)
+    except (binascii.Error, ValueError):
+        return None
+    mime = payload.get("mime") or "image/jpeg"
+    return decoded, mime
+
+
+def _normalize_clarity(value: float) -> float:
+    if value != value:  # NaN guard
+        return 1.0
+    return max(0.0, min(1.0, float(value)))
+
+
+async def _load_poster_source(
+    media: Media, cache: CacheBackend, settings: Settings
+) -> Tuple[bytes, str]:
+    cache_key = f"poster-image-source:{media.id}"
+    cached = await cache.get(cache_key)
+    cached_image = _deserialize_cached_image(cached)
+    if cached_image:
+        return cached_image
+
+    cover = media.coverImage or CoverImage()
+    image_url = getattr(cover, "extraLarge", None) or getattr(cover, "large", None)
+    if not image_url:
+        image_url = getattr(cover, "medium", None)
+    if not image_url:
+        raise PosterImageError("Poster image unavailable", status_code=404)
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(image_url)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.warning("Failed to fetch poster image for %s: %s", media.id, exc)
+        raise PosterImageError("Unable to fetch poster image", status_code=502) from exc
+
+    content = response.content
+    mime = response.headers.get("content-type") or "image/jpeg"
+
+    try:
+        encoded = base64.b64encode(content).decode("ascii")
+        await cache.set(
+            cache_key,
+            {"data": encoded, "mime": mime},
+            settings.puzzle_cache_ttl_seconds,
+        )
+    except Exception as exc:  # pragma: no cover - cache failures shouldn't block gameplay
+        logger.debug("Unable to cache poster source image: %s", exc)
+
+    return content, mime
+
+
+def _render_poster_variant(source: bytes, clarity: float) -> Tuple[bytes, str]:
+    try:
+        with Image.open(io.BytesIO(source)) as poster:
+            poster = poster.convert("RGB")
+            blur_radius = (1.0 - clarity) * 12.0
+            if blur_radius > 0:
+                poster = poster.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+            sharpness_factor = 0.4 + (clarity * 0.6)
+            poster = ImageEnhance.Sharpness(poster).enhance(sharpness_factor)
+            output = io.BytesIO()
+            poster.save(output, format="JPEG", quality=90, optimize=True)
+    except UnidentifiedImageError as exc:
+        raise PosterImageError("Unable to process poster image", status_code=500) from exc
+
+    return output.getvalue(), "image/jpeg"
+
+
+async def generate_poster_image(media_id: int, clarity: float) -> Tuple[bytes, str]:
+    cache = await _get_cache()
+    normalized = _normalize_clarity(clarity)
+    bucket = int(round(normalized * 100))
+    cache_key = f"poster-image:{media_id}:{bucket}"
+
+    cached = await cache.get(cache_key)
+    cached_image = _deserialize_cached_image(cached)
+    if cached_image:
+        return cached_image
+
+    media = await _load_media_details(media_id, cache, settings)
+    source, _ = await _load_poster_source(media, cache, settings)
+    variant_bytes, mime = _render_poster_variant(source, normalized)
+
+    try:
+        encoded = base64.b64encode(variant_bytes).decode("ascii")
+        await cache.set(
+            cache_key,
+            {"data": encoded, "mime": mime},
+            settings.puzzle_cache_ttl_seconds,
+        )
+    except Exception as exc:  # pragma: no cover - cache failures shouldn't block gameplay
+        logger.debug("Unable to cache poster variant: %s", exc)
+
+    return variant_bytes, mime
 
 
 def _redact_description(media: Media) -> tuple[str, List[str]]:
