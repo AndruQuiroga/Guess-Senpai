@@ -3,12 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  KeyboardEvent,
   MouseEvent,
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -21,6 +19,7 @@ import {
   type ProgressSummaryChunk,
 } from "../components/HomeHero";
 import { ShareRecapCard } from "../components/ShareRecapCard";
+import { UpcomingTimeline } from "../components/UpcomingTimeline";
 import {
   type GameDirectoryEntry,
   type GamePreviewMedia,
@@ -324,7 +323,6 @@ export default function HomePage() {
     refresh: refreshAvailability,
     loading: availabilityLoading,
   } = useDailyAvailability();
-  const upcomingCarouselRef = useRef<HTMLDivElement>(null);
   const showAvailabilityError = availabilityError;
 
   const nextIncompleteGame = useMemo(() => {
@@ -348,35 +346,6 @@ export default function HomePage() {
   const handleAvailabilityRetry = useCallback(() => {
     void refreshAvailability();
   }, [refreshAvailability]);
-
-  const handleUpcomingCarouselKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") {
-        return;
-      }
-
-      const container = upcomingCarouselRef.current;
-
-      if (!container) {
-        return;
-      }
-
-      event.preventDefault();
-
-      const firstTile = container.querySelector<HTMLElement>(
-        "[data-game-tile]",
-      );
-      const tileWidth = firstTile?.getBoundingClientRect().width ?? 0;
-      const fallbackWidth = container.getBoundingClientRect().width * 0.8;
-      const scrollAmount = Math.max(tileWidth + 24, fallbackWidth);
-
-      container.scrollBy({
-        left: event.key === "ArrowRight" ? scrollAmount : -scrollAmount,
-        behavior: "smooth",
-      });
-    },
-    [],
-  );
 
   const includeGuessTheOpening = useMemo(
     () =>
@@ -526,6 +495,15 @@ export default function HomePage() {
         secondaryCta={secondaryCta}
         nextIncompleteGame={nextIncompleteGame}
         timeRemaining={timeRemaining}
+      />
+
+      <UpcomingTimeline
+        games={upcomingGames}
+        unlockLabels={upcomingUnlockLabels}
+        onPreview={handleOpenPreview}
+        statusUnavailable={showAvailabilityError}
+        onRetry={handleAvailabilityRetry}
+        availabilityLoading={availabilityLoading}
       />
 
       {showCompletionBanner ? (
@@ -709,63 +687,6 @@ export default function HomePage() {
         ) : (
           <DailyRestNotice />
         )}
-        {upcomingGames.length > 0 ? (
-          <div className="space-y-5">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-              <h3 className="text-lg font-semibold text-white">
-                On the horizon
-              </h3>
-              <p className="text-sm text-neutral-300/90">
-                Peek at what unlocks next. Preview screens still work while
-                modes are in prep.
-              </p>
-            </div>
-            <div
-              ref={upcomingCarouselRef}
-              className="relative -mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 pt-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/65"
-              onKeyDown={handleUpcomingCarouselKeyDown}
-              role="list"
-              tabIndex={0}
-              aria-label="Upcoming game previews"
-            >
-              {upcomingGames.map((game) => {
-                const overlayClasses =
-                  "opacity-85 mix-blend-multiply saturate-150";
-                const statusChip: StatusChipConfig = showAvailabilityError
-                  ? { tone: "warning", label: "Status unavailable" }
-                  : game.comingSoon
-                    ? { tone: "comingSoon", label: "Coming soon" }
-                    : { tone: "locked", label: "Locked" };
-                const statusLabel =
-                  upcomingUnlockLabels[game.slug] ?? "Unlocking soon.";
-                const progressForGame = game.gameKey
-                  ? progress[game.gameKey]
-                  : undefined;
-
-                const handlePreviewClick = () => {
-                  handleOpenPreview(game);
-                };
-
-                return (
-                  <GameTile
-                    key={game.slug}
-                    game={game}
-                    statusChip={statusChip}
-                    statusLabel={statusLabel}
-                    onPreview={handlePreviewClick}
-                    overlayClasses={overlayClasses}
-                    showProgressReminder={Boolean(
-                      progressForGame && !progressForGame.completed,
-                    )}
-                    showAvailabilityError={showAvailabilityError}
-                    onAvailabilityRetry={handleAvailabilityRetry}
-                    availabilityLoading={availabilityLoading}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
       </section>
       <GamePreviewModal
         open={Boolean(previewGame)}
