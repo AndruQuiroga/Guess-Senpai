@@ -124,6 +124,20 @@ export default function PosterZoom({
     };
   }, [activeCropStage, fallbackZoom]);
 
+  const blurRadius = useMemo(() => {
+    if (completed) {
+      return 0;
+    }
+    if (totalRounds <= 1) {
+      return 0;
+    }
+    const clampedRound = Math.max(1, Math.min(totalRounds, round));
+    const progress = (clampedRound - 1) / (totalRounds - 1);
+    const maxBlur = 14;
+    const remaining = 1 - progress;
+    return Number((remaining * maxBlur).toFixed(2));
+  }, [completed, round, totalRounds]);
+
   const activeHints = useMemo(() => {
     const hints: string[] = [];
     payload.spec
@@ -216,6 +230,7 @@ export default function PosterZoom({
               transform: `scale(${imageTransform.scale})`,
               transformOrigin: imageTransform.transformOrigin,
               objectPosition: imageTransform.objectPosition,
+              filter: `blur(${blurRadius}px)`,
             }}
           />
         ) : (
