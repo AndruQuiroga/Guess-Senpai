@@ -170,11 +170,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     description: "Match a short music clip to the right series before time runs out.",
     preview: {
       summary:
-        "We are remixing quick-fire snippets of iconic OPs—lock in the right series before the chorus hits.",
+        "A trio of anime openings drop every day—clear the full set to bank your Guess the Opening streak.",
       rules: [
-        "Listen to a brisk audio teaser drawn from legendary anime openings.",
-        "Choose the matching series from a curated list of contenders.",
-        "Beat the countdown to maximize points before the full song plays.",
+        "Spin up each short clip sourced from AnimeThemes and lock in the correct series.",
+        "Three openings per day—solve every clip to secure the daily win.",
+        "Hints reveal metadata like season, artist, song title, and clip length as you advance.",
       ],
       media: {
         type: "image",

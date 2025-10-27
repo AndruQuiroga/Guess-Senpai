@@ -6,7 +6,14 @@ export const alt = "GuessSenpai daily share card";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-interface SimplifiedProgress { completed?: boolean; attempts?: number; round?: number; }
+interface SimplifiedProgress {
+  completed?: boolean;
+  attempts?: number;
+  round?: number;
+  clearedRounds?: number;
+  totalRounds?: number;
+  unitLabel?: string;
+}
 interface ShareCardPayload {
   title?: string | null;
   date?: string | null;
@@ -35,8 +42,19 @@ function describeAnidle(p?: SimplifiedProgress | null) {
 }
 function describeRoundGame(label: string, p?: SimplifiedProgress | null) {
   if (!p) return `${label} — ⏳`;
-  const round = Math.max(1, Math.min(3, p.round ?? 1));
-  return p.completed ? `${label} — ✅ (${round}/3)` : `${label} — ${round}/3`;
+  const total = Math.max(1, Math.floor(p.totalRounds ?? 3));
+  const unit = p.unitLabel?.trim();
+  const cleared = p.clearedRounds ?? (p.completed ? total : undefined);
+  const progressCount =
+    cleared !== undefined
+      ? Math.max(0, Math.min(total, cleared))
+      : Math.max(1, Math.min(total, p.round ?? 1));
+
+  if (p.completed) {
+    return `${label} — ✅ (${progressCount}/${total}${unit ? ` ${unit}` : ""})`;
+  }
+
+  return `${label} — ${progressCount}/${total}${unit ? ` ${unit}` : ""}`;
 }
 
 function toBase64FromArrayBuffer(ab: ArrayBuffer): string {

@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 
-import { GameProgress } from "../hooks/usePuzzleProgress";
+import { GameProgress, GameRoundProgress } from "../hooks/usePuzzleProgress";
 import { GuessOpeningRound } from "../types/puzzles";
 import { resolveHintRound } from "../utils/difficulty";
 import { verifyGuess } from "../utils/verifyGuess";
@@ -43,6 +43,17 @@ interface RoundState {
   hintUsed: boolean;
 }
 
+function createDefaultRoundState(round: GuessOpeningRound): RoundState {
+  return {
+    guesses: [],
+    stage: 1,
+    completed: false,
+    canonicalTitle: round.answer,
+    feedback: null,
+    hintUsed: false,
+  };
+}
+
 export default function GuessOpening({
   payload,
   initialProgress,
@@ -67,72 +78,118 @@ export default function GuessOpening({
     clampRoundIndex((initialProgress?.round ?? 1) - 1),
   );
   const [roundStates, setRoundStates] = useState<RoundState[]>(() =>
-    payload.map((round) => ({
-      guesses: [],
-      stage: 1,
-      completed: false,
-      canonicalTitle: round.answer,
-      feedback: null,
-      hintUsed: false,
-    })),
+    payload.map((round) => createDefaultRoundState(round)),
   );
+  const storedRoundMap = useMemo(() => {
+    const map = new Map<number, GameRoundProgress>();
+    const storedRounds = initialProgress?.rounds ?? [];
+    storedRounds.forEach((entry) => {
+      if (!entry) return;
+      const normalizedRound = Number.isFinite(entry.round)
+        ? Math.max(1, Math.floor(entry.round))
+        : null;
+      if (!normalizedRound) return;
+      map.set(normalizedRound, {
+        round: normalizedRound,
+        guesses: Array.isArray(entry.guesses) ? [...entry.guesses] : [],
+        stage: entry.stage,
+        completed: entry.completed,
+        hintUsed: entry.hintUsed,
+        resolvedAnswer: entry.resolvedAnswer,
+      });
+    });
+    return map;
+  }, [initialProgress?.rounds]);
   const [guess, setGuess] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
   useEffect(() => {
-    setRoundStates((prev) => {
-      return payload.map((round, index) => {
-        const existing = prev[index];
-        if (!existing) {
-          return {
-            guesses: [],
-            stage: 1,
-            completed: false,
-            canonicalTitle: round.answer,
-            feedback: null,
-            hintUsed: false,
-          };
+    const fallbackIndex = clampRoundIndex((initialProgress?.round ?? 1) - 1);
+    const fallbackGuesses =
+      initialProgress && Array.isArray(initialProgress.guesses)
+        ? [...initialProgress.guesses]
+        : [];
+    const markAllCompleted =
+      Boolean(initialProgress?.completed) && storedRoundMap.size === 0;
+
+    setRoundStates((prev) =>
+      payload.map((round, index) => {
+        const baseState = createDefaultRoundState(round);
+        const previous = prev[index] ?? baseState;
+        const stored = storedRoundMap.get(index + 1);
+        const totalStages = Math.max(round.spec.length, 1);
+
+        let guesses = previous.guesses;
+        if (stored) {
+          guesses = Array.isArray(stored.guesses) ? [...stored.guesses] : [];
+        } else if (
+          initialProgress &&
+          storedRoundMap.size === 0 &&
+          index === fallbackIndex
+        ) {
+          guesses = [...fallbackGuesses];
         }
+
+        let completed = previous.completed;
+        if (stored?.completed !== undefined) {
+          completed = Boolean(stored.completed);
+        } else if (markAllCompleted) {
+          completed = true;
+        } else if (!initialProgress) {
+          completed = false;
+        }
+
+        let stage = previous.stage;
+        if (stored?.stage !== undefined && Number.isFinite(stored.stage)) {
+          const normalizedStage = Math.floor(stored.stage ?? 1);
+          stage = Math.max(1, Math.min(totalStages, normalizedStage));
+        } else if (completed) {
+          stage = totalStages;
+        } else {
+          stage = Math.max(1, Math.min(totalStages, stage));
+        }
+
+        let hintUsed = previous.hintUsed;
+        if (stored?.hintUsed !== undefined) {
+          hintUsed = Boolean(stored.hintUsed);
+        } else if (completed || stage > 1) {
+          hintUsed = true;
+        }
+
+        const resolvedAnswer = stored?.resolvedAnswer?.trim();
+        const canonicalTitle = resolvedAnswer
+          ? resolvedAnswer
+          : completed
+            ? previous.canonicalTitle || round.answer
+            : round.answer;
+
+        const feedback = completed
+          ? {
+              type: "success" as const,
+              message: `Opening solved! ${canonicalTitle}`,
+            }
+          : previous.completed && !completed
+            ? null
+            : previous.feedback && !completed
+              ? previous.feedback
+              : null;
+
         return {
-          ...existing,
-          canonicalTitle: existing.completed
-            ? existing.canonicalTitle
-            : round.answer,
+          ...baseState,
+          guesses,
+          completed,
+          stage,
+          canonicalTitle,
+          feedback,
+          hintUsed,
         };
-      });
-    });
-    setActiveRoundIndex((current) =>
-      clampRoundIndex((initialProgress?.round ?? current + 1) - 1),
+      }),
     );
+
+    setActiveRoundIndex(() => fallbackIndex);
     setGuess("");
-    if (initialProgress?.guesses?.length) {
-      setRoundStates((prev) => {
-        const target = clampRoundIndex((initialProgress.round ?? 1) - 1);
-        return prev.map((state, index) =>
-          index === target
-            ? { ...state, guesses: [...initialProgress.guesses] }
-            : state,
-        );
-      });
-    }
-    if (initialProgress?.completed) {
-      setRoundStates((prev) =>
-        prev.map((state) => ({
-          ...state,
-          completed: true,
-          feedback:
-            state.feedback?.type === "success"
-              ? state.feedback
-              : {
-                  type: "success",
-                  message: `Opening solved! ${state.canonicalTitle}`,
-                },
-          hintUsed: true,
-        })),
-      );
-    }
-  }, [clampRoundIndex, initialProgress, payload]);
+  }, [clampRoundIndex, initialProgress, payload, storedRoundMap]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -338,10 +395,21 @@ export default function GuessOpening({
 
   useEffect(() => {
     const aggregatedGuesses = roundStates.flatMap((state) => state.guesses);
+    const roundsProgress: GameRoundProgress[] = roundStates.map(
+      (state, index) => ({
+        round: index + 1,
+        guesses: [...state.guesses],
+        stage: state.stage,
+        completed: state.completed,
+        hintUsed: state.hintUsed,
+        resolvedAnswer: state.completed ? state.canonicalTitle : undefined,
+      }),
+    );
     onProgressChange({
       completed: puzzleCompleted,
       round: activeRoundIndex + 1,
       guesses: aggregatedGuesses,
+      rounds: roundsProgress,
     });
   }, [activeRoundIndex, onProgressChange, puzzleCompleted, roundStates]);
 

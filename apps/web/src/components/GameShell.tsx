@@ -8,9 +8,18 @@ interface GameShellProps {
   totalRounds: number;
   onJumpRound?: (round: number) => void;
   actions?: React.ReactNode;
+  roundLabel?: string;
 }
 
-export function GameShell({ title, round, totalRounds, onJumpRound, actions, children }: PropsWithChildren<GameShellProps>) {
+export function GameShell({
+  title,
+  round,
+  totalRounds,
+  onJumpRound,
+  actions,
+  roundLabel,
+  children,
+}: PropsWithChildren<GameShellProps>) {
   useEffect(() => {
     if (!onJumpRound) return;
     const allowedKeys = new Set(Array.from({ length: totalRounds }, (_, idx) => String(idx + 1)));
@@ -40,7 +49,7 @@ export function GameShell({ title, round, totalRounds, onJumpRound, actions, chi
           </h2>
           <div className="mt-2 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-brand-200/80">
             <span className="rounded-full border border-brand-400/60 bg-brand-500/10 px-3 py-1 text-[0.65rem] font-semibold text-brand-200">
-              Round {round} / {totalRounds}
+              {roundLabel ?? "Round"} {round} / {totalRounds}
             </span>
             <span className="hidden text-[0.65rem] text-neutral-500 sm:inline">Press 1 • 2 • 3 to jump rounds</span>
           </div>
