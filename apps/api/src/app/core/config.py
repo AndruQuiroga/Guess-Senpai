@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     puzzle_cache_ttl_seconds: int = Field(default=172_800, alias="PUZZLE_CACHE_TTL_SECONDS")
     puzzle_history_days: int = Field(default=14, alias="PUZZLE_HISTORY_DAYS")
 
-    animethemes_enabled: bool = Field(default=False, alias="ANIMETHEMES_ENABLED")
+    animethemes_enabled: bool = Field(default=True, alias="ANIMETHEMES_ENABLED")
     guess_opening_pool_enabled: bool = Field(default=True, alias="GUESS_OPENING_POOL_ENABLED")
 
     session_secret: str = Field(default="dev-insecure-session-secret", alias="SESSION_SECRET")
