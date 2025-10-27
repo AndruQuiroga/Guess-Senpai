@@ -15,6 +15,7 @@ from app.puzzles.models import (
     GuessOpeningGame,
     GuessOpeningMeta,
     OpeningClip,
+    PosterZoomPuzzleBundle,
     RoundSpec,
 )
 from app.services.anilist import Media, Title
@@ -91,6 +92,18 @@ def make_character_silhouette(media: Media) -> CharacterSilhouetteGame:
             role="Main",
         ),
     )
+
+
+def test_build_poster_bundle_without_cover_image() -> None:
+    media = make_media(505, "No Cover")
+
+    bundle = PosterZoomPuzzleBundle(
+        mediaId=media.id,
+        puzzle=engine._build_poster(media),
+        solution=engine._build_solution(media),
+    )
+
+    assert bundle.puzzle.image is None
 
 
 @pytest.mark.asyncio

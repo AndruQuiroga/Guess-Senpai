@@ -10,7 +10,7 @@ from typing import List, Optional, Sequence
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
 from ..services import animethemes, anilist
-from ..services.anilist import Media, MediaCharacterEdge, MediaListCollection
+from ..services.anilist import CoverImage, Media, MediaCharacterEdge, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
 from ..services.history_repository import (
     list_recent_media as repo_list_recent_media,
@@ -209,8 +209,12 @@ def _build_poster_crop_stages(media: Media) -> List[PosterCropStage]:
 
 
 def _build_poster(media: Media) -> PosterZoomGame:
-    cover = media.coverImage or {}
-    image = cover.extraLarge or cover.large or cover.medium
+    cover = media.coverImage or CoverImage()
+    image = (
+        getattr(cover, "extraLarge", None)
+        or getattr(cover, "large", None)
+        or getattr(cover, "medium", None)
+    )
     meta = PosterZoomMeta(
         genres=[g for g in media.genres if g],
         year=media.seasonYear or (media.startDate or {}).get("year"),
