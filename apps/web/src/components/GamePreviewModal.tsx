@@ -25,11 +25,18 @@ interface GamePreviewModalProps {
 const FOCUSABLE_SELECTORS =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
-export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewModalProps) {
+export function GamePreviewModal({
+  open,
+  game,
+  onClose,
+  progress,
+}: GamePreviewModalProps) {
   const [mounted, setMounted] = useState(false);
+  const [rulesExpanded, setRulesExpanded] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const { guessTheOpeningEnabled, error, refresh, loading } = useDailyAvailability();
+  const { guessTheOpeningEnabled, error, refresh, loading } =
+    useDailyAvailability();
   const showAvailabilityError = error;
   const handleRetry = useCallback(() => {
     void refresh();
@@ -38,6 +45,16 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setRulesExpanded(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    setRulesExpanded(false);
+  }, [game?.slug]);
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +66,8 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
       if (event.key !== "Tab") return;
       const dialog = dialogRef.current;
       if (!dialog) return;
-      const focusable = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
+      const focusable =
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -115,7 +133,8 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
     }
     return { label: "Start playing", href, disabled: false };
   }, [progress, runtimeGame, showAvailabilityError]);
-  const showDemoNotice = runtimeGame?.playable && !progress && !showAvailabilityError;
+  const showDemoNotice =
+    runtimeGame?.playable && !progress && !showAvailabilityError;
 
   if (!mounted || !open || !runtimeGame) {
     return null;
@@ -125,6 +144,11 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
   const descriptionId = `game-preview-description-${runtimeGame.slug}`;
   const media = runtimeGame.preview.media;
   const placeholder = runtimeGame.preview.placeholder;
+
+  const rules = runtimeGame.preview.rules;
+  const firstRule = rules[0];
+  const remainingRules = rules.slice(1);
+  const hasAdditionalRules = remainingRules.length > 0;
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6">
@@ -147,7 +171,12 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
           className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
           aria-label="Close preview"
         >
-          <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
+          <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            className="h-4 w-4"
+            fill="currentColor"
+          >
             <path
               fillRule="evenodd"
               d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 011.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
@@ -157,79 +186,115 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
         </button>
 
         <div className="grid gap-6 p-6 sm:grid-cols-[1.1fr_0.9fr] sm:gap-8 sm:p-8">
-          <div className="space-y-4">
-            <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
-              {runtimeGame.playable
-                ? "Featured game"
-                : runtimeGame.comingSoon
-                  ? "In development"
-                  : "Unavailable"}
-            </span>
-            <div className="space-y-2">
-              <h2 id={titleId} className="text-2xl font-display font-semibold tracking-tight sm:text-3xl">
-                {runtimeGame.title}
-              </h2>
-              <p className="text-sm uppercase tracking-[0.3em] text-neutral-400">{runtimeGame.tagline}</p>
-            </div>
-            <p id={descriptionId} className="text-base leading-relaxed text-neutral-200">
-              {runtimeGame.preview.summary}
-            </p>
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-300">
-                How to play
-              </h3>
+          <div className="space-y-6">
+            <section className="space-y-3">
+              <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
+                {runtimeGame.playable
+                  ? "Featured game"
+                  : runtimeGame.comingSoon
+                    ? "In development"
+                    : "Unavailable"}
+              </span>
+              <div className="space-y-2">
+                <h2
+                  id={titleId}
+                  className="text-2xl font-display font-semibold tracking-tight sm:text-3xl"
+                >
+                  {runtimeGame.title}
+                </h2>
+                <p className="text-sm uppercase tracking-[0.3em] text-neutral-400">
+                  {runtimeGame.tagline}
+                </p>
+              </div>
+              <p
+                id={descriptionId}
+                className="text-base leading-relaxed text-neutral-200"
+              >
+                {runtimeGame.preview.summary}
+              </p>
+            </section>
+
+            <section className="space-y-3 border-t border-white/10 pt-6">
+              <div className="flex items-start justify-between gap-4">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-300">
+                  How to play
+                </h3>
+                {hasAdditionalRules ? (
+                  <button
+                    type="button"
+                    onClick={() => setRulesExpanded((current) => !current)}
+                    aria-expanded={rulesExpanded}
+                    className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+                  >
+                    {rulesExpanded
+                      ? "Hide details"
+                      : `Show ${remainingRules.length} more`}
+                  </button>
+                ) : null}
+              </div>
               <ul className="space-y-2 text-sm leading-relaxed text-neutral-200">
-                {runtimeGame.preview.rules.map((rule, index) => (
-                  <li key={rule} className="flex gap-2">
-                    <span className="mt-1 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 text-[0.7rem] font-semibold text-white/80">
-                      {index + 1}
-                    </span>
-                    <span>{rule}</span>
+                {firstRule ? (
+                  <li className="relative rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-neutral-100/90">
+                    {firstRule}
                   </li>
-                ))}
+                ) : null}
+                {rulesExpanded
+                  ? remainingRules.map((rule) => (
+                      <li
+                        key={rule}
+                        className="relative rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-neutral-100/90"
+                      >
+                        {rule}
+                      </li>
+                    ))
+                  : null}
               </ul>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            </section>
+
+            <section className="space-y-3 border-t border-white/10 pt-6">
               {showAvailabilityError ? (
-                <>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-4 py-2 text-sm font-medium text-amber-50">
-                    ⚠️ Unable to load today&apos;s availability
-                  </span>
+                <div className="space-y-3">
+                  <p className="inline-flex items-center gap-2 text-sm font-medium text-amber-200/90">
+                    <span aria-hidden>⚠️</span>
+                    <span>Unable to load today&apos;s availability.</span>
+                  </p>
                   <button
                     type="button"
                     onClick={handleRetry}
                     disabled={loading}
-                    className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+                    className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-white/25 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Retry
                   </button>
-                </>
+                </div>
               ) : primaryAction ? (
                 primaryAction.href ? (
                   <Link
                     href={primaryAction.href}
-                    className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                     onClick={onClose}
                   >
                     {primaryAction.label}
                   </Link>
                 ) : (
-                  <span className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-5 py-2 text-sm font-semibold text-white/80">
+                  <span className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/70">
                     {primaryAction.label}
                   </span>
                 )
               ) : null}
               {!showAvailabilityError && !runtimeGame.playable ? (
-                <span className="text-sm text-neutral-300">
-                  We&apos;re polishing assets and gameplay details—thanks for your patience!
-                </span>
+                <p className="text-sm leading-relaxed text-neutral-300">
+                  We&apos;re polishing assets and gameplay details—thanks for
+                  your patience!
+                </p>
               ) : null}
               {showDemoNotice ? (
-                <span className="text-sm text-neutral-300">
-                  This preview is a read-only demo. Start a round to track your guesses.
-                </span>
+                <p className="text-sm leading-relaxed text-neutral-300">
+                  This preview is a read-only demo. Start a round to track your
+                  guesses.
+                </p>
               ) : null}
-            </div>
+            </section>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
@@ -266,7 +331,8 @@ export function GamePreviewModal({ open, game, onClose, progress }: GamePreviewM
                       {placeholder?.headline ?? "Preview art coming soon"}
                     </p>
                     <p className="text-sm text-white/80">
-                      {placeholder?.description ?? "Concept visuals are in progress. Check back later!"}
+                      {placeholder?.description ??
+                        "Concept visuals are in progress. Check back later!"}
                     </p>
                   </div>
                 </div>
