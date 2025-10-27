@@ -899,17 +899,28 @@ async def _assemble_daily_puzzle(
         raise ValueError("Unable to build character silhouette puzzle")
 
     guess_bundle: Optional[GuessOpeningPuzzleBundle] = None
+    opening_pool: Optional[List[Media]] = None
+    if include_guess_opening and settings.guess_opening_pool_enabled:
+        try:
+            opening_pool = await anilist.fetch_opening_pool(
+                cache,
+                day=day,
+                ttl=settings.anilist_cache_ttl_seconds,
+            )
+        except Exception:
+            logger.exception("Failed to load dedicated opening pool")
     if include_guess_opening:
+        candidate_pool = opening_pool or pool
         attempted_ids: set[int] = set()
-        max_attempts = max(len(pool), 1)
+        max_attempts = max(len(candidate_pool), 1)
         for attempt in range(max_attempts):
-            if not any(media.id not in selected_ids for media in pool):
+            if not any(media.id not in selected_ids for media in candidate_pool):
                 if user is None:
                     break
             candidate = _choose_media_from_pool(
                 base_seed,
                 "guess_the_opening",
-                pool,
+                candidate_pool,
                 selected_ids,
                 attempt=attempt,
                 attempted_ids=attempted_ids,
