@@ -8,12 +8,17 @@ export interface GuessVerificationResult {
 export async function verifyGuess(
   mediaId: number,
   guess: string,
+  guessMediaId?: number,
 ): Promise<GuessVerificationResult> {
   const response = await fetch(`${API_BASE}/puzzles/verify`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ media_id: mediaId, guess }),
+    body: JSON.stringify({
+      media_id: mediaId,
+      guess,
+      guess_media_id: guessMediaId ?? null,
+    }),
   });
 
   if (!response.ok) {
