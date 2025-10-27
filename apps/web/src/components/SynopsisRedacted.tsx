@@ -134,15 +134,14 @@ export default function SynopsisRedacted({
     return segments.map((segment, index) => {
       const isMasked = segment.masked && !revealSet.has(index);
       if (isMasked) {
-        const maskText = segment.text.replace(/./g, "█") || "█";
         return (
           <span key={`segment-${index}`} className="relative inline-flex align-baseline">
             <span className="sr-only">Masked word</span>
             <span
               aria-hidden
-              className="inline-flex items-center rounded-sm bg-black/80 px-1 py-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.3em] text-white shadow-sm"
+              className="inline-flex select-none items-center rounded-sm bg-black px-1 py-0.5 text-sm font-semibold leading-tight text-transparent shadow-sm"
             >
-              {maskText}
+              {segment.text}
             </span>
           </span>
         );
