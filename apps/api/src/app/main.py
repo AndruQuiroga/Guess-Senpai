@@ -18,7 +18,16 @@ logger = logging.getLogger(__name__)
 def create_app() -> FastAPI:
     app = FastAPI(title="GuessSenpai API", version="0.1.0")
 
-    origins = settings.cors_origins or ["*"]
+    origins = [str(origin).rstrip("/") for origin in settings.cors_origins or []]
+
+    if settings.frontend_base_url:
+        frontend_origin = str(settings.frontend_base_url).rstrip("/")
+        if frontend_origin and frontend_origin not in origins:
+            origins.append(frontend_origin)
+
+    if not origins:
+        origins = ["*"]
+
     allow_origins = ["*"] if "*" in origins else origins
 
     app.add_middleware(
