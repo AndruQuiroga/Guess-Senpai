@@ -3,7 +3,18 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Dict, List, Optional
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, JSON, String, Text, func
+from sqlalchemy import (
+    BigInteger,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -123,3 +134,55 @@ class UserProfile(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="profile")
+
+
+class MediaTitle(Base):
+    __tablename__ = "media_titles"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    canonical_title: Mapped[str] = mapped_column(String(512))
+    normalized_title: Mapped[str] = mapped_column(String(512), index=True)
+    romaji_title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    english_title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    native_title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    user_preferred_title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    cover_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    format: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    aliases: Mapped[List["MediaTitleAlias"]] = relationship(
+        back_populates="media_title", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class MediaTitleAlias(Base):
+    __tablename__ = "media_title_aliases"
+    __table_args__ = (
+        UniqueConstraint("media_id", "normalized_alias", name="uq_media_title_alias_media"),
+        Index("ix_media_title_aliases_normalized_alias", "normalized_alias"),
+        Index(
+            "ix_media_title_aliases_trgm",
+            "alias",
+            postgresql_using="gin",
+            postgresql_ops={"alias": "gin_trgm_ops"},
+        ),
+        Index("ix_media_title_aliases_media_priority", "media_id", "priority"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    media_id: Mapped[int] = mapped_column(
+        ForeignKey("media_titles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    alias: Mapped[str] = mapped_column(String(512), nullable=False)
+    normalized_alias: Mapped[str] = mapped_column(String(512), nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    priority: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    media_title: Mapped[MediaTitle] = relationship(back_populates="aliases")
