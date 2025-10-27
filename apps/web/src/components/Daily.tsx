@@ -25,6 +25,7 @@ import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
 import StreakWidget from "./StreakWidget";
+import NotificationOptInCard from "./NotificationOptInCard";
 import {
   ShareCardRequestPayload,
   ShareComposer,
@@ -419,6 +420,8 @@ export default function Daily({ data }: Props) {
       </GlassSection>
 
       <StreakWidget currentDateIso={data.date} completed={allCompleted} />
+
+      <NotificationOptInCard />
 
       {syncToast && (
         <div

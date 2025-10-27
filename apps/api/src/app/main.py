@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .core.database import register_database
 from .puzzles.engine import get_daily_puzzle
-from .routers import auth, health, live, profile, puzzles
+from .routers import auth, health, live, notifications, profile, puzzles
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router, prefix="/health", tags=["health"])
     app.include_router(puzzles.router, prefix="/puzzles", tags=["puzzles"])
+    app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
     app.include_router(profile.router, prefix="/profile", tags=["profile"])
     app.include_router(live.router, prefix="/live", tags=["live"])
     app.include_router(auth.router)

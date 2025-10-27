@@ -27,6 +27,10 @@ class Settings(BaseSettings):
 
     redis_url: Optional[str] = Field(default=None, alias="REDIS_URL")
 
+    web_push_vapid_public_key: Optional[str] = Field(default=None, alias="WEB_PUSH_VAPID_PUBLIC_KEY")
+    web_push_vapid_private_key: Optional[str] = Field(default=None, alias="WEB_PUSH_VAPID_PRIVATE_KEY")
+    web_push_contact: Optional[str] = Field(default=None, alias="WEB_PUSH_CONTACT")
+
     database_url: str = Field(
         default="postgresql+asyncpg://guesssenpai:guesssenpai@postgres:5432/guesssenpai",
         alias="DATABASE_URL",
