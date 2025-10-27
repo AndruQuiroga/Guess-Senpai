@@ -28,7 +28,10 @@ describe("GuessOpening autocomplete", () => {
       loading: false,
       error: null,
     });
-    verifyGuessMock.mockResolvedValue({ correct: true, match: "Neon Genesis Evangelion" });
+    verifyGuessMock.mockResolvedValue({
+      correct: true,
+      match: "Neon Genesis Evangelion",
+    });
   });
 
   afterEach(() => {
@@ -59,9 +62,7 @@ describe("GuessOpening autocomplete", () => {
 
     const user = userEvent.setup();
 
-    render(
-      <GuessOpening payload={payload} onProgressChange={() => {}} />,
-    );
+    render(<GuessOpening payload={[payload]} onProgressChange={() => {}} />);
 
     const input = screen.getByLabelText("Guess the opening");
     await user.type(input, "ne");
@@ -72,7 +73,9 @@ describe("GuessOpening autocomplete", () => {
     expect(listbox).toBeInTheDocument();
 
     await user.keyboard("{ArrowDown}");
-    const option = screen.getByRole("option", { name: "Neon Genesis Evangelion" });
+    const option = screen.getByRole("option", {
+      name: "Neon Genesis Evangelion",
+    });
     expect(option).toHaveAttribute("aria-selected", "true");
 
     await user.keyboard("{Enter}");

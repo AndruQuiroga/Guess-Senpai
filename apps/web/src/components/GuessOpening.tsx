@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { GuessOpeningRound } from "../types/puzzles";
@@ -14,7 +21,7 @@ import {
 } from "./games/TitleGuessField";
 
 interface Props {
-  payload: GuessOpeningRound;
+  payload: GuessOpeningRound[];
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
@@ -27,6 +34,15 @@ type FeedbackState =
   | { type: "error"; message: string }
   | null;
 
+interface RoundState {
+  guesses: string[];
+  stage: number;
+  completed: boolean;
+  canonicalTitle: string;
+  feedback: FeedbackState;
+  hintUsed: boolean;
+}
+
 export default function GuessOpening({
   payload,
   initialProgress,
@@ -36,140 +52,232 @@ export default function GuessOpening({
   accountDifficulty,
 }: Props) {
   const totalRounds = useMemo(() => {
-    const specLength = payload.spec.length;
-    return specLength > 0 ? specLength : 3;
-  }, [payload.spec]);
+    return payload.length > 0 ? payload.length : 1;
+  }, [payload.length]);
 
-  const [round, setRound] = useState(initialProgress?.round ?? 1);
-  const [completed, setCompleted] = useState(
-    initialProgress?.completed ?? false,
+  const clampRoundIndex = useCallback(
+    (target: number) => {
+      if (totalRounds <= 0) return 0;
+      return Math.max(0, Math.min(totalRounds - 1, target));
+    },
+    [totalRounds],
+  );
+
+  const [activeRoundIndex, setActiveRoundIndex] = useState(() =>
+    clampRoundIndex((initialProgress?.round ?? 1) - 1),
+  );
+  const [roundStates, setRoundStates] = useState<RoundState[]>(() =>
+    payload.map((round) => ({
+      guesses: [],
+      stage: 1,
+      completed: false,
+      canonicalTitle: round.answer,
+      feedback: null,
+      hintUsed: false,
+    })),
   );
   const [guess, setGuess] = useState("");
-  const [guesses, setGuesses] = useState<string[]>(
-    initialProgress?.guesses ?? [],
-  );
-  const [canonicalTitle, setCanonicalTitle] = useState(payload.answer);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [submitting, setSubmitting] = useState(false);
   const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
   useEffect(() => {
-    if (!initialProgress) {
-      setRound(1);
-      setCompleted(false);
-      setGuesses([]);
-      setGuess("");
-      setCanonicalTitle(payload.answer);
-      setFeedback(null);
-      return;
-    }
-    setRound(initialProgress.round ?? 1);
-    setCompleted(initialProgress.completed ?? false);
-    setGuesses(initialProgress.guesses ?? []);
-    setGuess("");
-    const solvedTitle = payload.answer;
-    setCanonicalTitle(solvedTitle);
-    if (initialProgress.completed) {
-      setFeedback({
-        type: "success",
-        message: `Opening solved! ${solvedTitle}`,
+    setRoundStates((prev) => {
+      return payload.map((round, index) => {
+        const existing = prev[index];
+        if (!existing) {
+          return {
+            guesses: [],
+            stage: 1,
+            completed: false,
+            canonicalTitle: round.answer,
+            feedback: null,
+            hintUsed: false,
+          };
+        }
+        return {
+          ...existing,
+          canonicalTitle: existing.completed
+            ? existing.canonicalTitle
+            : round.answer,
+        };
       });
-    } else {
-      setFeedback(null);
+    });
+    setActiveRoundIndex((current) =>
+      clampRoundIndex((initialProgress?.round ?? current + 1) - 1),
+    );
+    setGuess("");
+    if (initialProgress?.guesses?.length) {
+      setRoundStates((prev) => {
+        const target = clampRoundIndex((initialProgress.round ?? 1) - 1);
+        return prev.map((state, index) =>
+          index === target
+            ? { ...state, guesses: [...initialProgress.guesses] }
+            : state,
+        );
+      });
     }
-  }, [initialProgress, payload.answer, payload.mediaId]);
+    if (initialProgress?.completed) {
+      setRoundStates((prev) =>
+        prev.map((state) => ({
+          ...state,
+          completed: true,
+          feedback:
+            state.feedback?.type === "success"
+              ? state.feedback
+              : {
+                  type: "success",
+                  message: `Opening solved! ${state.canonicalTitle}`,
+                },
+          hintUsed: true,
+        })),
+      );
+    }
+  }, [clampRoundIndex, initialProgress, payload]);
 
   useEffect(() => {
     if (!registerRoundController) return;
     registerRoundController((targetRound) => {
-      setRound(() => Math.max(1, Math.min(totalRounds, targetRound)));
+      setActiveRoundIndex(() => clampRoundIndex(targetRound - 1));
     });
-  }, [registerRoundController, totalRounds]);
+  }, [clampRoundIndex, registerRoundController, totalRounds]);
 
-  useEffect(() => {
-    onProgressChange({ completed, round, guesses });
-  }, [completed, round, guesses, onProgressChange]);
+  const currentRound = payload[activeRoundIndex];
+  const currentState = roundStates[activeRoundIndex];
 
-  const hintRound = useMemo(
-    () =>
-      completed
-        ? totalRounds
-        : resolveHintRound(round, totalRounds, accountDifficulty),
-    [accountDifficulty, completed, round, totalRounds],
-  );
+  const totalStages = useMemo(() => {
+    if (!currentRound) return 1;
+    const specLength = currentRound.spec.length;
+    return specLength > 0 ? specLength : 1;
+  }, [currentRound]);
+
+  const hintRound = useMemo(() => {
+    if (!currentRound || !currentState) return 1;
+    return currentState.completed
+      ? totalStages
+      : resolveHintRound(currentState.stage, totalStages, accountDifficulty);
+  }, [accountDifficulty, currentRound, currentState, totalStages]);
 
   const hints = useMemo(() => {
+    if (!currentRound || !currentState) return [];
     const badges: string[] = [];
-    payload.spec
+    currentRound.spec
       .filter((spec) => spec.difficulty <= hintRound)
       .forEach((spec) => {
         spec.hints.forEach((hint) => {
-          if (hint === "length" && payload.clip.lengthSeconds) {
-            badges.push(`Length: ${payload.clip.lengthSeconds}s`);
+          if (hint === "length" && currentRound.clip.lengthSeconds) {
+            badges.push(`Length: ${currentRound.clip.lengthSeconds}s`);
           }
-          if (hint === "season" && payload.meta.season) {
-            badges.push(payload.meta.season);
+          if (hint === "season" && currentRound.meta.season) {
+            badges.push(currentRound.meta.season);
           }
-          if (hint === "artist" && payload.meta.artist) {
-            badges.push(`Artist: ${payload.meta.artist}`);
+          if (hint === "artist" && currentRound.meta.artist) {
+            badges.push(`Artist: ${currentRound.meta.artist}`);
           }
-          if (hint === "song" && payload.meta.songTitle) {
-            badges.push(`Song: ${payload.meta.songTitle}`);
+          if (hint === "song" && currentRound.meta.songTitle) {
+            badges.push(`Song: ${currentRound.meta.songTitle}`);
           }
-          if (hint === "sequence" && payload.meta.sequence) {
-            badges.push(`OP ${payload.meta.sequence}`);
+          if (hint === "sequence" && currentRound.meta.sequence) {
+            badges.push(`OP ${currentRound.meta.sequence}`);
           }
         });
       });
-    if (completed) {
-      badges.push(`Answer: ${canonicalTitle}`);
+    if (currentState.completed) {
+      badges.push(`Answer: ${currentState.canonicalTitle}`);
     }
     return Array.from(new Set(badges));
-  }, [canonicalTitle, completed, hintRound, payload]);
+  }, [currentRound, currentState, hintRound]);
 
-  const clip = payload.clip;
-  const clipMimeType = clip.mimeType ?? undefined;
-  const shouldUseAudio = Boolean(
-    clip.audioUrl && (clipMimeType ? clipMimeType.startsWith("audio/") : true),
+  const guessesForRound = currentState?.guesses ?? [];
+  const roundHintUsed = Boolean(currentState?.hintUsed);
+  const puzzleCompleted = useMemo(
+    () =>
+      roundStates.length > 0 && roundStates.every((state) => state.completed),
+    [roundStates],
   );
-  const mediaSrc = shouldUseAudio
-    ? (clip.audioUrl ?? undefined)
-    : (clip.videoUrl ?? clip.audioUrl ?? undefined);
-  const hasMedia = Boolean(mediaSrc);
+
+  const clip = currentRound?.clip;
+  const clipMimeType = clip?.mimeType ?? undefined;
+  const audioSource = clip?.audioUrl ?? clip?.videoUrl ?? undefined;
+  const audioMimeType = clip?.audioUrl
+    ? (clipMimeType ?? "audio/mpeg")
+    : clip?.videoUrl
+      ? (clipMimeType ?? "video/mp4")
+      : undefined;
+  const videoSource = clip?.videoUrl ?? undefined;
+  const hasMedia = Boolean(audioSource || videoSource);
+  const canRevealVideo =
+    currentState.completed ||
+    (guessesForRound?.length ?? 0) >= 2 ||
+    roundHintUsed;
 
   const attemptGuess = useCallback(
     async ({ value, suggestionId }: TitleGuessSelection) => {
-      if (completed || submitting) return;
+      const round = payload[activeRoundIndex];
+      const state = currentState;
+      if (!round || !state) return;
+      if (state.completed || submitting) return;
       const trimmed = value.trim();
       if (!trimmed) {
-        setFeedback({
-          type: "error",
-          message: "Enter a guess before submitting.",
-        });
+        setRoundStates((prev) =>
+          prev.map((entry, index) =>
+            index === activeRoundIndex
+              ? {
+                  ...entry,
+                  feedback: {
+                    type: "error",
+                    message: "Enter a guess before submitting.",
+                  },
+                }
+              : entry,
+          ),
+        );
         return;
       }
 
       setSubmitting(true);
-      setFeedback(null);
+      setRoundStates((prev) =>
+        prev.map((entry, index) =>
+          index === activeRoundIndex ? { ...entry, feedback: null } : entry,
+        ),
+      );
       try {
-        const result = await verifyGuess(payload.mediaId, trimmed, suggestionId);
-        setGuesses((prev) => [...prev, trimmed]);
+        const result = await verifyGuess(round.mediaId, trimmed, suggestionId);
         if (result.correct) {
-          const matchTitle = result.match?.trim()
-            ? result.match
-            : payload.answer;
-          setCanonicalTitle(matchTitle);
-          setCompleted(true);
-          setFeedback({
-            type: "success",
-            message: `Opening solved! ${matchTitle}`,
-          });
+          const matchTitle = result.match?.trim() ? result.match : round.answer;
+          setRoundStates((prev) =>
+            prev.map((entry, index) => {
+              if (index !== activeRoundIndex) return entry;
+              return {
+                ...entry,
+                guesses: [...entry.guesses, trimmed],
+                completed: true,
+                canonicalTitle: matchTitle,
+                feedback: {
+                  type: "success",
+                  message: `Opening solved! ${matchTitle}`,
+                },
+                stage: totalStages,
+                hintUsed: true,
+              };
+            }),
+          );
         } else {
-          setFeedback({
-            type: "error",
-            message: "No match yet. Try another guess!",
-          });
-          setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1));
+          setRoundStates((prev) =>
+            prev.map((entry, index) => {
+              if (index !== activeRoundIndex) return entry;
+              const nextStage = Math.min(totalStages, entry.stage + 1);
+              return {
+                ...entry,
+                guesses: [...entry.guesses, trimmed],
+                stage: nextStage,
+                feedback: {
+                  type: "error",
+                  message: "No match yet. Try another guess!",
+                },
+                hintUsed: entry.hintUsed,
+              };
+            }),
+          );
         }
         setGuess("");
       } catch (error) {
@@ -177,12 +285,21 @@ export default function GuessOpening({
           error instanceof Error
             ? error.message
             : "Unable to verify your guess. Please try again.";
-        setFeedback({ type: "error", message });
+        setRoundStates((prev) =>
+          prev.map((entry, index) =>
+            index === activeRoundIndex
+              ? {
+                  ...entry,
+                  feedback: { type: "error", message },
+                }
+              : entry,
+          ),
+        );
       } finally {
         setSubmitting(false);
       }
     },
-    [completed, payload.answer, payload.mediaId, submitting, totalRounds],
+    [activeRoundIndex, currentState, payload, submitting, totalStages],
   );
 
   const handleFieldSubmit = useCallback(
@@ -195,51 +312,134 @@ export default function GuessOpening({
   const handleGuessSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (completed || submitting) return;
+      const state = currentState;
+      if (!state || state.completed || submitting) return;
       const selection = guessFieldRef.current?.submit();
       if (!selection) {
-        setFeedback({
-          type: "error",
-          message: "Enter a guess before submitting.",
-        });
+        setRoundStates((prev) =>
+          prev.map((entry, index) =>
+            index === activeRoundIndex
+              ? {
+                  ...entry,
+                  feedback: {
+                    type: "error",
+                    message: "Enter a guess before submitting.",
+                  },
+                }
+              : entry,
+          ),
+        );
         return;
       }
       void attemptGuess(selection);
     },
-    [attemptGuess, completed, submitting],
+    [activeRoundIndex, attemptGuess, currentState, submitting],
   );
+
+  useEffect(() => {
+    const aggregatedGuesses = roundStates.flatMap((state) => state.guesses);
+    onProgressChange({
+      completed: puzzleCompleted,
+      round: activeRoundIndex + 1,
+      guesses: aggregatedGuesses,
+    });
+  }, [activeRoundIndex, onProgressChange, puzzleCompleted, roundStates]);
+
+  useEffect(() => {
+    setGuess("");
+    guessFieldRef.current?.close();
+  }, [activeRoundIndex]);
+
+  const revealMore = useCallback(() => {
+    const round = payload[activeRoundIndex];
+    if (!round) return;
+    setRoundStates((prev) =>
+      prev.map((entry, index) => {
+        if (index !== activeRoundIndex) return entry;
+        const specLength = round.spec.length || 1;
+        const nextStage = Math.min(specLength, entry.stage + 1);
+        return {
+          ...entry,
+          stage: nextStage,
+          hintUsed: true,
+        };
+      }),
+    );
+  }, [activeRoundIndex, payload]);
+
+  if (!currentRound || !currentState) {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-neutral-200">
+        Unable to load Guess the Opening right now. Please try again later.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
+      {totalRounds > 1 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-neutral-300">
+          {payload.map((round, index) => {
+            const state = roundStates[index];
+            const isActive = index === activeRoundIndex;
+            return (
+              <button
+                key={`${round.mediaId}-${index}`}
+                type="button"
+                className={`rounded-full border px-4 py-1.5 transition ${
+                  isActive
+                    ? "border-brand-400/70 bg-brand-500/20 text-white"
+                    : state?.completed
+                      ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+                      : "border-white/10 bg-white/5 text-white/70 hover:border-white/20"
+                }`}
+                onClick={() => setActiveRoundIndex(index)}
+              >
+                Opening {index + 1}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {hasMedia ? (
-        shouldUseAudio ? (
-          <div className="rounded-[1.8rem] border border-white/10 bg-gradient-to-br from-white/8 via-white/5 to-transparent p-5 backdrop-blur-xl">
+        <div className="space-y-3 rounded-[1.8rem] border border-white/10 bg-gradient-to-br from-white/8 via-white/5 to-transparent p-5 backdrop-blur-xl">
+          {audioSource && (
             <audio
               controls
               preload="none"
               className="w-full rounded-2xl bg-black/40 px-4 py-3 text-sm text-neutral-200 shadow-inner shadow-brand-500/20"
             >
-              <source src={mediaSrc} type={clipMimeType} />
+              <source src={audioSource} type={audioMimeType} />
               Your browser does not support the audio element.
             </audio>
-          </div>
-        ) : (
-          <div className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-gradient-to-br from-white/8 via-white/5 to-transparent p-5 backdrop-blur-xl">
-            <div
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_65%)] opacity-80"
-              aria-hidden="true"
-            />
-            <video
-              controls
-              preload="none"
-              playsInline
-              className="relative z-[1] w-full rounded-2xl bg-black/40 text-sm text-neutral-200 shadow-inner shadow-brand-500/20"
-            >
-              <source src={mediaSrc} type={clipMimeType} />
-              Your browser does not support the video element.
-            </video>
-          </div>
-        )
+          )}
+          {videoSource ? (
+            canRevealVideo ? (
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/60">
+                <div
+                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.25),_transparent_65%)]"
+                  aria-hidden="true"
+                />
+                <video
+                  controls
+                  preload="none"
+                  playsInline
+                  className="relative z-[1] w-full rounded-2xl border border-white/5 bg-black/60 text-sm text-neutral-200 shadow-inner shadow-brand-500/20 filter saturate-0 blur-sm contrast-[1.35]"
+                >
+                  <source
+                    src={videoSource}
+                    type={clipMimeType ?? "video/mp4"}
+                  />
+                  Your browser does not support the video element.
+                </video>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/15 bg-black/40 px-4 py-6 text-center text-sm text-neutral-300">
+                Guess twice or use Reveal More to unlock the video.
+              </div>
+            )
+          ) : null}
+        </div>
       ) : (
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
           No clip available for this title today.
@@ -259,10 +459,8 @@ export default function GuessOpening({
         <button
           type="button"
           className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-brand-400/50 hover:text-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() =>
-            setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1))
-          }
-          disabled={completed || round === totalRounds}
+          onClick={revealMore}
+          disabled={currentState.completed || currentState.stage >= totalStages}
         >
           Reveal More
         </button>
@@ -277,13 +475,15 @@ export default function GuessOpening({
           value={guess}
           onValueChange={setGuess}
           onSubmit={handleFieldSubmit}
-          disabled={completed || submitting}
+          disabled={currentState.completed || submitting}
           placeholder={
-            completed ? `Opening solved! ${canonicalTitle}` : "Type your guess…"
+            currentState.completed
+              ? `Opening solved! ${currentState.canonicalTitle}`
+              : "Type your guess…"
           }
           ariaLabel={
-            completed
-              ? `Opening solved: ${canonicalTitle}`
+            currentState.completed
+              ? `Opening solved: ${currentState.canonicalTitle}`
               : "Guess the opening"
           }
           suggestionsLabel="Opening title suggestions"
@@ -291,16 +491,16 @@ export default function GuessOpening({
         <button
           type="submit"
           className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={completed || submitting}
+          disabled={currentState.completed || submitting}
         >
           {submitting ? "Checking…" : "Submit Guess"}
         </button>
       </form>
       <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
-        {guesses.length > 0 && (
+        {guessesForRound.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
             Attempts
-            {guesses.map((value, index) => (
+            {guessesForRound.map((value, index) => (
               <span
                 key={`${value}-${index}`}
                 className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
@@ -310,17 +510,17 @@ export default function GuessOpening({
             ))}
           </div>
         )}
-        {feedback?.type === "error" && (
+        {currentState.feedback?.type === "error" && (
           <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {feedback.message}
+            {currentState.feedback.message}
           </div>
         )}
-        {feedback?.type === "success" && (
+        {currentState.feedback?.type === "success" && (
           <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            {feedback.message}
+            {currentState.feedback.message}
           </div>
         )}
-        {completed && <NextPuzzleButton nextSlug={nextSlug} />}
+        {puzzleCompleted && <NextPuzzleButton nextSlug={nextSlug} />}
       </div>
     </div>
   );
