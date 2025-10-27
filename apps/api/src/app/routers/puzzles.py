@@ -181,10 +181,10 @@ def _build_list_feedback(
 @router.get("/poster/{media_id}/image")
 async def get_poster_image(
     media_id: int,
-    clarity: float = Query(default=1.0, ge=0.0, le=1.0),
+    hints: int = Query(default=0, ge=0, description="Number of hints revealed"),
 ) -> Response:
     try:
-        content, mime = await puzzle_engine.generate_poster_image(media_id, clarity)
+        content, mime = await puzzle_engine.generate_poster_image(media_id, hints)
     except puzzle_engine.PosterImageError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return Response(content=content, media_type=mime)
