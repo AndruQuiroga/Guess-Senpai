@@ -1,4 +1,9 @@
-import { DailyProgress, GameKey, GameProgress } from "../types/progress";
+import {
+  DailyProgress,
+  GameKey,
+  GameProgress,
+  GameRoundProgress,
+} from "../types/progress";
 
 const GAME_DESCRIPTORS: Array<{
   label: string;
@@ -77,6 +82,40 @@ function buildRoundStates(
     for (let index = 1; index <= totalRounds; index += 1) {
       rounds.push({ round: index, state: "cleared" });
     }
+    return rounds;
+  }
+
+  if (progress.rounds && progress.rounds.length > 0) {
+    const map = new Map<number, GameRoundProgress>();
+    progress.rounds.forEach((entry) => {
+      if (!entry) return;
+      const normalizedRound = Number.isFinite(entry.round)
+        ? Math.max(1, Math.floor(entry.round))
+        : null;
+      if (!normalizedRound) return;
+      map.set(normalizedRound, entry);
+    });
+
+    let activeMarked = false;
+    for (let index = 1; index <= totalRounds; index += 1) {
+      const stored = map.get(index);
+      if (stored?.completed) {
+        rounds.push({ round: index, state: "cleared" });
+        continue;
+      }
+      if (!activeMarked) {
+        rounds.push({ round: index, state: "active" });
+        activeMarked = true;
+        continue;
+      }
+      rounds.push({ round: index, state: "locked" });
+    }
+
+    if (!activeMarked && rounds.length > 0) {
+      const lastIndex = rounds.length - 1;
+      rounds[lastIndex] = { ...rounds[lastIndex], state: "active" };
+    }
+
     return rounds;
   }
 
@@ -183,6 +222,30 @@ export function buildShareEvent(
         status: "pending" as const,
         rounds,
         summary: `${label} — ⏳`,
+      };
+    }
+
+    if (key === "guess_the_opening") {
+      const openingLabel = clearedRounds === 1 ? "opening" : "openings";
+
+      if (gameProgress.completed) {
+        return {
+          key,
+          label,
+          totalRounds,
+          status: "completed" as const,
+          rounds,
+          summary: `${label} — ✅ (${totalRounds}/${totalRounds} openings)`,
+        };
+      }
+
+      return {
+        key,
+        label,
+        totalRounds,
+        status: "in_progress" as const,
+        rounds,
+        summary: `${label} — ${clearedRounds}/${totalRounds} ${openingLabel}`,
       };
     }
 

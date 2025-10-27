@@ -2,9 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { DailyProgress, GameKey, GameProgress } from "../types/progress";
+import type {
+  DailyProgress,
+  GameKey,
+  GameProgress,
+  GameRoundProgress,
+} from "../types/progress";
 
-export type { DailyProgress, GameKey, GameProgress } from "../types/progress";
+export type {
+  DailyProgress,
+  GameKey,
+  GameProgress,
+  GameRoundProgress,
+} from "../types/progress";
 
 const STORAGE_KEY = "guesssenpai-progress";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";

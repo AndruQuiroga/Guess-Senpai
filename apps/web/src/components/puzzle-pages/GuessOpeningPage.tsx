@@ -53,10 +53,20 @@ export function GuessOpeningPage({
 
   const selectedDifficulty = clampDifficulty(accountDifficulty);
   const recommendedDifficulty = clampDifficulty(difficultyHint);
-  const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
-  const [displayRound, setDisplayRound] = useState(
-    progress?.round ?? highlightDifficulty,
+  const preferredRound = useMemo(
+    () =>
+      clampDifficulty(progress?.round) ??
+      selectedDifficulty ??
+      recommendedDifficulty ??
+      1,
+    [
+      clampDifficulty,
+      progress?.round,
+      recommendedDifficulty,
+      selectedDifficulty,
+    ],
   );
+  const [displayRound, setDisplayRound] = useState(preferredRound);
 
   useEffect(() => {
     controller.current = null;
@@ -65,13 +75,12 @@ export function GuessOpeningPage({
 
   useEffect(() => {
     if (!controllerReady) return;
-    if (progress?.completed) return;
-    controller.current?.(highlightDifficulty);
-  }, [controllerReady, highlightDifficulty, progress?.completed]);
+    controller.current?.(preferredRound);
+  }, [controllerReady, preferredRound]);
 
   useEffect(() => {
-    setDisplayRound(progress?.round ?? highlightDifficulty);
-  }, [progress?.round, highlightDifficulty]);
+    setDisplayRound(preferredRound);
+  }, [preferredRound]);
 
   if (rounds.length === 0) {
     return (
@@ -95,6 +104,7 @@ export function GuessOpeningPage({
         title="Guess the Opening"
         round={displayRound}
         totalRounds={totalRounds}
+        roundLabel="Opening"
         onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >

@@ -61,6 +61,7 @@ export default function HowToPlayPage() {
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
             <li>Listen to a short OP/ED clip sourced from AnimeThemes.moe.</li>
+            <li>Three openings drop each day—clear all of them to secure the daily win.</li>
             <li>Hints reveal the season, artist, and song title across rounds.</li>
           </ul>
         </GlassSection>
