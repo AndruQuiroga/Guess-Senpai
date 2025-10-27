@@ -12,4 +12,3 @@ export interface GameProgress {
 }
 
 export type DailyProgress = Partial<Record<GameKey, GameProgress>>;
-export type DailyDifficultySelections = Partial<Record<GameKey, number>>;

@@ -15,7 +15,7 @@ interface Props {
   payload: GuessOpeningGame;
   progress?: GameProgress;
   dailyProgress?: DailyProgress;
-  difficultyChoice?: number;
+  accountDifficulty?: number;
   difficultyHint?: number;
   onDifficultyChange?: (level: number) => void;
   onProgressChange: (state: GameProgress) => void;
@@ -46,7 +46,7 @@ export function GuessOpeningPage({
   payload,
   progress,
   dailyProgress,
-  difficultyChoice,
+  accountDifficulty,
   difficultyHint,
   onDifficultyChange,
   onProgressChange,
@@ -67,7 +67,7 @@ export function GuessOpeningPage({
     [totalRounds],
   );
 
-  const selectedDifficulty = clampDifficulty(difficultyChoice);
+  const selectedDifficulty = clampDifficulty(accountDifficulty);
   const recommendedDifficulty = clampDifficulty(difficultyHint);
   const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
   const [displayRound, setDisplayRound] = useState(progress?.round ?? highlightDifficulty);
