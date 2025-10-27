@@ -96,30 +96,36 @@ function ProgressSummaryChip({
   chunk: ProgressSummaryChunk;
   layout?: "inline" | "pill";
 }): JSX.Element {
+  const gradientClasses =
+    chunk.accent === "highlight"
+      ? "from-brand-500/90 via-purple-500/80 to-amber-400/85"
+      : "from-white/15 via-white/10 to-white/5";
+
   const wrapperClasses =
     layout === "inline"
       ? classNames(
-          "inline-flex min-w-0 items-center gap-2 whitespace-nowrap text-white/80",
-          chunk.accent === "highlight" && "font-medium text-amber-100",
+          "inline-flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-br px-3 py-2 text-xs font-medium text-white/90 shadow-ambient sm:text-sm",
+          `bg-gradient-to-br ${gradientClasses}`,
         )
       : classNames(
-          "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-ambient backdrop-blur-sm sm:text-sm",
-          chunk.accent === "highlight"
-            ? "border border-amber-300/60 bg-amber-400/15 text-amber-50"
-            : "border border-white/15 bg-white/10 text-white/85",
+          "inline-flex w-full min-w-[10rem] flex-1 items-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-br px-4 py-3 text-left text-sm text-white/95 shadow-ambient transition-transform duration-200 ease-out sm:w-auto sm:text-base",
+          `bg-gradient-to-br ${gradientClasses}`,
         );
 
-  const iconClasses =
-    layout === "inline" ? "text-base sm:text-lg" : "text-sm sm:text-base";
+  const iconWrapperClasses = classNames(
+    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-base text-white",
+    layout === "pill" && "h-10 w-10 text-lg",
+  );
 
-  const labelClasses =
-    layout === "inline"
-      ? classNames("block truncate", chunk.textClassName)
-      : classNames("truncate", chunk.textClassName);
+  const labelClasses = classNames(
+    "truncate",
+    layout === "pill" && "font-semibold",
+    chunk.textClassName,
+  );
 
   return (
     <span className={wrapperClasses}>
-      <span aria-hidden className={iconClasses}>
+      <span aria-hidden className={iconWrapperClasses}>
         {chunk.icon}
       </span>
       <span className={labelClasses}>{chunk.text}</span>
@@ -135,7 +141,7 @@ function ProgressSummary({
   return (
     <div
       className={classNames(
-        "flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/90 sm:text-base",
+        "flex flex-wrap items-start gap-3 text-sm text-white/90 sm:items-center sm:text-base",
         className,
       )}
     >
@@ -394,19 +400,48 @@ export default function HomePage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <ProgressSummary chunks={progressChunks} />
           {shareLocked ? (
-            <p className="flex items-center gap-2 text-sm text-neutral-300/90">
-              <span aria-hidden className="text-base">
+            <button
+              type="button"
+              disabled
+              aria-disabled={true}
+              className="group inline-flex items-center gap-3 rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-white/8 to-white/3 px-5 py-2.5 text-sm font-medium text-neutral-200/90 shadow-ambient transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+            >
+              <span
+                aria-hidden
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg text-white"
+              >
                 🔒
               </span>
-              <span>Play a round to unlock sharing.</span>
-            </p>
+              <span className="text-left">
+                Play a round to unlock sharing.
+              </span>
+            </button>
           ) : (
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              className="group relative inline-flex items-center gap-3 overflow-hidden rounded-3xl border border-brand-400/30 bg-gradient-to-br from-brand-500 via-purple-500 to-amber-400 px-6 py-3 text-sm font-semibold text-white shadow-[0_20px_45px_-25px_rgba(168,85,247,0.75)] transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-[0_25px_55px_-25px_rgba(236,72,153,0.7)] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
               onClick={handleShare}
             >
-              Share progress
+              <span
+                aria-hidden
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-base text-white transition-colors duration-200 group-hover:bg-white/20"
+              >
+                <svg
+                  aria-hidden
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
+                  <path d="M16 6l-4-4-4 4" />
+                  <path d="M12 2v14" />
+                </svg>
+              </span>
+              <span className="relative z-10">Share progress</span>
             </button>
           )}
         </div>
