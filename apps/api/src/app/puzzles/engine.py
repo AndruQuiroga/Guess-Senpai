@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import html
+import io
 import logging
 import math
 import random
 import re
 from dataclasses import asdict, dataclass
 from datetime import date
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Tuple
+
+import httpx
+from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
@@ -44,12 +50,15 @@ from .models import (
     RoundSpec,
     SolutionPayload,
     SolutionStreamingLink,
+    SynopsisHint,
 )
 
+ANIDLE_SYNOPSIS_REVEAL_LEVELS: Sequence[float] = (0.3, 0.5, 0.7)
+
 ANIDLE_ROUNDS = [
-    RoundSpec(difficulty=1, hints=["genres", "year"]),
-    RoundSpec(difficulty=2, hints=["episodes", "popularity", "average_score"]),
-    RoundSpec(difficulty=3, hints=["duration", "tags"]),
+    RoundSpec(difficulty=1, hints=["synopsis:0"]),
+    RoundSpec(difficulty=2, hints=["synopsis:1"]),
+    RoundSpec(difficulty=3, hints=["synopsis:2"]),
 ]
 
 POSTER_ROUNDS = [
@@ -118,6 +127,14 @@ class UserContext:
     access_token: str
 
 
+class PosterImageError(Exception):
+    """Raised when poster image generation fails."""
+
+    def __init__(self, message: str, *, status_code: int = 500) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 async def _get_cache() -> CacheBackend:
     return await get_cache(settings.redis_url)
 
@@ -165,6 +182,62 @@ def _extract_top_tags(media: Media, limit: int = 6) -> List[str]:
     return [name for _, name in tags[:limit]]
 
 
+def _generate_synopsis_levels(
+    text: str, seed: int, reveal_levels: Sequence[float]
+) -> List[SynopsisHint]:
+    if not text:
+        return []
+
+    word_matches = list(re.finditer(r"\b[\w']+\b", text))
+    candidates = [match for match in word_matches if match.group(0).upper() != "REDACTED"]
+
+    if not candidates:
+        return [SynopsisHint(ratio=max(0.0, min(level, 1.0)), text=text.strip()) for level in reveal_levels]
+
+    rng = random.Random(seed)
+    ordering = list(range(len(candidates)))
+    rng.shuffle(ordering)
+    shuffled = [candidates[index] for index in ordering]
+
+    hints: List[SynopsisHint] = []
+    for level in reveal_levels:
+        ratio = max(0.0, min(level, 1.0))
+        if ratio <= 0.0:
+            reveal_count = 0
+        elif ratio >= 1.0:
+            reveal_count = len(candidates)
+        else:
+            reveal_count = max(1, int(round(len(candidates) * ratio)))
+
+        visible_spans = {
+            shuffled[index].span()
+            for index in range(min(reveal_count, len(shuffled)))
+        }
+
+        pieces: List[str] = []
+        cursor = 0
+        for match in word_matches:
+            start, end = match.span()
+            pieces.append(text[cursor:start])
+            token = match.group(0)
+            if token.upper() == "REDACTED" or (start, end) in visible_spans:
+                pieces.append(token)
+            else:
+                pieces.append("[REDACTED]")
+            cursor = end
+        pieces.append(text[cursor:])
+
+        redacted_text = "".join(pieces).strip()
+        hints.append(SynopsisHint(ratio=ratio, text=redacted_text))
+
+    return hints
+
+
+def _build_anidle_synopsis(media: Media) -> List[SynopsisHint]:
+    text, _ = _redact_description(media)
+    return _generate_synopsis_levels(text, media.id, ANIDLE_SYNOPSIS_REVEAL_LEVELS)
+
+
 def _build_anidle(media: Media) -> AnidleGame:
     hints = AnidleHints(
         genres=[g for g in media.genres if g],
@@ -174,6 +247,7 @@ def _build_anidle(media: Media) -> AnidleGame:
         duration=media.duration,
         popularity=media.popularity,
         average_score=media.averageScore,
+        synopsis=_build_anidle_synopsis(media),
     )
     return AnidleGame(spec=ANIDLE_ROUNDS, answer=_choose_answer(media), hints=hints)
 
@@ -273,6 +347,112 @@ def _mask_title_variants(tokens: List[str], word_indices: List[int], variants: S
 
 
 def _redact_description(media: Media) -> tuple[str, List[RedactedSynopsisSegment], List[int], List[str]]:
+def _deserialize_cached_image(payload: Any) -> Optional[Tuple[bytes, str]]:
+    if not isinstance(payload, dict):
+        return None
+    encoded = payload.get("data")
+    if not isinstance(encoded, str):
+        return None
+    try:
+        decoded = base64.b64decode(encoded)
+    except (binascii.Error, ValueError):
+        return None
+    mime = payload.get("mime") or "image/jpeg"
+    return decoded, mime
+
+
+def _normalize_clarity(value: float) -> float:
+    if value != value:  # NaN guard
+        return 1.0
+    return max(0.0, min(1.0, float(value)))
+
+
+async def _load_poster_source(
+    media: Media, cache: CacheBackend, settings: Settings
+) -> Tuple[bytes, str]:
+    cache_key = f"poster-image-source:{media.id}"
+    cached = await cache.get(cache_key)
+    cached_image = _deserialize_cached_image(cached)
+    if cached_image:
+        return cached_image
+
+    cover = media.coverImage or CoverImage()
+    image_url = getattr(cover, "extraLarge", None) or getattr(cover, "large", None)
+    if not image_url:
+        image_url = getattr(cover, "medium", None)
+    if not image_url:
+        raise PosterImageError("Poster image unavailable", status_code=404)
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(image_url)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.warning("Failed to fetch poster image for %s: %s", media.id, exc)
+        raise PosterImageError("Unable to fetch poster image", status_code=502) from exc
+
+    content = response.content
+    mime = response.headers.get("content-type") or "image/jpeg"
+
+    try:
+        encoded = base64.b64encode(content).decode("ascii")
+        await cache.set(
+            cache_key,
+            {"data": encoded, "mime": mime},
+            settings.puzzle_cache_ttl_seconds,
+        )
+    except Exception as exc:  # pragma: no cover - cache failures shouldn't block gameplay
+        logger.debug("Unable to cache poster source image: %s", exc)
+
+    return content, mime
+
+
+def _render_poster_variant(source: bytes, clarity: float) -> Tuple[bytes, str]:
+    try:
+        with Image.open(io.BytesIO(source)) as poster:
+            poster = poster.convert("RGB")
+            blur_radius = (1.0 - clarity) * 12.0
+            if blur_radius > 0:
+                poster = poster.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+            sharpness_factor = 0.4 + (clarity * 0.6)
+            poster = ImageEnhance.Sharpness(poster).enhance(sharpness_factor)
+            output = io.BytesIO()
+            poster.save(output, format="JPEG", quality=90, optimize=True)
+    except UnidentifiedImageError as exc:
+        raise PosterImageError("Unable to process poster image", status_code=500) from exc
+
+    return output.getvalue(), "image/jpeg"
+
+
+async def generate_poster_image(media_id: int, clarity: float) -> Tuple[bytes, str]:
+    cache = await _get_cache()
+    normalized = _normalize_clarity(clarity)
+    bucket = int(round(normalized * 100))
+    cache_key = f"poster-image:{media_id}:{bucket}"
+
+    cached = await cache.get(cache_key)
+    cached_image = _deserialize_cached_image(cached)
+    if cached_image:
+        return cached_image
+
+    media = await _load_media_details(media_id, cache, settings)
+    source, _ = await _load_poster_source(media, cache, settings)
+    variant_bytes, mime = _render_poster_variant(source, normalized)
+
+    try:
+        encoded = base64.b64encode(variant_bytes).decode("ascii")
+        await cache.set(
+            cache_key,
+            {"data": encoded, "mime": mime},
+            settings.puzzle_cache_ttl_seconds,
+        )
+    except Exception as exc:  # pragma: no cover - cache failures shouldn't block gameplay
+        logger.debug("Unable to cache poster variant: %s", exc)
+
+    return variant_bytes, mime
+
+
+def _redact_description(media: Media) -> tuple[str, List[str]]:
     if not media.description:
         return "", [], [], []
 

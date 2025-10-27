@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
 from ..core.config import settings
@@ -176,6 +176,18 @@ def _build_list_feedback(
         )
         feedback.append(AnidleListFeedbackItem(value=value, status=status))
     return feedback
+
+
+@router.get("/poster/{media_id}/image")
+async def get_poster_image(
+    media_id: int,
+    clarity: float = Query(default=1.0, ge=0.0, le=1.0),
+) -> Response:
+    try:
+        content, mime = await puzzle_engine.generate_poster_image(media_id, clarity)
+    except puzzle_engine.PosterImageError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    return Response(content=content, media_type=mime)
 
 
 @router.get(
