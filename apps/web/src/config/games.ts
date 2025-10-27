@@ -58,6 +58,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Submit a guess after every listen—wrong answers unlock richer hints.",
         "Solve the playlist in three rounds to keep your streak alive.",
       ],
+      media: {
+        type: "image",
+        src: "/games/anidle.svg",
+        alt: "Stylized waveform cards highlighting a blended anime soundtrack.",
+      },
       placeholder: {
         headline: "Audio sampler",
         description:
@@ -83,6 +88,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Every incorrect answer widens the view with new visual context.",
         "Name the anime before the final reveal to score a perfect poster run.",
       ],
+      media: {
+        type: "image",
+        src: "/games/poster-zoomed.svg",
+        alt: "Layered poster frames expanding outward from a highlighted focal point.",
+      },
       placeholder: {
         headline: "Poster focus",
         description: "A shifting crop that unveils key art details frame by frame.",
@@ -107,6 +117,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Each miss turns up the lights with softer filters and richer detail.",
         "Name the originating series before the portrait is fully revealed.",
       ],
+      media: {
+        type: "image",
+        src: "/games/character-silhouette.svg",
+        alt: "Neon-lit character silhouette emerging from a dramatic spotlight.",
+      },
       placeholder: {
         headline: "Silhouette spotlight",
         description: "A character outline emerging from neon rim lighting.",
@@ -131,6 +146,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Guess the anime—incorrect answers restore a few missing terms.",
         "Fill in enough blanks to identify the series before the final reveal.",
       ],
+      media: {
+        type: "image",
+        src: "/games/redacted-synopsis.svg",
+        alt: "Classified dossier with highlighted lines and bold redaction bars.",
+      },
       placeholder: {
         headline: "Blackout dossier",
         description: "Highlighted text lines with dramatic black bars covering keywords.",
@@ -155,6 +175,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Choose the matching series from a curated list of contenders.",
         "Beat the countdown to maximize points before the full song plays.",
       ],
+      media: {
+        type: "image",
+        src: "/games/guess-the-opening.svg",
+        alt: "Colorful equalizer bars pulsing behind a glowing play button.",
+      },
       placeholder: {
         headline: "Loop lab",
         description: "Pulsing equalizer bars teasing the next wave of OP snippets.",
@@ -178,6 +203,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Pick the right character or series before the reveal is triggered.",
         "Rack up streak bonuses for consecutive perfect matches.",
       ],
+      media: {
+        type: "image",
+        src: "/games/mystery-voice.svg",
+        alt: "Retro microphone console surrounded by radiating vocal waveforms.",
+      },
       placeholder: {
         headline: "Vocal vignette",
         description: "Stylized sound waves paired with a silhouetted character profile.",
@@ -201,6 +231,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Lock in the anime title that best fits the pictographic story.",
         "Earn bonus points for solving without requesting clarifying hints.",
       ],
+      media: {
+        type: "image",
+        src: "/games/emoji-synopsis.svg",
+        alt: "Collage of vibrant emojis arranged over a glassy card surface.",
+      },
       placeholder: {
         headline: "Emoji storyboard",
         description: "Rows of expressive icons hinting at dramatic twists and tropes.",
@@ -224,6 +259,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Select the correct series or speaker from multiple options.",
         "Maintain accuracy streaks to climb the leaderboard when it launches.",
       ],
+      media: {
+        type: "image",
+        src: "/games/quote-quiz.svg",
+        alt: "Dual speech bubbles floating above a neon quote card.",
+      },
       placeholder: {
         headline: "Quote archive",
         description: "A dramatic typeset pull-quote waiting for attribution.",
