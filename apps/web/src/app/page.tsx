@@ -404,8 +404,8 @@ export default function HomePage() {
                 >
                   Share your streak
                 </Link>{" "}
-                See tips for exporting recap cards and celebrating wins with your
-                squad.
+                See tips for exporting recap cards and celebrating wins with
+                your squad.
               </span>
             </li>
           </ul>
@@ -439,7 +439,9 @@ export default function HomePage() {
           </div>
           {shareLocked ? (
             <p className="flex items-center gap-2 text-sm text-neutral-300/90">
-              <span aria-hidden className="text-base">🔒</span>
+              <span aria-hidden className="text-base">
+                🔒
+              </span>
               <span>Play a round to unlock sharing.</span>
             </p>
           ) : (
@@ -589,9 +591,9 @@ export default function HomePage() {
                   <div key={game.slug} className="flex h-full flex-col gap-3">
                     <div className={cardClasses}>{content}</div>
                     {game.playable && canResume ? (
-                      <span className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/70">
+                      <p className="text-sm text-neutral-400">
                         Progress carries over when this mode launches
-                      </span>
+                      </p>
                     ) : null}
                   </div>
                 );
@@ -611,7 +613,6 @@ export default function HomePage() {
                     : "Unavailable";
                 const statusLabel =
                   upcomingUnlockLabels[game.slug] ?? "Unlocking soon.";
-                const statusClasses = "text-neutral-400";
                 const overlayClasses = "opacity-70";
                 const cardClasses =
                   "group relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/5 bg-surface-raised/60 p-6 text-white/80 shadow-ambient backdrop-blur-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60";
@@ -645,65 +646,54 @@ export default function HomePage() {
                       <p className="text-sm leading-relaxed text-neutral-200/80">
                         {game.tagline}
                       </p>
-                    </div>
-                    <span
-                      className={`relative z-10 mt-6 inline-flex items-center gap-2 text-sm font-semibold ${statusClasses}`}
-                    >
-                      {statusLabel}
-                    </span>
-                    {showAvailabilityError ? (
-                      <div className="relative z-10 mt-6 flex flex-wrap items-center gap-3">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 text-sm font-medium text-amber-50">
-                          ⚠️ Unable to load today&apos;s availability
+                      <div className="mt-auto space-y-3 text-sm text-neutral-400/90">
+                        <span className="font-medium text-neutral-200/90">
+                          {statusLabel}
                         </span>
-                        <button
-                          type="button"
-                          onClick={handleAvailabilityRetry}
-                          disabled={availabilityLoading}
-                          className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
-                        >
-                          Retry
-                        </button>
+                        <span className="inline-flex items-center gap-2 text-neutral-300/80">
+                          Preview details
+                          <svg
+                            aria-hidden
+                            className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-focus-visible:translate-x-1"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path d="M7.293 4.707a1 1 0 011.414-1.414l5.586 5.586a1 1 0 010 1.414l-5.586 5.586a1 1 0 01-1.414-1.414L11.172 10 7.293 6.121a1 1 0 010-1.414z" />
+                          </svg>
+                        </span>
+                        {showAvailabilityError ? (
+                          <div className="flex flex-wrap items-center gap-3 pt-1">
+                            <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-3 py-1.5 font-medium text-amber-50">
+                              ⚠️ Unable to load today&apos;s availability
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleAvailabilityRetry}
+                              disabled={availabilityLoading}
+                              className="inline-flex items-center justify-center rounded-2xl border border-amber-300/60 bg-amber-400/10 px-4 py-2 font-semibold text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
+                    </div>
                   </>
                 );
 
                 return (
                   <div key={game.slug} className="flex h-full flex-col gap-3">
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={handlePreviewClick}
-                        className={`${cardClasses} flex-1 text-left`}
-                      >
-                        {content}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handlePreviewClick}
-                        className="absolute right-4 top-4 inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 text-sm font-semibold text-white/80 shadow-ambient backdrop-blur transition hover:border-white/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
-                      >
-                        <svg
-                          aria-hidden
-                          className="h-4 w-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M1.5 12s3.5-7 10.5-7 10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                        Preview game
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handlePreviewClick}
+                      className={`${cardClasses} flex-1 text-left`}
+                    >
+                      {content}
+                    </button>
                     {progressForGame && !progressForGame.completed ? (
-                      <span className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/70">
+                      <p className="text-sm text-neutral-400">
                         Progress carries over when this mode launches
-                      </span>
+                      </p>
                     ) : null}
                   </div>
                 );
