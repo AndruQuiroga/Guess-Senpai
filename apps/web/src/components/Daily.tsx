@@ -155,12 +155,82 @@ export default function Daily({ data }: Props) {
     [includeGuessTheOpening, bundleByKey],
   );
 
-  const requiredGames: GameKey[] = availableGames
-    .map((entry) => entry.gameKey)
-    .filter((key): key is GameKey => Boolean(key));
+  type GameProgressStatus = "not-started" | "in-progress" | "completed";
+
+  interface PlayableGame {
+    slug: string;
+    title: string;
+    status: GameProgressStatus;
+    statusLabel: string;
+    statusIcon: string;
+    gameKey: GameKey;
+  }
+
+  const playableGames = useMemo<PlayableGame[]>(() => {
+    return availableGames.reduce<PlayableGame[]>((acc, entry) => {
+      if (!entry.gameKey || !entry.slug) {
+        return acc;
+      }
+
+      const progressForGame = progress[entry.gameKey];
+      const completed = Boolean(progressForGame?.completed);
+      const inProgress = Boolean(
+        progressForGame &&
+          !progressForGame.completed &&
+          ((progressForGame.round ?? 0) > 0 ||
+            (progressForGame.guesses?.length ?? 0) > 0),
+      );
+
+      let status: GameProgressStatus = "not-started";
+      let statusLabel = "Not started";
+      let statusIcon = "•";
+
+      if (completed) {
+        status = "completed";
+        statusLabel = "Completed";
+        statusIcon = "✓";
+      } else if (inProgress) {
+        status = "in-progress";
+        statusLabel = "In progress";
+        statusIcon = "◐";
+      }
+
+      acc.push({
+        slug: entry.slug,
+        title: entry.title,
+        status,
+        statusLabel,
+        statusIcon,
+        gameKey: entry.gameKey,
+      });
+
+      return acc;
+    }, []);
+  }, [availableGames, progress]);
+
+  const requiredGames: GameKey[] = playableGames.map((entry) => entry.gameKey);
 
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
   const streak = useStreak(data.date, allCompleted);
+
+  const activeSlug = useMemo(() => {
+    const firstIncomplete = playableGames.find(
+      (game) => game.status !== "completed",
+    );
+    return firstIncomplete?.slug ?? playableGames[0]?.slug ?? null;
+  }, [playableGames]);
+
+  const stepperStyles: Record<GameProgressStatus, string> = {
+    "not-started": "border-white/15 bg-white/5",
+    "in-progress": "border-amber-300/40 bg-amber-500/15",
+    completed: "border-emerald-300/40 bg-emerald-500/15",
+  };
+
+  const stepperIconStyles: Record<GameProgressStatus, string> = {
+    "not-started": "text-neutral-200",
+    "in-progress": "text-amber-200",
+    completed: "text-emerald-200",
+  };
 
   const shareText = useMemo(() => {
     return buildShareText(data.date, progress, {
@@ -414,6 +484,43 @@ export default function Daily({ data }: Props) {
             puzzles individually from their dedicated pages.
           </p>
         </div>
+
+        {playableGames.length > 0 && (
+          <nav aria-label="Today&apos;s puzzle progress" className="sm:-mx-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:gap-3 sm:overflow-x-auto sm:px-4 sm:py-1">
+              {playableGames.map((game) => {
+                const isActive = activeSlug === game.slug;
+                const stepperClassName = `${stepperStyles[game.status]} ${
+                  isActive ? "ring-2 ring-white/80" : "ring-0"
+                }`;
+
+                return (
+                  <Link
+                    key={game.slug}
+                    href={`/games/${game.slug}`}
+                    className={`group relative flex min-w-0 items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 sm:min-w-[12rem] ${stepperClassName}`}
+                    aria-current={isActive ? "step" : undefined}
+                  >
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-base font-semibold ${stepperIconStyles[game.status]}`}
+                      aria-hidden
+                    >
+                      {game.statusIcon}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-[0.24em] text-neutral-300/90">
+                        {game.statusLabel}
+                      </p>
+                      <p className="truncate text-sm font-semibold text-white">
+                        {game.title}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
 
         {availableGames.length > 0 ? (
           <div className="grid gap-5 lg:grid-cols-2">
