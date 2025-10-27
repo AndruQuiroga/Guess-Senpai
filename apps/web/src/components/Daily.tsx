@@ -191,50 +191,50 @@ export default function Daily({ data }: Props) {
   );
 
   const timelineEntries = useMemo<TimelineEntry[]>(() => {
-    return availableGames
-      .map((entry) => {
-        if (!entry.gameKey || !entry.slug) {
-          return null;
-        }
+    return availableGames.flatMap((entry) => {
+      if (!entry.gameKey || !entry.slug) {
+        return [];
+      }
 
-        const progressForGame = progress[entry.gameKey];
-        const completed = Boolean(progressForGame?.completed);
-        const inProgress = Boolean(
-          progressForGame &&
-            !progressForGame.completed &&
-            ((progressForGame.round ?? 0) > 0 ||
-              (progressForGame.guesses?.length ?? 0) > 0),
-        );
+      const progressForGame = progress[entry.gameKey];
+      const completed = Boolean(progressForGame?.completed);
+      const inProgress = Boolean(
+        progressForGame &&
+          !progressForGame.completed &&
+          ((progressForGame.round ?? 0) > 0 ||
+            (progressForGame.guesses?.length ?? 0) > 0),
+      );
 
-        let status: GameProgressStatus = "not-started";
-        let statusLabel = "Not started";
-        let statusIcon = "•";
+      let status: GameProgressStatus = "not-started";
+      let statusLabel = "Not started";
+      let statusIcon = "•";
 
-        if (completed) {
-          status = "completed";
-          statusLabel = "Completed";
-          statusIcon = "✓";
-        } else if (inProgress) {
-          status = "in-progress";
-          statusLabel = "In progress";
-          statusIcon = "◐";
-        }
+      if (completed) {
+        status = "completed";
+        statusLabel = "Completed";
+        statusIcon = "✓";
+      } else if (inProgress) {
+        status = "in-progress";
+        statusLabel = "In progress";
+        statusIcon = "◐";
+      }
 
-        const ctaLabel = completed ? "Replay" : inProgress ? "Resume" : "Play now";
+      const ctaLabel = completed ? "Replay" : inProgress ? "Resume" : "Play now";
 
-        return {
-          slug: entry.slug,
-          title: entry.title,
-          description: entry.description,
-          accentColor: entry.accentColor,
-          gameKey: entry.gameKey,
-          status,
-          statusLabel,
-          statusIcon,
-          ctaLabel,
-        } satisfies TimelineEntry;
-      })
-      .filter((entry): entry is TimelineEntry => Boolean(entry));
+      const timelineEntry = {
+        slug: entry.slug,
+        title: entry.title,
+        description: entry.description,
+        accentColor: entry.accentColor,
+        gameKey: entry.gameKey,
+        status,
+        statusLabel,
+        statusIcon,
+        ctaLabel,
+      } satisfies TimelineEntry;
+
+      return [timelineEntry];
+    });
   }, [availableGames, progress]);
 
   const previewComponents = useMemo<Partial<Record<GameKey, ReactNode>>>(
