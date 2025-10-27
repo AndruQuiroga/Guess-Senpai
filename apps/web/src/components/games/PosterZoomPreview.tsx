@@ -1,3 +1,4 @@
+import { formatMediaFormatLabel } from "../../utils/formatMediaFormatLabel";
 import type { PosterZoomPuzzleBundle } from "../../types/puzzles";
 
 interface PosterZoomPreviewProps {
@@ -33,7 +34,7 @@ export function PosterZoomPreview({ bundle }: PosterZoomPreviewProps) {
         {meta.format ? (
           <div>
             <dt className="font-semibold text-neutral-200">Format</dt>
-            <dd>{meta.format}</dd>
+            <dd>{formatMediaFormatLabel(meta.format)}</dd>
           </div>
         ) : null}
         {meta.year ? (
