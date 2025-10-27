@@ -4,6 +4,7 @@ import SessionRefresher from "../components/SessionRefresher";
 import HeaderNavigation from "../components/HeaderNavigation";
 import "../styles/globals.css";
 import { DailyAvailabilityProvider } from "../hooks/useDailyAvailability";
+import { footerSections } from "../config/footer";
 
 export default function RootLayout({
   children,
@@ -31,11 +32,56 @@ export default function RootLayout({
               <HeaderNavigation archiveDate={today} />
             </header>
             <main className="flex-1 pb-16">{children}</main>
-            <footer className="mt-auto flex items-center justify-between rounded-3xl border border-white/10 bg-white/5 px-6 py-4 text-xs text-neutral-400 backdrop-blur-xl">
-              <span>Built with AniList &amp; AnimeThemes data.</span>
-              <span className="text-neutral-500">
-                Stay curious · Guess wisely.
-              </span>
+            <footer className="mt-auto rounded-3xl border border-white/10 bg-white/5 px-6 py-8 text-sm text-neutral-300 shadow-glow backdrop-blur-xl">
+              <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-sm space-y-3 text-sm text-neutral-400">
+                  <p className="text-base font-medium text-white">GuessSenpai</p>
+                  <p className="leading-relaxed text-neutral-400">
+                    Built with AniList &amp; AnimeThemes data to deliver daily anime discovery moments.
+                  </p>
+                </div>
+                <div className="grid flex-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                  {footerSections.map((section) => (
+                    <div key={section.title} className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                        {section.title}
+                      </p>
+                      <ul className="space-y-2 text-sm text-neutral-300">
+                        {section.links.map((link) => {
+                          const isExternal = (link.external ?? false) || link.href.startsWith("http") || link.href.startsWith("mailto:");
+
+                          if (isExternal) {
+                            return (
+                              <li key={link.href}>
+                                <a
+                                  href={link.href}
+                                  className="transition hover:text-brand-300"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {link.label}
+                                </a>
+                              </li>
+                            );
+                          }
+
+                          return (
+                            <li key={link.href}>
+                              <Link href={link.href} className="transition hover:text-brand-300">
+                                {link.label}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-10 flex flex-col gap-4 border-t border-white/10 pt-6 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
+                <span>Built with AniList &amp; AnimeThemes data.</span>
+                <span className="text-neutral-500">Stay curious · Guess wisely.</span>
+              </div>
             </footer>
           </div>
         </DailyAvailabilityProvider>
