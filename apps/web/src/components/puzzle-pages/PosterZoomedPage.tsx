@@ -79,6 +79,7 @@ export function PosterZoomedPage({
   const selectedDifficulty = clampDifficulty(difficultyChoice);
   const recommendedDifficulty = clampDifficulty(difficultyHint);
   const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
+  const [displayRound, setDisplayRound] = useState(progress?.round ?? highlightDifficulty);
 
   useEffect(() => {
     controller.current = null;
@@ -91,6 +92,10 @@ export function PosterZoomedPage({
     controller.current?.(highlightDifficulty);
   }, [controllerReady, highlightDifficulty, progress?.completed]);
 
+  useEffect(() => {
+    setDisplayRound(progress?.round ?? highlightDifficulty);
+  }, [progress?.round, highlightDifficulty]);
+
   const handlePresetSelect = useCallback(
     (level: number) => {
       const clamped = clampDifficulty(level) ?? 1;
@@ -98,6 +103,14 @@ export function PosterZoomedPage({
       controller.current?.(clamped);
     },
     [clampDifficulty, onDifficultyChange],
+  );
+
+  const handleProgressChange = useCallback(
+    (state: GameProgress) => {
+      setDisplayRound(state.round);
+      onProgressChange(state);
+    },
+    [onProgressChange],
   );
 
   return (
@@ -112,7 +125,7 @@ export function PosterZoomedPage({
       />
       <GameShell
         title="Poster Zoomed"
-        round={progress?.round ?? highlightDifficulty}
+        round={displayRound}
         totalRounds={totalRounds}
         onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
@@ -121,7 +134,7 @@ export function PosterZoomedPage({
           mediaId={mediaId}
           payload={payload}
           initialProgress={progress}
-          onProgressChange={onProgressChange}
+          onProgressChange={handleProgressChange}
           registerRoundController={(fn) => {
             controller.current = fn;
             setControllerReady(true);

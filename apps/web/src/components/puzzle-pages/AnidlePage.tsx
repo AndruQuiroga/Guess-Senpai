@@ -71,6 +71,7 @@ export function AnidlePage({
   const selectedDifficulty = clampDifficulty(difficultyChoice);
   const recommendedDifficulty = clampDifficulty(difficultyHint);
   const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
+  const [displayRound, setDisplayRound] = useState(progress?.round ?? highlightDifficulty);
 
   useEffect(() => {
     controller.current = null;
@@ -83,6 +84,10 @@ export function AnidlePage({
     controller.current?.(highlightDifficulty);
   }, [controllerReady, highlightDifficulty, progress?.completed]);
 
+  useEffect(() => {
+    setDisplayRound(progress?.round ?? highlightDifficulty);
+  }, [progress?.round, highlightDifficulty]);
+
   const handlePresetSelect = useCallback(
     (level: number) => {
       const clamped = clampDifficulty(level) ?? 1;
@@ -90,6 +95,14 @@ export function AnidlePage({
       controller.current?.(clamped);
     },
     [clampDifficulty, onDifficultyChange],
+  );
+
+  const handleProgressChange = useCallback(
+    (state: GameProgress) => {
+      setDisplayRound(state.round);
+      onProgressChange(state);
+    },
+    [onProgressChange],
   );
 
   return (
@@ -104,7 +117,7 @@ export function AnidlePage({
       />
       <GameShell
         title="Anidle"
-        round={progress?.round ?? highlightDifficulty}
+        round={displayRound}
         totalRounds={totalRounds}
         onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
@@ -113,7 +126,7 @@ export function AnidlePage({
           mediaId={mediaId}
           payload={payload}
           initialProgress={progress}
-          onProgressChange={onProgressChange}
+          onProgressChange={handleProgressChange}
           registerRoundController={(fn) => {
             controller.current = fn;
             setControllerReady(true);
