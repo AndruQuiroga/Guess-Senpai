@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState, type ChangeEvent 
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { PosterZoomGame as PosterPayload } from "../types/puzzles";
+import { formatMediaFormatLabel } from "../utils/formatMediaFormatLabel";
 import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
 
@@ -157,13 +158,7 @@ export default function PosterZoom({
             hints.push(`Year: ${payload.meta.year}`);
           }
           if (hint === "format" && payload.meta.format) {
-            const formattedLabel = payload.meta.format
-              .split(/[_\s]+/)
-              .filter(Boolean)
-              .map((segment) =>
-                segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase(),
-              )
-              .join(" ");
+            const formattedLabel = formatMediaFormatLabel(payload.meta.format);
             hints.push(`Format: ${formattedLabel}`);
           }
         });
