@@ -16,11 +16,19 @@ import {
   GamesPayload,
   SolutionPayload,
 } from "../types/puzzles";
-import { buildShareText, formatShareDate } from "../utils/shareText";
+import {
+  buildShareEvent,
+  formatShareDate,
+  type ShareEventData,
+} from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
 import StreakWidget from "./StreakWidget";
+import {
+  ShareCardRequestPayload,
+  ShareComposer,
+} from "./ShareComposer";
 import {
   AnidlePreview,
   CharacterSilhouettePreview,
@@ -65,9 +73,6 @@ export default function Daily({ data }: Props) {
   const { progress, refresh, isRefreshing } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
   const nextResetIso = useMemo(() => getNextResetIso(data.date), [data.date]);
-  const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
-  const [supportsFileShare, setSupportsFileShare] = useState(false);
   const includeGuessTheOpening = data.guess_the_opening_enabled;
   const anidleBundle = data.games.anidle;
   const posterBundle = data.games.poster_zoomed;
@@ -258,8 +263,8 @@ export default function Daily({ data }: Props) {
   const streakInfo = useStreak(data.date, allCompleted);
   const streakCount = streakInfo.count;
 
-  const shareText = useMemo(() => {
-    return buildShareText(data.date, progress, {
+  const shareEvent = useMemo<ShareEventData>(() => {
+    return buildShareEvent(data.date, progress, {
       includeGuessTheOpening,
       aniListUrls: allCompleted ? solutionUrls : undefined,
     });
@@ -271,7 +276,7 @@ export default function Daily({ data }: Props) {
     solutionUrls,
   ]);
 
-  const shareCardPayload = useMemo(() => {
+  const shareCardPayload = useMemo<ShareCardRequestPayload>(() => {
     const preferredTitle = primarySolution
       ? primarySolution.titles.userPreferred ??
         primarySolution.titles.english ??
@@ -281,60 +286,25 @@ export default function Daily({ data }: Props) {
       : null;
 
     return {
+      event: shareEvent,
       title: preferredTitle,
-      date: data.date,
       streak: streakCount,
       cover: primarySolution?.coverImage ?? null,
-      includeGuessTheOpening,
-      progress: {
-        anidle: progress.anidle
-          ? {
-              completed: progress.anidle.completed,
-              attempts: progress.anidle.guesses?.length ?? 0,
-            }
-          : null,
-        poster_zoomed: progress.poster_zoomed
-          ? {
-              completed: progress.poster_zoomed.completed,
-              round: progress.poster_zoomed.round,
-            }
-          : null,
-        character_silhouette: progress.character_silhouette
-          ? {
-              completed: progress.character_silhouette.completed,
-              round: progress.character_silhouette.round,
-            }
-          : null,
-        redacted_synopsis: progress.redacted_synopsis
-          ? {
-              completed: progress.redacted_synopsis.completed,
-              round: progress.redacted_synopsis.round,
-            }
-          : null,
-        guess_the_opening:
-          includeGuessTheOpening && progress.guess_the_opening
-            ? {
-                completed: progress.guess_the_opening.completed,
-                round: progress.guess_the_opening.round,
-              }
-            : null,
-      },
     };
   }, [
-    data.date,
-    includeGuessTheOpening,
+    shareEvent,
     primarySolution,
-    progress.anidle,
-    progress.character_silhouette,
-    progress.guess_the_opening,
-    progress.poster_zoomed,
-    progress.redacted_synopsis,
     streakCount,
   ]);
 
-  const shareButtonLabel = supportsFileShare
-    ? "Share Progress"
-    : "Download card";
+  const shareLocked = useMemo(() => {
+    return shareEvent.games.every((game) => game.status === "pending");
+  }, [shareEvent]);
+
+  const shareFileName = useMemo(
+    () => `guesssenpai-${data.date}-share`,
+    [data.date],
+  );
 
   const syncButtonLabel = isRefreshing ? "Syncing…" : "Sync progress";
 
@@ -391,87 +361,11 @@ export default function Daily({ data }: Props) {
     setSyncToast({ tone: "error", message: errorMessage });
   }, [refresh]);
 
-  const handleShare = useCallback(async () => {
-    try {
-      setIsGeneratingCard(true);
-      setShareStatus("Preparing share card…");
-
-      const params = new URLSearchParams({
-        data: JSON.stringify(shareCardPayload),
-      });
-      const response = await fetch(`/api/share-card?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error(`Failed to generate share card: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const fileName = `guesssenpai-${data.date}-share.png`;
-
-      if (supportsFileShare && navigator.share) {
-        const file = new File([blob], fileName, {
-          type: blob.type || "image/png",
-        });
-        const shareData: ShareData = {
-          files: [file],
-          text: shareText,
-        };
-
-        if (!navigator.canShare || navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-          setShareStatus("Shared");
-          return;
-        }
-      }
-
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
-
-      setShareStatus("Card downloaded");
-    } catch (error) {
-      console.warn("Share cancelled", error);
-      setShareStatus("Unable to share card");
-    } finally {
-      setIsGeneratingCard(false);
-    }
-  }, [data.date, shareCardPayload, shareText, supportsFileShare]);
-
-  useEffect(() => {
-    if (!shareStatus) return;
-    const timeout = window.setTimeout(() => setShareStatus(null), 3000);
-    return () => window.clearTimeout(timeout);
-  }, [shareStatus]);
-
   useEffect(() => {
     if (!syncToast) return;
     const timeout = window.setTimeout(() => setSyncToast(null), 3000);
     return () => window.clearTimeout(timeout);
   }, [syncToast]);
-
-  useEffect(() => {
-    if (typeof navigator === "undefined") {
-      return;
-    }
-    if (!navigator.share) {
-      setSupportsFileShare(false);
-      return;
-    }
-    if (typeof navigator.canShare !== "function") {
-      setSupportsFileShare(false);
-      return;
-    }
-    try {
-      const testFile = new File([""], "test.txt", { type: "text/plain" });
-      setSupportsFileShare(navigator.canShare({ files: [testFile] }));
-    } catch {
-      setSupportsFileShare(false);
-    }
-  }, []);
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -504,22 +398,25 @@ export default function Daily({ data }: Props) {
             >
               {syncButtonLabel}
             </button>
-            <button
-              type="button"
-              className="rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={handleShare}
-              disabled={isGeneratingCard}
-            >
-              {shareButtonLabel}
-            </button>
           </div>
         </div>
-        {shareStatus && (
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs text-white/90 shadow-inner transition">
-            {shareStatus}
-          </p>
-        )}
       </header>
+
+      <GlassSection innerClassName="space-y-4 text-neutral-200">
+        <div className="space-y-1">
+          <h2 className="text-lg font-display font-semibold tracking-tight text-white">
+            Share your run
+          </h2>
+          <p className="text-sm text-neutral-300/90">
+            Choose a theme, generate a recap card, and spread the word with a single tap.
+          </p>
+        </div>
+        <ShareComposer
+          payload={shareCardPayload}
+          shareLocked={shareLocked}
+          fileName={shareFileName}
+        />
+      </GlassSection>
 
       <StreakWidget currentDateIso={data.date} completed={allCompleted} />
 

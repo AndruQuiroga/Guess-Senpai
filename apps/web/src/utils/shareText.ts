@@ -1,4 +1,4 @@
-import { DailyProgress, GameKey } from "../types/progress";
+import { DailyProgress, GameKey, GameProgress } from "../types/progress";
 
 const GAME_DESCRIPTORS: Array<{
   label: string;
@@ -12,11 +12,40 @@ const GAME_DESCRIPTORS: Array<{
   { label: "Guess the Opening", key: "guess_the_opening", totalRounds: 3 },
 ];
 
-export interface ShareTextOptions {
+export interface ShareEventOptions {
   includeGuessTheOpening?: boolean;
   aniListUrls?: string[];
   /** @deprecated use aniListUrls */
   aniListUrl?: string;
+}
+
+export type ShareRoundState = "locked" | "active" | "cleared";
+
+export interface ShareEventRound {
+  round: number;
+  state: ShareRoundState;
+}
+
+export type ShareGameStatus = "pending" | "in_progress" | "completed";
+
+export interface ShareEventGame {
+  key: GameKey;
+  label: string;
+  totalRounds: number;
+  status: ShareGameStatus;
+  summary: string;
+  attempts?: number;
+  rounds: ShareEventRound[];
+}
+
+export interface ShareEventData {
+  schema: "guesssenpai.share.v1";
+  date: string;
+  formattedDate: string;
+  includeGuessTheOpening: boolean;
+  games: ShareEventGame[];
+  tags: string[];
+  externalUrls: string[];
 }
 
 export function formatShareDate(value: string): string {
@@ -31,58 +60,180 @@ export function formatShareDate(value: string): string {
   });
 }
 
-export function buildShareText(
-  dateIso: string,
-  progress: DailyProgress,
-  options?: ShareTextOptions,
-): string {
-  const formattedDate = formatShareDate(dateIso);
-  const lines: string[] = [];
-  lines.push(`GuessSenpai — ${formattedDate}`);
+function buildRoundStates(
+  totalRounds: number,
+  progress: GameProgress | null | undefined,
+): ShareEventRound[] {
+  const rounds: ShareEventRound[] = [];
 
-  const includeOpening = options?.includeGuessTheOpening ?? false;
-  const requiredKeys: GameKey[] = [
-    "anidle",
-    "poster_zoomed",
-    "character_silhouette",
-    "redacted_synopsis",
-  ];
-  if (includeOpening) {
-    requiredKeys.push("guess_the_opening");
+  if (!progress) {
+    for (let index = 1; index <= totalRounds; index += 1) {
+      rounds.push({ round: index, state: "locked" });
+    }
+    return rounds;
   }
 
-  const describe = (label: string, key: GameKey, totalRounds: number) => {
-    const game = progress[key];
-    if (!game) {
-      return `${label} — ⏳`;
+  if (progress.completed) {
+    for (let index = 1; index <= totalRounds; index += 1) {
+      rounds.push({ round: index, state: "cleared" });
     }
-    if (game.completed) {
-      if (key === "anidle") {
-        const attempts = Math.max(1, game.guesses.length);
-        return `${label} — ${attempts} ${attempts === 1 ? "try" : "tries"} ✅`;
-      }
-      return `${label} — ✅ (${Math.min(totalRounds, game.round)}/${totalRounds})`;
+    return rounds;
+  }
+
+  const unlockedRounds = Math.max(1, Math.min(totalRounds, progress.round ?? 1));
+
+  for (let index = 1; index <= totalRounds; index += 1) {
+    if (index < unlockedRounds) {
+      rounds.push({ round: index, state: "cleared" });
+    } else if (index === unlockedRounds) {
+      rounds.push({ round: index, state: "active" });
+    } else {
+      rounds.push({ round: index, state: "locked" });
     }
-    return `${label} — ${Math.min(totalRounds, game.round)}/${totalRounds}`;
-  };
+  }
 
-  GAME_DESCRIPTORS.forEach(({ label, key, totalRounds }) => {
-    if (key === "guess_the_opening" && !includeOpening) {
-      return;
-    }
-    lines.push(describe(label, key, totalRounds));
-  });
+  return rounds;
+}
 
-  lines.push("#GuessSenpai");
+export function buildShareEvent(
+  dateIso: string,
+  progress: DailyProgress,
+  options?: ShareEventOptions,
+): ShareEventData {
+  const formattedDate = formatShareDate(dateIso);
+  const includeOpening = options?.includeGuessTheOpening ?? false;
+  const tags = ["#GuessSenpai"];
 
-  const allCompleted = requiredKeys.every((key) => progress[key]?.completed);
-  const shareUrls = [
+  const externalUrls = [
     ...(options?.aniListUrls ?? []),
     ...(options?.aniListUrl ? [options.aniListUrl] : []),
-  ].filter((url): url is string => Boolean(url));
-  const uniqueUrls = Array.from(new Set(shareUrls));
-  if (allCompleted && uniqueUrls.length > 0) {
-    lines.push("", ...uniqueUrls);
+  ]
+    .filter((url): url is string => Boolean(url))
+    .filter((value, index, array) => array.indexOf(value) === index);
+
+  const games: ShareEventGame[] = GAME_DESCRIPTORS.filter(({ key }) => {
+    if (key === "guess_the_opening" && !includeOpening) {
+      return false;
+    }
+    return true;
+  }).map(({ key, label, totalRounds }) => {
+    const gameProgress = progress[key];
+
+    if (key === "anidle") {
+      const attempts = Math.max(0, gameProgress?.guesses?.length ?? 0);
+
+      if (!gameProgress) {
+        return {
+          key,
+          label,
+          totalRounds,
+          status: "pending" as const,
+          attempts,
+          rounds: [],
+          summary: `${label} — ⏳`,
+        };
+      }
+
+      if (gameProgress.completed) {
+        const completedAttempts = Math.max(1, attempts);
+        const attemptLabel = completedAttempts === 1 ? "try" : "tries";
+        return {
+          key,
+          label,
+          totalRounds,
+          status: "completed" as const,
+          attempts: completedAttempts,
+          rounds: [],
+          summary: `${label} — ${completedAttempts} ${attemptLabel} ✅`,
+        };
+      }
+
+      if (attempts > 0) {
+        const attemptLabel = attempts === 1 ? "try" : "tries";
+        return {
+          key,
+          label,
+          totalRounds,
+          status: "in_progress" as const,
+          attempts,
+          rounds: [],
+          summary: `${label} — ${attempts} ${attemptLabel}`,
+        };
+      }
+
+      return {
+        key,
+        label,
+        totalRounds,
+        status: "in_progress" as const,
+        attempts,
+        rounds: [],
+        summary: `${label} — In progress`,
+      };
+    }
+
+    const rounds = buildRoundStates(totalRounds, gameProgress);
+    const clearedRounds = rounds.filter((round) => round.state === "cleared").length;
+
+    if (!gameProgress) {
+      return {
+        key,
+        label,
+        totalRounds,
+        status: "pending" as const,
+        rounds,
+        summary: `${label} — ⏳`,
+      };
+    }
+
+    if (gameProgress.completed) {
+      return {
+        key,
+        label,
+        totalRounds,
+        status: "completed" as const,
+        rounds,
+        summary: `${label} — ✅ (${clearedRounds}/${totalRounds})`,
+      };
+    }
+
+    return {
+      key,
+      label,
+      totalRounds,
+      status: "in_progress" as const,
+      rounds,
+      summary: `${label} — ${clearedRounds}/${totalRounds}`,
+    };
+  });
+
+  return {
+    schema: "guesssenpai.share.v1",
+    date: dateIso,
+    formattedDate,
+    includeGuessTheOpening: includeOpening,
+    games,
+    tags,
+    externalUrls,
+  };
+}
+
+export function formatShareEventMessage(event: ShareEventData): string {
+  const lines: string[] = [];
+  lines.push(`GuessSenpai — ${event.formattedDate}`);
+
+  event.games.forEach((game) => {
+    lines.push(game.summary);
+  });
+
+  event.tags.forEach((tag) => {
+    if (!lines.includes(tag)) {
+      lines.push(tag);
+    }
+  });
+
+  if (event.externalUrls.length > 0) {
+    lines.push("", ...event.externalUrls);
   }
 
   return lines.join("\n");

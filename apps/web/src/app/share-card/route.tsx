@@ -1,8 +1,19 @@
-import { ImageResponse } from "next/og";
-import type { NextRequest } from "next/server";
+import { promises as fs } from "node:fs";
 import { Buffer } from "node:buffer";
 
-import { formatShareDate } from "../../utils/shareText";
+import { Resvg } from "@resvg/resvg-js";
+import satori from "satori";
+import type { NextRequest } from "next/server";
+
+import {
+  type ShareEventData,
+  type ShareEventGame,
+  type ShareRoundState,
+} from "../../utils/shareText";
+import {
+  ShareCardTheme,
+  getShareThemeConfig,
+} from "../../utils/shareThemes";
 
 export const runtime = "nodejs";
 export const alt = "GuessSenpai daily share card";
@@ -12,67 +23,40 @@ export const size = {
 };
 export const contentType = "image/png";
 
-interface SimplifiedProgress {
-  completed?: boolean;
-  attempts?: number;
-  round?: number;
-}
+const FONT_REGULAR_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+const FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
-interface ShareCardPayload {
+interface ShareCardRequestPayload {
+  event?: ShareEventData | null;
   title?: string | null;
-  date?: string | null;
   streak?: number | null;
   cover?: string | null;
-  includeGuessTheOpening?: boolean;
-  progress?: {
-    anidle?: SimplifiedProgress | null;
-    poster_zoomed?: SimplifiedProgress | null;
-    character_silhouette?: SimplifiedProgress | null;
-    redacted_synopsis?: SimplifiedProgress | null;
-    guess_the_opening?: SimplifiedProgress | null;
-  } | null;
+  theme?: ShareCardTheme | string | null;
 }
 
-function parsePayload(value: string | null): ShareCardPayload | null {
+const fontCache = new Map<string, Promise<ArrayBuffer>>();
+
+function loadFont(path: string): Promise<ArrayBuffer> {
+  const existing = fontCache.get(path);
+  if (existing) {
+    return existing;
+  }
+  const promise = fs.readFile(path).then((buffer) =>
+    buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+  );
+  fontCache.set(path, promise);
+  return promise;
+}
+
+function parsePayload(value: string | null): ShareCardRequestPayload | null {
   if (!value) return null;
   try {
-    const parsed = JSON.parse(value) as ShareCardPayload;
+    const parsed = JSON.parse(value) as ShareCardRequestPayload;
     return parsed;
   } catch (error) {
     console.warn("Failed to parse share card payload", error);
     return null;
   }
-}
-
-function describeAnidle(progress: SimplifiedProgress | null | undefined): string {
-  if (!progress) {
-    return "Anidle — ⏳";
-  }
-  const attempts = Math.max(0, progress.attempts ?? 0);
-  if (!progress.completed) {
-    if (attempts > 0) {
-      return `Anidle — ${attempts} ${attempts === 1 ? "try" : "tries"}`;
-    }
-    return "Anidle — In progress";
-  }
-  const completedAttempts = Math.max(1, attempts);
-  return `Anidle — ${completedAttempts} ${
-    completedAttempts === 1 ? "try" : "tries"
-  } ✅`;
-}
-
-function describeRoundGame(
-  label: string,
-  progress: SimplifiedProgress | null | undefined,
-): string {
-  if (!progress) {
-    return `${label} — ⏳`;
-  }
-  const round = Math.max(1, Math.min(3, progress.round ?? 1));
-  if (progress.completed) {
-    return `${label} — ✅ (${round}/3)`;
-  }
-  return `${label} — ${round}/3`;
 }
 
 async function loadCoverDataUrl(url: string | null | undefined): Promise<string | null> {
@@ -92,46 +76,97 @@ async function loadCoverDataUrl(url: string | null | undefined): Promise<string 
   }
 }
 
+function roundStateColor(state: ShareRoundState, accent: string): string {
+  switch (state) {
+    case "cleared":
+      return accent;
+    case "active":
+      return "rgba(248,250,252,0.85)";
+    default:
+      return "rgba(148,163,184,0.35)";
+  }
+}
+
+function roundStateOpacity(state: ShareRoundState): number {
+  return state === "locked" ? 0.5 : 1;
+}
+
+function renderGameRow(game: ShareEventGame, accent: string) {
+  const detail = game.summary.replace(`${game.label} — `, "");
+  return (
+    <div
+      key={game.key}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+        padding: "16px",
+        borderRadius: "20px",
+        background: "rgba(15,23,42,0.55)",
+        border: "1px solid rgba(148,163,184,0.25)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+        }}
+      >
+        <span style={{ fontSize: "26px", fontWeight: 600 }}>{game.label}</span>
+        <span style={{ fontSize: "20px", opacity: 0.85 }}>{detail}</span>
+      </div>
+      {game.rounds.length > 0 ? (
+        <div style={{ display: "flex", gap: "10px" }}>
+          {game.rounds.map((round) => (
+            <div
+              key={`${game.key}-${round.round}`}
+              style={{
+                width: "18px",
+                height: "18px",
+                borderRadius: "9999px",
+                background: roundStateColor(round.state, accent),
+                border: "1px solid rgba(248,250,252,0.45)",
+                opacity: roundStateOpacity(round.state),
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <span style={{ fontSize: "20px", color: "rgba(226,232,240,0.85)" }}>{detail}</span>
+      )}
+    </div>
+  );
+}
+
 export async function GET(request: NextRequest): Promise<Response> {
   const { searchParams } = new URL(request.url);
   const payload = parsePayload(searchParams.get("data"));
 
-  if (!payload) {
+  if (!payload || !payload.event) {
     return new Response("Invalid share card payload", { status: 400 });
   }
 
-  const formattedDate = payload.date ? formatShareDate(payload.date) : null;
-  const title = payload.title?.trim() || "GuessSenpai Daily";
-  const streak = payload.streak ?? 0;
-  const includeOpening = Boolean(payload.includeGuessTheOpening);
-
-  const progress = payload.progress ?? {};
+  const event = payload.event;
+  const theme = getShareThemeConfig(payload.theme ?? undefined);
   const coverSrc = await loadCoverDataUrl(payload.cover);
+  const streak = Math.max(0, payload.streak ?? 0);
+  const title = payload.title?.trim() || "GuessSenpai Daily";
 
-  const stats: string[] = [
-    describeAnidle(progress.anidle),
-    describeRoundGame("Poster Zoomed", progress.poster_zoomed),
-    describeRoundGame("Character Silhouette", progress.character_silhouette),
-    describeRoundGame("Redacted Synopsis", progress.redacted_synopsis),
-  ];
-  if (includeOpening) {
-    stats.push(describeRoundGame("Guess the Opening", progress.guess_the_opening));
-  }
-
-  return new ImageResponse(
+  const svg = await satori(
     (
       <div
         style={{
-          height: "100%",
           width: "100%",
+          height: "100%",
           display: "flex",
           flexDirection: "row",
           justifyContent: "space-between",
           padding: "48px",
-          background:
-            "radial-gradient(circle at top left, rgba(59,130,246,0.6), rgba(14,23,42,0.95))",
-          color: "white",
-          fontFamily: "'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+          background: theme.background,
+          color: theme.textColor,
+          fontFamily: "DejaVuSans",
           position: "relative",
           overflow: "hidden",
         }}
@@ -140,30 +175,45 @@ export async function GET(request: NextRequest): Promise<Response> {
           style={{
             position: "absolute",
             inset: 0,
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(15,23,42,0.65))",
+            background: theme.overlay,
             mixBlendMode: "overlay",
-            pointerEvents: "none",
           }}
         />
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", zIndex: 1 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "24px",
+            zIndex: 1,
+            maxWidth: "760px",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <span
               style={{
                 fontSize: "20px",
                 letterSpacing: "0.3em",
                 textTransform: "uppercase",
-                opacity: 0.85,
+                opacity: 0.8,
               }}
             >
               GuessSenpai Daily
             </span>
-            <h1 style={{ fontSize: "54px", fontWeight: 700, lineHeight: 1.1, maxWidth: "620px" }}>{title}</h1>
-            {formattedDate ? (
-              <p style={{ fontSize: "22px", color: "rgba(226,232,240,0.85)" }}>{formattedDate}</p>
-            ) : null}
+            <h1
+              style={{
+                fontSize: "56px",
+                fontWeight: 700,
+                lineHeight: 1.1,
+                textShadow: "0 0 32px rgba(15,23,42,0.35)",
+              }}
+            >
+              {title}
+            </h1>
+            <p style={{ fontSize: "24px", color: "rgba(248,250,252,0.88)" }}>
+              {event.formattedDate}
+            </p>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
             <div
               style={{
                 display: "inline-flex",
@@ -171,35 +221,57 @@ export async function GET(request: NextRequest): Promise<Response> {
                 gap: "12px",
                 padding: "12px 20px",
                 borderRadius: "9999px",
-                border: "1px solid rgba(252, 211, 77, 0.45)",
-                background: "rgba(251, 191, 36, 0.22)",
-                color: "#FEF3C7",
+                border: `1px solid ${theme.accent}55`,
+                background: "rgba(15,23,42,0.35)",
                 fontSize: "22px",
                 fontWeight: 600,
               }}
             >
-              <span style={{ fontSize: "26px" }}>🔥</span>
-              <span>Streak {Math.max(0, streak)}</span>
+              <span style={{ fontSize: "28px" }}>🔥</span>
+              <span>Streak {streak}</span>
             </div>
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-                padding: "20px",
-                borderRadius: "24px",
-                background: "rgba(15, 23, 42, 0.55)",
-                border: "1px solid rgba(148, 163, 184, 0.3)",
-                backdropFilter: "blur(16px)",
-                minWidth: "480px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "12px",
+                padding: "12px 20px",
+                borderRadius: "9999px",
+                border: "1px solid rgba(248,250,252,0.35)",
+                background: "rgba(15,23,42,0.35)",
+                fontSize: "22px",
               }}
             >
-              {stats.map((line) => (
-                <p key={line} style={{ fontSize: "22px", display: "flex", alignItems: "center" }}>
-                  <span style={{ opacity: 0.85 }}>{line}</span>
-                </p>
-              ))}
+              <span>🎮 {event.games.filter((game) => game.status === "completed").length}</span>
+              <span>completed</span>
             </div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            {event.games.map((game) => renderGameRow(game, theme.accent))}
+          </div>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            {event.tags.map((tag) => (
+              <span
+                key={tag}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "8px 16px",
+                  borderRadius: "9999px",
+                  border: "1px solid rgba(248,250,252,0.35)",
+                  background: "rgba(15,23,42,0.35)",
+                  fontSize: "20px",
+                }}
+              >
+                {tag}
+              </span>
+            ))}
           </div>
         </div>
         <div
@@ -209,10 +281,10 @@ export async function GET(request: NextRequest): Promise<Response> {
             height: "100%",
             borderRadius: "36px",
             overflow: "hidden",
-            border: "1px solid rgba(148, 163, 184, 0.4)",
-            boxShadow: "0 25px 55px rgba(15, 23, 42, 0.45)",
+            border: "1px solid rgba(248,250,252,0.25)",
+            boxShadow: "0 25px 55px rgba(15,23,42,0.45)",
             zIndex: 1,
-            background: "rgba(148,163,184,0.12)",
+            background: "rgba(15,23,42,0.55)",
           }}
         >
           {coverSrc ? (
@@ -230,7 +302,7 @@ export async function GET(request: NextRequest): Promise<Response> {
                 justifyContent: "center",
                 height: "100%",
                 fontSize: "28px",
-                color: "rgba(226,232,240,0.7)",
+                color: "rgba(226,232,240,0.75)",
               }}
             >
               Cover unavailable
@@ -241,14 +313,43 @@ export async function GET(request: NextRequest): Promise<Response> {
               position: "absolute",
               inset: 0,
               background:
-                "linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.55) 100%)",
+                "linear-gradient(180deg, rgba(15,23,42,0.1) 0%, rgba(15,23,42,0.65) 100%)",
             }}
           />
         </div>
       </div>
     ),
     {
-      ...size,
+      width: size.width,
+      height: size.height,
+      fonts: [
+        {
+          name: "DejaVuSans",
+          data: await loadFont(FONT_REGULAR_PATH),
+          weight: 400,
+          style: "normal",
+        },
+        {
+          name: "DejaVuSans",
+          data: await loadFont(FONT_BOLD_PATH),
+          weight: 700,
+          style: "normal",
+        },
+      ],
     },
   );
+
+  const resvg = new Resvg(svg, {
+    fitTo: {
+      mode: "width",
+      value: size.width,
+    },
+  });
+  const png = resvg.render().asPng();
+  return new Response(png, {
+    headers: {
+      "content-type": contentType,
+      "cache-control": "public, max-age=86400",
+    },
+  });
 }

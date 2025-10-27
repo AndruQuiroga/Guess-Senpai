@@ -15,7 +15,11 @@ import { useAccount } from "../hooks/useAccount";
 import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
-import { buildShareText, formatShareDate } from "../utils/shareText";
+import {
+  buildShareEvent,
+  formatShareDate,
+  formatShareEventMessage,
+} from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 
 const BASE_GAME_KEYS: readonly GameKey[] = [
@@ -161,12 +165,17 @@ export default function HomePage() {
 
   const shareLocked = completedCount === 0 && !hasStartedAnyRounds;
 
-  const shareText = useMemo(
+  const shareEvent = useMemo(
     () =>
-      buildShareText(todayIso, progress, {
+      buildShareEvent(todayIso, progress, {
         includeGuessTheOpening,
       }),
     [includeGuessTheOpening, progress, todayIso],
+  );
+
+  const shareMessage = useMemo(
+    () => formatShareEventMessage(shareEvent),
+    [shareEvent],
   );
 
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
@@ -223,12 +232,12 @@ export default function HomePage() {
   const handleShare = useCallback(async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ text: shareText });
+        await navigator.share({ text: shareMessage });
         setShareStatus("Shared");
         return;
       }
       if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareText);
+        await navigator.clipboard.writeText(shareMessage);
         setShareStatus("Copied to clipboard");
         return;
       }
@@ -236,7 +245,7 @@ export default function HomePage() {
       console.warn("Share cancelled", error);
     }
     setShareStatus("Unable to share on this device");
-  }, [shareText]);
+  }, [shareMessage]);
 
   useEffect(() => {
     if (shareLocked && shareStatus) {
