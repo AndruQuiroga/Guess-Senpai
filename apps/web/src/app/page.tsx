@@ -2,7 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  MouseEvent,
+  SVGProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  ArrowPathIcon,
+  CheckBadgeIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+  LockClosedIcon,
+} from "@heroicons/react/24/solid";
 
 import { DailyCompletionBanner } from "../components/DailyCompletionBanner";
 import { GamePreviewModal } from "../components/GamePreviewModal";
@@ -48,34 +62,37 @@ type StatusChipConfig = {
   tone: StatusTone;
 };
 
-const STATUS_TONE_STYLES: Record<
-  StatusTone,
-  { icon: string; className: string }
-> = {
+type StatusToneStyle = {
+  Icon: (props: SVGProps<SVGSVGElement>) => JSX.Element;
+  className: string;
+  iconClassName: string;
+};
+
+const STATUS_TONE_STYLES: Record<StatusTone, StatusToneStyle> = {
   resume: {
-    icon: "↺",
-    className:
-      "border-emerald-300/50 bg-emerald-400/15 text-emerald-50 shadow-[0_0_25px_-12px_rgba(16,185,129,0.8)]",
+    Icon: ArrowPathIcon,
+    className: "border-emerald-500/50 bg-emerald-600/25 text-emerald-50",
+    iconClassName: "text-emerald-200",
   },
   available: {
-    icon: "✨",
-    className:
-      "border-brand-300/50 bg-brand-400/15 text-brand-50 shadow-[0_0_25px_-12px_rgba(168,85,247,0.7)]",
+    Icon: CheckBadgeIcon,
+    className: "border-brand-500/50 bg-brand-600/25 text-brand-50",
+    iconClassName: "text-brand-200",
   },
   comingSoon: {
-    icon: "⏳",
-    className:
-      "border-amber-300/50 bg-amber-400/15 text-amber-50 shadow-[0_0_25px_-12px_rgba(251,191,36,0.8)]",
+    Icon: ClockIcon,
+    className: "border-sky-500/45 bg-sky-600/25 text-sky-50",
+    iconClassName: "text-sky-200",
   },
   locked: {
-    icon: "🔒",
-    className:
-      "border-white/20 bg-white/10 text-white/85 shadow-[0_0_20px_-12px_rgba(148,163,184,0.75)]",
+    Icon: LockClosedIcon,
+    className: "border-slate-500/45 bg-slate-600/25 text-slate-100",
+    iconClassName: "text-slate-200",
   },
   warning: {
-    icon: "⚠️",
-    className:
-      "border-amber-400/60 bg-amber-500/10 text-amber-100 shadow-[0_0_25px_-12px_rgba(251,191,36,0.6)]",
+    Icon: ExclamationTriangleIcon,
+    className: "border-amber-500/60 bg-amber-600/25 text-amber-50",
+    iconClassName: "text-amber-200",
   },
 };
 
@@ -121,13 +138,16 @@ function StatusChip({
   return (
     <span
       className={classNames(
-        "inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] transition",
+        "inline-flex items-center gap-2 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] transition",
         toneStyles.className,
         className,
       )}
     >
-      <span aria-hidden>{toneStyles.icon}</span>
-      <span>{config.label}</span>
+      <toneStyles.Icon
+        aria-hidden
+        className={classNames("h-4 w-4", toneStyles.iconClassName)}
+      />
+      <span className="leading-none">{config.label}</span>
     </span>
   );
 }
