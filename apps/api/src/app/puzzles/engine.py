@@ -14,6 +14,8 @@ from datetime import date
 from typing import Any, List, Optional, Sequence, Tuple
 
 import httpx
+import cv2
+import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 
 from ..core.config import Settings, settings
@@ -117,6 +119,77 @@ PUZZLE_CACHE_PREFIX = "guesssenpai:puzzle"
 USER_HISTORY_KEY_TEMPLATE = "guesssenpai:user-history:{user_id}"
 
 logger = logging.getLogger(__name__)
+
+
+def _generate_character_silhouette(image_url: str) -> Optional[str]:
+    try:
+        response = httpx.get(image_url, timeout=10.0)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.warning("Failed to download character artwork for silhouette", exc_info=exc)
+        return None
+
+    image_data = np.frombuffer(response.content, dtype=np.uint8)
+    if image_data.size == 0:
+        logger.warning("Character artwork response was empty when building silhouette")
+        return None
+
+    image = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+    if image is None:
+        logger.warning("Unable to decode character artwork for silhouette generation")
+        return None
+
+    try:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        _, otsu_mask = cv2.threshold(
+            blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        )
+        otsu_mask = cv2.bitwise_not(otsu_mask)
+
+        edges = cv2.Canny(blurred, 50, 140)
+        edge_kernel = np.ones((5, 5), np.uint8)
+        expanded_edges = cv2.dilate(edges, edge_kernel, iterations=1)
+
+        combined = cv2.bitwise_or(otsu_mask, expanded_edges)
+        smooth_kernel = np.ones((7, 7), np.uint8)
+        combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, smooth_kernel, iterations=2)
+
+        contours, _ = cv2.findContours(
+            combined, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+
+        mask = np.zeros(gray.shape, dtype=np.uint8)
+        if contours:
+            contours = sorted(contours, key=cv2.contourArea, reverse=True)
+            primary_area = cv2.contourArea(contours[0])
+            if primary_area > 0:
+                cv2.drawContours(mask, [contours[0]], -1, 255, thickness=-1)
+                for contour in contours[1:]:
+                    if cv2.contourArea(contour) >= primary_area * 0.15:
+                        cv2.drawContours(mask, [contour], -1, 255, thickness=-1)
+        else:
+            mask = combined
+
+        mask = cv2.GaussianBlur(mask, (9, 9), 0)
+        mask = cv2.normalize(mask, None, 0, 255, cv2.NORM_MINMAX)
+
+        silhouette = cv2.bitwise_and(image, image, mask=mask)
+        background = np.zeros_like(image)
+        silhouette = cv2.addWeighted(silhouette, 1.0, background, 0.0, 0.0)
+
+        success, buffer = cv2.imencode(".png", silhouette)
+        if not success:
+            logger.warning("Failed to encode character silhouette image")
+            return None
+
+        base64_image = base64.b64encode(buffer.tobytes()).decode("ascii")
+        return f"data:image/png;base64,{base64_image}"
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Error while generating character silhouette", exc_info=exc)
+        return None
+
 
 TOKEN_PATTERN = re.compile(r"\s+|[^\w\s]+|\w+(?:'\w+)?", re.UNICODE)
 WORD_PATTERN = re.compile(r"\w+(?:'\w+)?", re.UNICODE)
@@ -548,6 +621,8 @@ def _build_character_silhouette(media: Media) -> Optional[CharacterSilhouetteGam
     if not image_url:
         return None
 
+    silhouette_image = _generate_character_silhouette(image_url)
+
     name = (
         edge.node.name.full
         or edge.node.name.userPreferred
@@ -561,7 +636,7 @@ def _build_character_silhouette(media: Media) -> Optional[CharacterSilhouetteGam
         character=CharacterSilhouetteCharacter(
             id=edge.node.id,
             name=name,
-            image=image_url,
+            image=silhouette_image or image_url,
             role=_normalize_role(edge.role),
         ),
     )
