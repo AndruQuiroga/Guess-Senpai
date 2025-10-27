@@ -101,6 +101,8 @@ class GuessOpeningMeta(BaseModel):
     artist: Optional[str] = None
     sequence: Optional[int] = None
     season: Optional[str] = None
+    roundOrder: Optional[int] = None
+    roundTotal: Optional[int] = None
 
 
 class GuessOpeningGame(BaseModel):
@@ -108,6 +110,13 @@ class GuessOpeningGame(BaseModel):
     answer: str
     clip: OpeningClip
     meta: GuessOpeningMeta
+
+
+class GuessOpeningRound(BaseModel):
+    order: int
+    mediaId: int
+    puzzle: GuessOpeningGame
+    solution: SolutionPayload
 
 
 class AnidlePuzzleBundle(BaseModel):
@@ -138,6 +147,7 @@ class GuessOpeningPuzzleBundle(BaseModel):
     mediaId: int
     puzzle: GuessOpeningGame
     solution: SolutionPayload
+    rounds: Optional[List[GuessOpeningRound]] = None
 
 
 class GamesPayload(BaseModel):

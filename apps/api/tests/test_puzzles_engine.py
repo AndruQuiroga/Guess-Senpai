@@ -170,7 +170,7 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
     async def fake_load_media_details(media_id: int, cache, settings):
         return media_by_id[media_id]
 
-    async def fake_build_guess_opening(media: Media, cache):
+    async def fake_build_guess_opening(media: Media, cache, **kwargs):
         return make_guess_opening(media)
 
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
@@ -196,7 +196,9 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
         result.games.character_silhouette.mediaId,
     ]
     if result.games.guess_the_opening:
-        bundle_ids.append(result.games.guess_the_opening.mediaId)
+        rounds = result.games.guess_the_opening.rounds or []
+        assert len(rounds) == 3
+        bundle_ids.extend(round.mediaId for round in rounds)
 
     assert len(bundle_ids) == len(set(bundle_ids))
     assert result.games.anidle.solution.aniListUrl.endswith(
@@ -223,7 +225,7 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
 
     attempts: list[int] = []
 
-    async def fake_build_guess_opening(media: Media, cache):
+    async def fake_build_guess_opening(media: Media, cache, **kwargs):
         attempts.append(media.id)
         if len(attempts) == 1:
             return None
@@ -264,11 +266,13 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
         result.games.character_silhouette.mediaId,
     ]
     if result.games.guess_the_opening:
-        bundle_ids.append(result.games.guess_the_opening.mediaId)
+        rounds = result.games.guess_the_opening.rounds or []
+        assert len(rounds) == 3
+        bundle_ids.extend(round.mediaId for round in rounds)
+        assert attempts[-3:] == [round.mediaId for round in rounds]
 
     assert set(recorded) == set(bundle_ids)
     assert len(recorded) == len(bundle_ids)
     assert result.games.character_silhouette is not None
     assert result.games.guess_the_opening is not None
-    assert len(attempts) >= 2
-    assert attempts[-1] == result.games.guess_the_opening.mediaId
+    assert len(attempts) >= 4

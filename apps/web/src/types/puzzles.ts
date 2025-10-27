@@ -91,6 +91,8 @@ export interface GuessOpeningMeta {
   artist?: string | null;
   sequence?: number | null;
   season?: string | null;
+  roundOrder?: number | null;
+  roundTotal?: number | null;
 }
 
 export interface GuessOpeningGame {
@@ -98,6 +100,13 @@ export interface GuessOpeningGame {
   answer: string;
   clip: OpeningClip;
   meta: GuessOpeningMeta;
+}
+
+export interface GuessOpeningRound {
+  order: number;
+  mediaId: number;
+  puzzle: GuessOpeningGame;
+  solution: SolutionPayload;
 }
 
 export interface SolutionTitles {
@@ -148,6 +157,7 @@ export interface GuessOpeningPuzzleBundle {
   mediaId: number;
   puzzle: GuessOpeningGame;
   solution: SolutionPayload;
+  rounds?: GuessOpeningRound[] | null;
 }
 
 export interface GamesPayload {
