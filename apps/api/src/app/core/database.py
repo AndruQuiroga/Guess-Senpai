@@ -32,10 +32,15 @@ def _resolve_project_path(path_value: str) -> Path:
 
 def _get_alembic_config() -> Config:
     config = Config(str(_resolve_project_path(settings.alembic_ini_path)))
-    config.set_main_option("script_location", str(_resolve_project_path(settings.alembic_migrations_path)))
+    config.set_main_option(
+        "script_location", str(_resolve_project_path(settings.alembic_migrations_path))
+    )
 
-    sync_database_url = settings.database_url.replace("+asyncpg", "")
-    config.set_main_option("sqlalchemy.url", sync_database_url)
+    # Alembic uses the async SQLAlchemy engine configured in ``alembic/env.py``.
+    # Preserve the async driver suffix (e.g. ``+asyncpg`` or ``+aiosqlite``)
+    # from the application settings so Alembic doesn't attempt to import
+    # synchronous drivers that aren't installed.
+    config.set_main_option("sqlalchemy.url", settings.database_url)
     return config
 
 
