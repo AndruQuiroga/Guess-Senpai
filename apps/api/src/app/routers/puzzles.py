@@ -69,6 +69,15 @@ async def _require_session(request: Request) -> SessionData:
     return session
 
 
+async def _optional_session(request: Request) -> Optional[SessionData]:
+    session_token = request.cookies.get("guesssenpai_session")
+    if not session_token:
+        return None
+    manager = await get_session_manager()
+    session = await manager.get_session(session_token)
+    return session
+
+
 class TitleSuggestion(BaseModel):
     id: int
     title: str
@@ -211,14 +220,18 @@ async def get_today_puzzles(
 
 @router.get("/progress", response_model=DailyProgressPayload)
 async def get_progress(request: Request, d: Optional[str] = Query(default=None)) -> DailyProgressPayload:
-    session = await _require_session(request)
+    session = await _optional_session(request)
     day = _parse_date(d)
+    if not session:
+        return DailyProgressPayload(date=day, progress={})
     return await load_daily_progress(session.user_id, day)
 
 
 @router.put("/progress", response_model=DailyProgressPayload)
 async def put_progress(request: Request, payload: DailyProgressPayload) -> DailyProgressPayload:
-    session = await _require_session(request)
+    session = await _optional_session(request)
+    if not session:
+        return DailyProgressPayload(date=payload.date, progress=payload.progress)
     return await merge_daily_progress(session.user_id, payload)
 
 
