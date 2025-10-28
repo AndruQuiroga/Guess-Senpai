@@ -11,6 +11,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    ctx = op.get_context()
     op.create_table(
         "users",
         sa.Column("id", sa.BigInteger(), primary_key=True),
@@ -35,11 +36,23 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
     )
     op.create_index("ix_sessions_user_id", "sessions", ["user_id"], unique=False)
-    op.create_unique_constraint("uq_sessions_token_hash", "sessions", ["token_hash"])
+    if ctx.dialect.name == "sqlite":
+        op.create_index(
+            "uq_sessions_token_hash",
+            "sessions",
+            ["token_hash"],
+            unique=True,
+        )
+    else:
+        op.create_unique_constraint("uq_sessions_token_hash", "sessions", ["token_hash"])
 
 
 def downgrade() -> None:
-    op.drop_constraint("uq_sessions_token_hash", "sessions", type_="unique")
+    ctx = op.get_context()
+    if ctx.dialect.name == "sqlite":
+        op.drop_index("uq_sessions_token_hash", table_name="sessions")
+    else:
+        op.drop_constraint("uq_sessions_token_hash", "sessions", type_="unique")
     op.drop_index("ix_sessions_user_id", table_name="sessions")
     op.drop_table("sessions")
     op.drop_table("users")
