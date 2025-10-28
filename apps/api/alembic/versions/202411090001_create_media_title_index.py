@@ -20,8 +20,19 @@ depends_on = None
 
 def upgrade() -> None:
     ctx = op.get_context()
-    if not ctx.is_offline_mode() and ctx.dialect.name == "postgresql":
-        op.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+    dialect_name = getattr(ctx.dialect, "name", "")
+    trigram_supported = False
+
+    if dialect_name == "postgresql":
+        try:
+            op.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+            trigram_supported = True
+        except Exception:  # pragma: no cover - dependent on database privs
+            # ``pg_trgm`` requires superuser/owner privileges. When the
+            # extension cannot be installed (e.g. managed Postgres services),
+            # we still want the schema migration to succeed so that the API
+            # can boot.  We fall back to standard indexes below.
+            trigram_supported = False
 
     op.create_table(
         "media_titles",
@@ -90,23 +101,47 @@ def upgrade() -> None:
         ["media_id", "priority"],
         unique=False,
     )
-    op.create_index(
-        "ix_media_title_aliases_trgm",
-        "media_title_aliases",
-        ["alias"],
-        unique=False,
-        postgresql_using="gin",
-        postgresql_ops={"alias": "gin_trgm_ops"},
-    )
-    op.create_unique_constraint(
-        "uq_media_title_alias_media",
-        "media_title_aliases",
-        ["media_id", "normalized_alias"],
-    )
+    if trigram_supported and dialect_name == "postgresql":
+        op.create_index(
+            "ix_media_title_aliases_trgm",
+            "media_title_aliases",
+            ["alias"],
+            unique=False,
+            postgresql_using="gin",
+            postgresql_ops={"alias": "gin_trgm_ops"},
+        )
+    else:
+        # Fallback for databases where ``pg_trgm`` is unavailable.  The
+        # regular btree index keeps lookups responsive even without trigram
+        # search support.
+        op.create_index(
+            "ix_media_title_aliases_trgm",
+            "media_title_aliases",
+            ["alias"],
+            unique=False,
+        )
+    if dialect_name == "sqlite":
+        op.create_index(
+            "uq_media_title_alias_media",
+            "media_title_aliases",
+            ["media_id", "normalized_alias"],
+            unique=True,
+        )
+    else:
+        op.create_unique_constraint(
+            "uq_media_title_alias_media",
+            "media_title_aliases",
+            ["media_id", "normalized_alias"],
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("uq_media_title_alias_media", "media_title_aliases", type_="unique")
+    ctx = op.get_context()
+    dialect_name = getattr(ctx.dialect, "name", "")
+    if dialect_name == "sqlite":
+        op.drop_index("uq_media_title_alias_media", table_name="media_title_aliases")
+    else:
+        op.drop_constraint("uq_media_title_alias_media", "media_title_aliases", type_="unique")
     op.drop_index("ix_media_title_aliases_trgm", table_name="media_title_aliases")
     op.drop_index("ix_media_title_aliases_media_priority", table_name="media_title_aliases")
     op.drop_index("ix_media_title_aliases_normalized_alias", table_name="media_title_aliases")
