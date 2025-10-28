@@ -8,7 +8,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "202411070001_add_progress_tables"
-down_revision = "202411040001_create_users_sessions"
+down_revision = "202411040001"
 branch_labels = None
 depends_on = None
 
