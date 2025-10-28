@@ -36,8 +36,11 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://guesssenpai:guesssenpai@postgres:5432/guesssenpai",
         alias="DATABASE_URL",
     )
-    alembic_ini_path: str = Field(default="alembic.ini", alias="ALEMBIC_INI_PATH")
-    alembic_migrations_path: str = Field(default="alembic", alias="ALEMBIC_MIGRATIONS_PATH")
+    database_echo: bool = Field(default=False, alias="DATABASE_ECHO")
+    database_connect_retries: int = Field(default=10, alias="DATABASE_CONNECT_RETRIES")
+    database_connect_retry_interval_seconds: float = Field(
+        default=3.0, alias="DATABASE_CONNECT_RETRY_INTERVAL_SECONDS"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
