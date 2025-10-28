@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from starlette.requests import Request
 
@@ -10,6 +12,7 @@ from app.routers import puzzles as puzzles_router
 from app.routers.puzzles import AnidleGuessEvaluationPayload
 from app.services import title_index
 from app.services.anilist import Media, MediaTitlePair, Title
+from app.puzzles.models import DailyProgressPayload, GameProgressPayload
 
 
 def make_media(media_id: int, title_text: str) -> Media:
@@ -122,3 +125,39 @@ async def test_evaluate_guess_falls_back_to_remote(monkeypatch: pytest.MonkeyPat
     assert search_called
     assert response.title == "Guess Show"
     assert response.correct is False
+
+
+@pytest.mark.asyncio
+async def test_get_progress_without_session_returns_empty_payload() -> None:
+    request = Request(scope={"type": "http", "headers": []})
+
+    response = await puzzles_router.get_progress(request, d="2024-01-02")
+
+    assert response.date == date(2024, 1, 2)
+    assert response.progress == {}
+
+
+@pytest.mark.asyncio
+async def test_put_progress_without_session_returns_request_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    called = False
+
+    async def fake_merge_daily_progress(user_id, payload):  # type: ignore[override]
+        nonlocal called
+        called = True
+        return payload
+
+    monkeypatch.setattr(puzzles_router, "merge_daily_progress", fake_merge_daily_progress)
+
+    request = Request(scope={"type": "http", "headers": []})
+    payload = DailyProgressPayload(
+        date=date(2024, 1, 3),
+        progress={
+            "anidle": GameProgressPayload(completed=False, round=1, guesses=["Guess"]),
+        },
+    )
+
+    response = await puzzles_router.put_progress(request, payload)
+
+    assert response.date == payload.date
+    assert response.progress == payload.progress
+    assert called is False
