@@ -65,6 +65,7 @@ async def _ping_database(engine: AsyncEngine) -> None:
 
 async def _create_schema(engine: AsyncEngine) -> None:
     async with engine.begin() as connection:
+        await connection.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         await connection.run_sync(Base.metadata.create_all)
 
 
