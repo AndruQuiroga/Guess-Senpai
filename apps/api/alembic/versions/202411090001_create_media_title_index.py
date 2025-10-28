@@ -19,6 +19,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    ctx = op.get_context()
+    if not ctx.is_offline_mode() and ctx.dialect.name == "postgresql":
+        op.execute(sa.text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+
     op.create_table(
         "media_titles",
         sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=False),
