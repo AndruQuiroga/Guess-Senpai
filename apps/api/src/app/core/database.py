@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+import anyio
 from alembic import command
 from alembic.config import Config
 
@@ -80,7 +81,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def connect_database() -> None:
     engine = get_engine()
-    run_migrations()
+    await anyio.to_thread.run_sync(run_migrations)
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
 
