@@ -14,7 +14,7 @@ import {
   PuzzleProgressProvider,
   usePuzzleProgress,
 } from "../hooks/usePuzzleProgress";
-import { useStreak } from "../hooks/useStreak";
+import { useAccountStreak } from "../hooks/useAccount";
 import {
   DailyPuzzleResponse,
   GamesPayload,
@@ -26,6 +26,7 @@ import {
   type ShareEventData,
 } from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
+import { projectStreakSnapshot } from "../utils/streak";
 import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
 import StreakWidget from "./StreakWidget";
@@ -281,8 +282,12 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
 
   const requiredGames: GameKey[] = timelineEntries.map((entry) => entry.gameKey);
 
+  const { streak: accountStreak } = useAccountStreak();
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
-  const streakInfo = useStreak(data.date, allCompleted);
+  const streakInfo = useMemo(
+    () => projectStreakSnapshot(accountStreak, data.date, allCompleted),
+    [accountStreak, data.date, allCompleted],
+  );
   const streakCount = streakInfo.count;
 
   const shareEvent = useMemo<ShareEventData>(() => {
@@ -533,6 +538,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
         <StreakWidget
           currentDateIso={data.date}
           completed={allCompleted}
+          streak={streakInfo}
           className="h-full"
         />
         <NotificationOptInCard />

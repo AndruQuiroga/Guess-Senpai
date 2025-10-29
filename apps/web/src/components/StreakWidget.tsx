@@ -13,11 +13,12 @@ import {
 import { useMemo } from "react";
 
 import { STREAK_MILESTONES } from "../config/streak";
-import { useStreak } from "../hooks/useStreak";
+import type { StreakSnapshot } from "../types/streak";
 
 interface Props {
   currentDateIso: string;
   completed: boolean;
+  streak: StreakSnapshot;
   className?: string;
   weeks?: number;
 }
@@ -64,10 +65,10 @@ function toIso(date: Date): string {
 export default function StreakWidget({
   currentDateIso,
   completed,
+  streak,
   className,
   weeks = DEFAULT_WEEKS,
 }: Props) {
-  const streak = useStreak(currentDateIso, completed);
   const streakCount = streak.count;
   const lastCompletedIso = streak.lastCompleted ?? (completed ? currentDateIso : null);
 

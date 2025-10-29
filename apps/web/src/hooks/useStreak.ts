@@ -2,17 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { computeNextStreakSnapshot } from "../utils/streak";
+import type { StreakSnapshot } from "../types/streak";
+import { useAccount } from "./useAccount";
+
 const STORAGE_KEY = "guesssenpai-streak";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
-interface StreakState {
+interface PersistedStreakState {
   count: number;
   lastDate: string | null;
-}
-
-export interface StreakSnapshot {
-  count: number;
-  lastCompleted: string | null;
 }
 
 interface StreakResponse {
@@ -20,12 +19,17 @@ interface StreakResponse {
   last_completed: string | null;
 }
 
-function readStoredState(): StreakState | null {
+const DEFAULT_STREAK: StreakSnapshot = {
+  count: 0,
+  lastCompleted: null,
+};
+
+function readStoredState(): PersistedStreakState | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as StreakState;
+    const parsed = JSON.parse(raw) as PersistedStreakState;
     if (!parsed || typeof parsed.count !== "number") {
       return null;
     }
@@ -38,56 +42,40 @@ function readStoredState(): StreakState | null {
   }
 }
 
-function writeStoredState(state: StreakState) {
+function writeStoredState(state: StreakSnapshot) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const payload: PersistedStreakState = {
+      count: state.count,
+      lastDate: state.lastCompleted,
+    };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     /* noop */
   }
-}
-
-function addDays(date: Date, days: number): Date {
-  const clone = new Date(date);
-  clone.setDate(clone.getDate() + days);
-  return clone;
-}
-
-function computeNextState(previous: StreakState, currentDateIso: string): StreakState {
-  if (!currentDateIso) {
-    return previous;
-  }
-  if (previous.lastDate === currentDateIso) {
-    return previous;
-  }
-
-  const today = new Date(currentDateIso + "T00:00:00Z");
-
-  if (!previous.lastDate) {
-    return { count: 1, lastDate: currentDateIso };
-  }
-
-  const previousDate = new Date(previous.lastDate + "T00:00:00Z");
-  const expected = addDays(previousDate, 1);
-  const isConsecutive =
-    expected.getUTCFullYear() === today.getUTCFullYear() &&
-    expected.getUTCMonth() === today.getUTCMonth() &&
-    expected.getUTCDate() === today.getUTCDate();
-
-  const nextCount = isConsecutive ? previous.count + 1 : 1;
-  return { count: nextCount, lastDate: currentDateIso };
 }
 
 export function useStreak(
   currentDateIso: string,
   completed: boolean,
 ): StreakSnapshot {
-  const [state, setState] = useState<StreakState>(() => readStoredState() ?? { count: 0, lastDate: null });
+  const { account } = useAccount();
+  const isAuthenticated = account.authenticated;
+  const [state, setState] = useState<StreakSnapshot>(() => {
+    const stored = readStoredState();
+    if (!stored) {
+      return DEFAULT_STREAK;
+    }
+    return { count: stored.count, lastCompleted: stored.lastDate };
+  });
 
   useEffect(() => {
     let cancelled = false;
 
     async function hydrateFromServer() {
+      if (!isAuthenticated) {
+        return;
+      }
       try {
         const response = await fetch(`${API_BASE}/puzzles/streak`, {
           credentials: "include",
@@ -102,9 +90,9 @@ export function useStreak(
         if (!payload || typeof payload !== "object") {
           return;
         }
-        const nextState: StreakState = {
+        const nextState: StreakSnapshot = {
           count: typeof payload.count === "number" ? payload.count : 0,
-          lastDate: payload.last_completed ?? null,
+          lastCompleted: payload.last_completed ?? null,
         };
         if (!cancelled) {
           setState(nextState);
@@ -120,10 +108,13 @@ export function useStreak(
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthenticated]);
 
-  const pushServerUpdate = useCallback(async (next: StreakState) => {
-    if (!next.lastDate) {
+  const pushServerUpdate = useCallback(async (next: StreakSnapshot) => {
+    if (!isAuthenticated) {
+      return;
+    }
+    if (!next.lastCompleted) {
       return;
     }
     try {
@@ -133,7 +124,7 @@ export function useStreak(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           count: next.count,
-          last_completed: next.lastDate,
+          last_completed: next.lastCompleted,
         }),
       });
       if (!response.ok && response.status !== 401) {
@@ -142,16 +133,15 @@ export function useStreak(
     } catch (error) {
       console.warn("Failed to update streak on server", error);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!completed) {
       return;
     }
-
     setState((prev) => {
-      const next = computeNextState(prev, currentDateIso);
-      if (next.count === prev.count && next.lastDate === prev.lastDate) {
+      const next = computeNextStreakSnapshot(prev, currentDateIso);
+      if (next.count === prev.count && next.lastCompleted === prev.lastCompleted) {
         return prev;
       }
       writeStoredState(next);
@@ -160,5 +150,5 @@ export function useStreak(
     });
   }, [completed, currentDateIso, pushServerUpdate]);
 
-  return { count: state.count, lastCompleted: state.lastDate };
+  return state;
 }

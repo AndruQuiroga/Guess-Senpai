@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+
+import type { StreakSnapshot } from "../types/streak";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
@@ -15,20 +17,21 @@ export interface AccountState {
 
 interface AccountSnapshot {
   account: AccountState;
-  streakCount: number | null;
+  streak: StreakSnapshot;
   loading: boolean;
 }
 
 interface AccountResult {
   account: AccountState;
-  streakCount: number | null;
+  streak: StreakSnapshot;
 }
 
 const defaultAccount: AccountState = { authenticated: false };
+const defaultStreak: StreakSnapshot = { count: 0, lastCompleted: null };
 
 let snapshot: AccountSnapshot = {
   account: defaultAccount,
-  streakCount: null,
+  streak: { ...defaultStreak },
   loading: true,
 };
 
@@ -74,27 +77,33 @@ async function requestAccountData(): Promise<AccountResult> {
       // Ignore JSON parsing issues and fall back to the default state.
     }
 
-    let streakCount: number | null = null;
+    let streak: StreakSnapshot = { count: 0, lastCompleted: null };
     if (data.authenticated) {
       try {
         const streakResponse = await fetch(`${API_BASE}/puzzles/streak`, {
           credentials: "include",
         });
         if (streakResponse.ok) {
-          const streakData = (await streakResponse.json()) as { count?: number };
-          streakCount =
-            typeof streakData.count === "number" ? streakData.count : null;
+          const streakData = (await streakResponse.json()) as {
+            count?: number;
+            last_completed?: string | null;
+          };
+          streak = {
+            count:
+              typeof streakData.count === "number" ? streakData.count : 0,
+            lastCompleted: streakData.last_completed ?? null,
+          };
         }
       } catch (streakError) {
         // If streak fetching fails we simply clear the cached count.
-        streakCount = null;
+        streak = { count: 0, lastCompleted: null };
       }
     }
 
-    return { account: data, streakCount };
+    return { account: data, streak };
   } catch (error) {
     console.warn("Unable to fetch account info", error);
-    return { account: { authenticated: false }, streakCount: null };
+    return { account: { authenticated: false }, streak: { ...defaultStreak } };
   }
 }
 
@@ -103,7 +112,7 @@ async function loadAccountSnapshot(force = false): Promise<AccountResult> {
     if (!snapshot.loading) {
       return {
         account: snapshot.account,
-        streakCount: snapshot.streakCount,
+        streak: snapshot.streak,
       };
     }
     if (inflightRequest) {
@@ -116,7 +125,7 @@ async function loadAccountSnapshot(force = false): Promise<AccountResult> {
   const request = requestAccountData().then((result) => {
     setSnapshot({
       account: result.account,
-      streakCount: result.streakCount,
+      streak: result.streak,
       loading: false,
     });
     return result;
@@ -144,7 +153,7 @@ async function performLogout(): Promise<void> {
     inflightRequest = null;
     setSnapshot({
       account: { authenticated: false },
-      streakCount: null,
+      streak: { ...defaultStreak },
       loading: false,
     });
   }
@@ -171,7 +180,16 @@ export function useAccount() {
 
   return {
     ...state,
+    streakCount: state.account.authenticated ? state.streak.count : null,
     refresh,
     logout,
   };
+}
+
+export function useAccountStreak(): { streak: StreakSnapshot; loading: boolean } {
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  return useMemo(
+    () => ({ streak: state.streak, loading: state.loading }),
+    [state.streak, state.loading],
+  );
 }

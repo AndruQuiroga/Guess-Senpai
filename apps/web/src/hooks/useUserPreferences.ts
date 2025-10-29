@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useAccount } from "./useAccount";
 import { createDefaultUserPreferences, type UserPreferences } from "../types/preferences";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
@@ -38,7 +39,56 @@ function normalizeDifficultyLevel(value: unknown): number | null {
   return Math.max(1, Math.min(3, rounded));
 }
 
-export function useUserPreferences() {
+class PreferencesRequestError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "PreferencesRequestError";
+    this.status = status;
+  }
+}
+
+let refreshPromise: Promise<UserPreferences> | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let unauthorizedAuthState: boolean | null = null;
+
+function clearRefreshTimer(): void {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+function isUnauthorizedLocked(authenticated: boolean): boolean {
+  return (
+    unauthorizedAuthState !== null &&
+    unauthorizedAuthState === authenticated
+  );
+}
+
+function lockUnauthorized(authenticated: boolean): void {
+  unauthorizedAuthState = authenticated;
+  clearRefreshTimer();
+}
+
+function releaseUnauthorizedIfNeeded(authenticated: boolean): void {
+  if (
+    unauthorizedAuthState !== null &&
+    unauthorizedAuthState !== authenticated
+  ) {
+    unauthorizedAuthState = null;
+  }
+}
+
+interface UseUserPreferencesOptions {
+  authenticated?: boolean;
+}
+
+export function useUserPreferences(options?: UseUserPreferencesOptions) {
+  const { account } = useAccount();
+  const authenticated =
+    options?.authenticated ?? account?.authenticated ?? false;
   const [preferences, setPreferences] = useState<UserPreferences>(() =>
     createDefaultUserPreferences(),
   );
@@ -51,44 +101,100 @@ export function useUserPreferences() {
   );
 
   const refresh = useCallback(async () => {
+    if (!authenticated) {
+      releaseUnauthorizedIfNeeded(authenticated);
+      clearRefreshTimer();
+      const fallback = createDefaultUserPreferences();
+      setPreferences(fallback);
+      setLoading(false);
+      setError(null);
+      return fallback;
+    }
+
+    if (isUnauthorizedLocked(authenticated)) {
+      const fallback = createDefaultUserPreferences();
+      setPreferences(fallback);
+      setLoading(false);
+      setError(null);
+      return fallback;
+    }
+
     setLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch(`${API_BASE}/profile/preferences`, {
-        credentials: "include",
-      });
+    if (!refreshPromise) {
+      const request = (async () => {
+        const response = await fetch(`${API_BASE}/profile/preferences`, {
+          credentials: "include",
+        });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          const fallback = createDefaultUserPreferences();
-          setPreferences(fallback);
-          setLoading(false);
-          return fallback;
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new PreferencesRequestError("Unauthorized", 401);
+          }
+
+          throw new PreferencesRequestError(
+            `Request failed with status ${response.status}`,
+            response.status,
+          );
         }
 
-        throw new Error(`Request failed with status ${response.status}`);
-      }
+        const payload = (await response.json()) as PreferencesResponse;
+        return mergePreferences(payload);
+      })();
 
-      const payload = (await response.json()) as PreferencesResponse;
-      const next = mergePreferences(payload);
-      setPreferences(next);
+      refreshPromise = request.finally(() => {
+        refreshPromise = null;
+      });
+    }
+
+    try {
+      const next = await refreshPromise;
+      const resolved = next ?? createDefaultUserPreferences();
+      setPreferences(resolved);
       setLoading(false);
-      return next;
+      return resolved;
     } catch (caught) {
       const normalized =
-        caught instanceof Error ? caught : new Error(String(caught));
+        caught instanceof PreferencesRequestError
+          ? caught
+          : new PreferencesRequestError(String(caught));
+
+      if (normalized.status === 401) {
+        lockUnauthorized(authenticated);
+        const fallback = createDefaultUserPreferences();
+        setPreferences(fallback);
+        setLoading(false);
+        setError(null);
+        return fallback;
+      }
+
       setError(normalized);
       const fallback = createDefaultUserPreferences();
       setPreferences(fallback);
       setLoading(false);
       return fallback;
     }
-  }, []);
+  }, [authenticated]);
 
   useEffect(() => {
+    releaseUnauthorizedIfNeeded(authenticated);
+    if (!authenticated) {
+      const fallback = createDefaultUserPreferences();
+      setPreferences(fallback);
+      setLoading(false);
+      setError(null);
+      return () => {
+        clearRefreshTimer();
+      };
+    }
+
     void refresh();
-  }, [refresh]);
+
+    return () => {
+      clearRefreshTimer();
+    };
+  }, [authenticated, refresh]);
 
   const updateDifficulty = useCallback((level: number) => {
     const roundedLevel = Math.round(level);
@@ -97,6 +203,10 @@ export function useUserPreferences() {
       ...previous,
       difficultyLevel: normalizeDifficultyLevel(roundedLevel),
     }));
+
+    if (!authenticated || isUnauthorizedLocked(authenticated)) {
+      return;
+    }
 
     const submit = async () => {
       try {
@@ -109,7 +219,14 @@ export function useUserPreferences() {
           }),
         });
 
-        if (!response.ok && response.status !== 401) {
+        if (response.status === 401) {
+          lockUnauthorized(authenticated);
+          setPreferences(createDefaultUserPreferences());
+          setError(null);
+          return;
+        }
+
+        if (!response.ok) {
           console.warn(
             "Failed to update difficulty preference on server",
             response.statusText,
@@ -121,7 +238,7 @@ export function useUserPreferences() {
     };
 
     void submit();
-  }, []);
+  }, [authenticated]);
 
   return {
     preferences,
