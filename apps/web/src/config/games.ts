@@ -75,19 +75,20 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
   {
     slug: "poster-zoomed",
     title: "Poster Zoomed",
-    tagline: "Sharpen the view and guess the anime key art in time.",
+    tagline: "Sharpen the view across three rounds to name the anime and its release.",
     accentColor: "from-emerald-400 via-teal-400 to-sky-500",
     playable: true,
     comingSoon: false,
     gameKey: "poster_zoomed",
-    description: "Pinpoint the show as its promotional poster gradually zooms out.",
+    description:
+      "Pinpoint the anime and when it debuted as its promotional poster gradually zooms out over three rounds.",
     preview: {
       summary:
-        "Watch an iconic key visual slowly zoom out and make the call before the full poster is revealed.",
+        "Watch an iconic key visual slowly zoom out—each round adds release clues so you can lock in the anime and its debut.",
       rules: [
-        "Study the zoomed-in artwork and lock in a guess when inspiration strikes.",
-        "Every incorrect answer widens the view with new visual context.",
-        "Name the anime before the final reveal to score a perfect poster run.",
+        "Start with a tight crop; each round widens the frame and layers on extra metadata.",
+        "Submit both the anime title and its release season or year to clear the round.",
+        "Seal the win before the third-round reveal to perfect your poster streak.",
       ],
       media: {
         type: "image",
