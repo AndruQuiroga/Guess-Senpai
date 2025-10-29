@@ -83,10 +83,32 @@ class CharacterSilhouetteCharacter(BaseModel):
     role: Optional[str] = None
 
 
+class CharacterGuessReveal(BaseModel):
+    label: str
+    filter: str = "none"
+    description: Optional[str] = None
+
+
+class CharacterGuessEntry(BaseModel):
+    character: CharacterSilhouetteCharacter
+    characterAnswer: str
+    characterAliases: List[str] = Field(default_factory=list)
+    animeAnswer: str
+    animeAliases: List[str] = Field(default_factory=list)
+    reveal: CharacterGuessReveal
+
+
+class CharacterGuessRound(BaseModel):
+    order: int
+    difficulty: int
+    entries: List[CharacterGuessEntry] = Field(default_factory=list)
+
+
 class CharacterSilhouetteGame(BaseModel):
     spec: List[CharacterSilhouetteRound]
     answer: str
     character: CharacterSilhouetteCharacter
+    rounds: List[CharacterGuessRound] = Field(default_factory=list)
 
 
 class OpeningClip(BaseModel):
