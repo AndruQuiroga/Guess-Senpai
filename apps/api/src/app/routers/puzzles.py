@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
@@ -33,7 +33,7 @@ from ..services.progress import (
     store_streak,
 )
 from ..services.session import SessionData, get_session_manager
-from ..services.anilist import search_media
+from ..services.anilist import Media, search_media
 
 router = APIRouter()
 
@@ -95,6 +95,8 @@ class AnidleScalarFeedback(BaseModel):
     guess: Optional[int] = None
     target: Optional[int] = None
     status: Literal["match", "higher", "lower", "unknown"]
+    guess_season: Optional[str] = None
+    target_season: Optional[str] = None
 
 
 class AnidleListFeedbackItem(BaseModel):
@@ -113,8 +115,11 @@ class AnidleGuessEvaluationResponse(BaseModel):
     correct: bool
     year: AnidleScalarFeedback
     average_score: AnidleScalarFeedback
+    popularity: AnidleScalarFeedback
     genres: List[AnidleListFeedbackItem]
     tags: List[AnidleListFeedbackItem]
+    studios: List[AnidleListFeedbackItem]
+    source: List[AnidleListFeedbackItem]
 
 
 class GuessVerificationPayload(BaseModel):
@@ -158,9 +163,41 @@ def _dedupe_preserve_order(values: List[str]) -> List[str]:
     return result
 
 
+def _format_enum_label(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    normalized = value.replace("_", " ").replace("-", " ").strip()
+    if not normalized:
+        return None
+    return normalized.title()
+
+
+def _extract_studio_names(media: Media) -> List[str]:
+    studios = getattr(media, "studios", None)
+    if not studios or not getattr(studios, "edges", None):
+        return []
+    primary: List[str] = []
+    secondary: List[str] = []
+    for edge in studios.edges:
+        if not edge:
+            continue
+        node: Any = getattr(edge, "node", None)
+        if not node:
+            continue
+        name = getattr(node, "name", None)
+        if not name:
+            continue
+        bucket = primary if getattr(edge, "isMain", False) else secondary
+        bucket.append(name)
+    return _dedupe_preserve_order(primary + secondary)
+
+
 def _build_scalar_feedback(
     guess_value: Optional[int],
     target_value: Optional[int],
+    *,
+    guess_season: Optional[str] = None,
+    target_season: Optional[str] = None,
 ) -> AnidleScalarFeedback:
     if guess_value is None or target_value is None:
         status: Literal["match", "higher", "lower", "unknown"] = "unknown"
@@ -170,7 +207,13 @@ def _build_scalar_feedback(
         status = "higher"
     else:
         status = "lower"
-    return AnidleScalarFeedback(guess=guess_value, target=target_value, status=status)
+    return AnidleScalarFeedback(
+        guess=guess_value,
+        target=target_value,
+        status=status,
+        guess_season=guess_season,
+        target_season=target_season,
+    )
 
 
 def _build_list_feedback(
@@ -412,9 +455,13 @@ async def evaluate_anidle_guess(
             guess_media = best_candidate
 
     target_year = target_media.seasonYear or (target_media.startDate or {}).get("year")
+    target_season = _format_enum_label(target_media.season)
     target_score = target_media.averageScore
+    target_popularity = target_media.popularity
     target_genres = [genre for genre in target_media.genres if genre]
     target_tags = puzzle_engine._extract_top_tags(target_media)
+    target_studios = _extract_studio_names(target_media)
+    target_source = _format_enum_label(getattr(target_media, "source", None))
 
     if guess_media is not None:
         resolved_title = (
@@ -425,16 +472,24 @@ async def evaluate_anidle_guess(
             or guess_value
         )
         guess_year = guess_media.seasonYear or (guess_media.startDate or {}).get("year")
+        guess_season = _format_enum_label(guess_media.season)
         guess_score = guess_media.averageScore
+        guess_popularity = guess_media.popularity
         guess_genres = [genre for genre in guess_media.genres if genre]
         guess_tags = puzzle_engine._extract_top_tags(guess_media)
+        guess_studios = _extract_studio_names(guess_media)
+        guess_source = _format_enum_label(getattr(guess_media, "source", None))
         correct = guess_media.id == target_media.id
     else:
         resolved_title = guess_value
         guess_year = None
+        guess_season = None
         guess_score = None
+        guess_popularity = None
         guess_genres = []
         guess_tags = []
+        guess_studios = []
+        guess_source = None
         correct = any(
             variant and _normalize_text(variant) == normalized_guess
             for variant in puzzle_engine._title_variants(target_media)
@@ -443,10 +498,21 @@ async def evaluate_anidle_guess(
     return AnidleGuessEvaluationResponse(
         title=resolved_title,
         correct=correct,
-        year=_build_scalar_feedback(guess_year, target_year),
+        year=_build_scalar_feedback(
+            guess_year,
+            target_year,
+            guess_season=guess_season,
+            target_season=target_season,
+        ),
         average_score=_build_scalar_feedback(guess_score, target_score),
+        popularity=_build_scalar_feedback(guess_popularity, target_popularity),
         genres=_build_list_feedback(guess_genres, target_genres),
         tags=_build_list_feedback(guess_tags, target_tags),
+        studios=_build_list_feedback(guess_studios, target_studios),
+        source=_build_list_feedback(
+            [guess_source] if guess_source else [],
+            [target_source] if target_source else [],
+        ),
     )
 
 
