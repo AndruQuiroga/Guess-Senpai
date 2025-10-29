@@ -29,11 +29,13 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 const SEASON_OPTIONS = ["", "Winter", "Spring", "Summer", "Fall"] as const;
 type SeasonValue = (typeof SEASON_OPTIONS)[number];
 
-type FeedbackState =
-  | { type: "success"; message: string }
-  | { type: "partial"; message: string }
-  | { type: "error"; message: string }
-  | null;
+type FeedbackType = "success" | "partial" | "error";
+
+type FeedbackState = { type: FeedbackType; message: string } | null;
+
+function createFeedback(type: FeedbackType, message: string): FeedbackState {
+  return { type, message };
+}
 
 interface RoundController {
   roundNumber: number;
@@ -372,22 +374,17 @@ export default function PosterZoom({
           storedFeedbackType === "success" && storedFeedbackMessage
             ? storedFeedbackMessage
             : `Poster solved! ${canonicalTitle}`;
-        feedback = {
-          type: "success",
-          message: successMessage,
-        };
+        feedback = createFeedback("success", successMessage);
       } else if (storedFeedbackType === "partial") {
-        feedback = {
-          type: "partial",
-          message:
-            storedFeedbackMessage ?? "Title correct! Almost there!",
-        };
+        feedback = createFeedback(
+          "partial",
+          storedFeedbackMessage ?? "Title correct! Almost there!",
+        );
       } else if (storedFeedbackType === "error") {
-        feedback = {
-          type: "error",
-          message:
-            storedFeedbackMessage ?? "Not quite. Keep trying!",
-        };
+        feedback = createFeedback(
+          "error",
+          storedFeedbackMessage ?? "Not quite. Keep trying!",
+        );
       }
 
       return {
@@ -589,10 +586,10 @@ export default function PosterZoom({
             index === activeRoundIndex
               ? {
                   ...entry,
-                  feedback: {
-                    type: "error",
-                    message: "Enter a guess before submitting.",
-                  },
+                  feedback: createFeedback(
+                    "error",
+                    "Enter a guess before submitting.",
+                  ),
                 }
               : entry,
           ),
@@ -641,10 +638,10 @@ export default function PosterZoom({
                 yearGuesses,
                 completed: true,
                 canonicalTitle: matchTitle,
-                feedback: {
-                  type: "success",
-                  message: `Poster solved! ${matchTitle}`,
-                },
+                feedback: createFeedback(
+                  "success",
+                  `Poster solved! ${matchTitle}`,
+                ),
                 stage: totalStages,
                 hintUsed: true,
                 resolvedYear:
@@ -671,7 +668,7 @@ export default function PosterZoom({
                 guesses: [...entry.guesses, trimmed],
                 yearGuesses,
                 canonicalTitle: matchTitle,
-                feedback: { type: "partial", message: partialMessage },
+                feedback: createFeedback("partial", partialMessage),
                 lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
                 lastSeasonYearGuess:
                   parsedYear ?? entry.lastSeasonYearGuess,
@@ -683,10 +680,10 @@ export default function PosterZoom({
               ...entry,
               guesses: [...entry.guesses, trimmed],
               yearGuesses,
-              feedback: {
-                type: "error",
-                message: "Not quite. Keep trying!",
-              },
+              feedback: createFeedback(
+                "error",
+                "Not quite. Keep trying!",
+              ),
               stage: nextStage,
               hintUsed: nextStage > entry.stage ? true : entry.hintUsed,
               lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
@@ -727,7 +724,7 @@ export default function PosterZoom({
         setRoundStates((prev) =>
           prev.map((entry, index) =>
             index === activeRoundIndex
-              ? { ...entry, feedback: { type: "error", message } }
+              ? { ...entry, feedback: createFeedback("error", message) }
               : entry,
           ),
         );
@@ -767,10 +764,10 @@ export default function PosterZoom({
             index === activeRoundIndex
               ? {
                   ...entry,
-                  feedback: {
-                    type: "error",
-                    message: "Enter a guess before submitting.",
-                  },
+                  feedback: createFeedback(
+                    "error",
+                    "Enter a guess before submitting.",
+                  ),
                 }
               : entry,
           ),
