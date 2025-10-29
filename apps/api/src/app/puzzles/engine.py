@@ -20,7 +20,7 @@ from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
-from ..services import animethemes, anilist, title_index
+from ..services import animethemes, anilist, character_index, title_index
 from ..services.anilist import CoverImage, Media, MediaCharacterEdge, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
 from ..services.history_repository import (
@@ -845,10 +845,13 @@ async def _load_media_details(media_id: int, cache: CacheBackend, settings: Sett
     async with session_factory() as session:
         try:
             await title_index.ingest_media(session, media, variants)
+            await character_index.ingest_characters(
+                session, media.characters.edges if media.characters else []
+            )
             await session.commit()
         except Exception:  # pragma: no cover - index warming must not break gameplay
             await session.rollback()
-            logger.exception("Failed to warm title index for media %s", media.id)
+            logger.exception("Failed to warm search indices for media %s", media.id)
 
     return media
 

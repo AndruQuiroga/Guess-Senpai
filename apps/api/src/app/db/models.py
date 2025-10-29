@@ -186,3 +186,54 @@ class MediaTitleAlias(Base):
     )
 
     media_title: Mapped[MediaTitle] = relationship(back_populates="aliases")
+
+
+class CharacterEntry(Base):
+    __tablename__ = "character_entries"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    canonical_name: Mapped[str] = mapped_column(String(512))
+    normalized_name: Mapped[str] = mapped_column(String(512), index=True)
+    full_name: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    native_name: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    user_preferred_name: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    image_large: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    image_medium: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    aliases: Mapped[List["CharacterAlias"]] = relationship(
+        back_populates="character", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class CharacterAlias(Base):
+    __tablename__ = "character_aliases"
+    __table_args__ = (
+        UniqueConstraint("character_id", "normalized_alias", name="uq_character_alias_character"),
+        Index("ix_character_aliases_normalized_alias", "normalized_alias"),
+        Index(
+            "ix_character_aliases_trgm",
+            "alias",
+            postgresql_using="gin",
+            postgresql_ops={"alias": "gin_trgm_ops"},
+        ),
+        Index("ix_character_aliases_character_priority", "character_id", "priority"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    character_id: Mapped[int] = mapped_column(
+        ForeignKey("character_entries.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    alias: Mapped[str] = mapped_column(String(512), nullable=False)
+    normalized_alias: Mapped[str] = mapped_column(String(512), nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    priority: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    character: Mapped[CharacterEntry] = relationship(back_populates="aliases")
