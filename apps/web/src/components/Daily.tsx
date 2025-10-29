@@ -9,8 +9,8 @@ import {
 } from "react";
 
 import { GAMES_DIRECTORY } from "../config/games";
+import { useAccountStreak } from "../hooks/useAccount";
 import { GameKey, usePuzzleProgress } from "../hooks/usePuzzleProgress";
-import { useStreak } from "../hooks/useStreak";
 import {
   DailyPuzzleResponse,
   GamesPayload,
@@ -22,6 +22,7 @@ import {
   type ShareEventData,
 } from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
+import { projectStreakSnapshot } from "../utils/streak";
 import { GlassSection } from "./GlassSection";
 import SolutionReveal from "./SolutionReveal";
 import StreakWidget from "./StreakWidget";
@@ -269,8 +270,12 @@ export default function Daily({ data }: Props) {
 
   const requiredGames: GameKey[] = timelineEntries.map((entry) => entry.gameKey);
 
+  const { streak: accountStreak } = useAccountStreak();
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
-  const streakInfo = useStreak(data.date, allCompleted);
+  const streakInfo = useMemo(
+    () => projectStreakSnapshot(accountStreak, data.date, allCompleted),
+    [accountStreak, data.date, allCompleted],
+  );
   const streakCount = streakInfo.count;
 
   const shareEvent = useMemo<ShareEventData>(() => {
@@ -521,6 +526,7 @@ export default function Daily({ data }: Props) {
         <StreakWidget
           currentDateIso={data.date}
           completed={allCompleted}
+          streak={streakInfo}
           className="h-full"
         />
         <NotificationOptInCard />
