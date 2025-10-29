@@ -13,6 +13,7 @@ from app.puzzles.engine import _title_variants
 from app.routers import puzzles as puzzles_router
 from app.routers.puzzles import AnidleGuessEvaluationPayload, GuessVerificationPayload
 from app.services import character_index, title_index
+from app.services import anidle_evaluator
 from app.services.anilist import (
     Character,
     CharacterImage,
@@ -55,7 +56,7 @@ async def test_search_titles_prefers_index(monkeypatch: pytest.MonkeyPatch) -> N
         called_remote = True
         return []
 
-    monkeypatch.setattr(puzzles_router, "search_media", fake_search_media)
+    monkeypatch.setattr(anidle_evaluator, "search_media", fake_search_media)
 
     request = Request(scope={"type": "http", "headers": [], "app": None})
     response = await puzzles_router.search_titles(request, q="Indexed", limit=5)
@@ -125,7 +126,7 @@ async def test_evaluate_guess_falls_back_to_remote(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(puzzle_engine, "_load_media_details", fake_load_media_details)
     monkeypatch.setattr(puzzles_router.title_index, "search_titles", fake_search_titles)
-    monkeypatch.setattr(puzzles_router, "search_media", fake_search_media)
+    monkeypatch.setattr(anidle_evaluator, "search_media", fake_search_media)
 
     request = Request(scope={"type": "http", "headers": [], "app": None})
     payload = AnidleGuessEvaluationPayload(puzzle_media_id=target_media.id, guess="Guess Show")
@@ -171,6 +172,44 @@ async def test_put_progress_without_session_returns_request_payload(monkeypatch:
     assert response.date == payload.date
     assert response.progress == payload.progress
     assert called is False
+
+
+@pytest.mark.asyncio
+async def test_batch_evaluate_reuses_cached_media(monkeypatch: pytest.MonkeyPatch) -> None:
+    target_media = make_media(300, "Target Show")
+    guess_media = make_media(400, "Guess Show")
+    media_by_id = {target_media.id: target_media, guess_media.id: guess_media}
+
+    load_calls = {"count": 0}
+
+    async def fake_load_media_details(media_id: int, _cache, _settings):
+        load_calls["count"] += 1
+        return media_by_id[media_id]
+
+    async def fake_search_titles(session, query, limit=5):  # type: ignore[override]
+        return []
+
+    remote_calls = {"count": 0}
+
+    async def fake_search_media(query: str, limit: int = 5, token: str | None = None):
+        remote_calls["count"] += 1
+        return [MediaTitlePair(id=guess_media.id, title=guess_media.title)]
+
+    monkeypatch.setattr(puzzle_engine, "_load_media_details", fake_load_media_details)
+    monkeypatch.setattr(anidle_evaluator.title_index, "search_titles", fake_search_titles)
+    monkeypatch.setattr(anidle_evaluator, "search_media", fake_search_media)
+
+    request = Request(scope={"type": "http", "headers": [], "app": None})
+    payloads = [
+        AnidleGuessEvaluationPayload(puzzle_media_id=target_media.id, guess="Guess Show"),
+        AnidleGuessEvaluationPayload(puzzle_media_id=target_media.id, guess="Guess Show"),
+    ]
+
+    responses = await puzzles_router.evaluate_anidle_guess_batch(request, payloads)
+
+    assert len(responses) == 2
+    assert load_calls["count"] == 2
+    assert remote_calls["count"] == 1
 
 
 @pytest.mark.asyncio
