@@ -1,87 +1,16 @@
+import type { AnidleGuessEvaluation } from "../types/anidle";
+import {
+  normalizeAnidleEvaluation,
+  normalizeListFeedback,
+  normalizeScalarFeedback,
+} from "./normalizeAnidleEvaluation";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-
-export type ScalarStatus = "match" | "higher" | "lower" | "unknown";
-export type ListStatus = "match" | "miss";
-
-export interface ScalarFeedback {
-  guess: number | null;
-  target: number | null;
-  status: ScalarStatus;
-  guessSeason?: string | null;
-  targetSeason?: string | null;
-}
-
-export interface ListFeedbackItem {
-  value: string;
-  status: ListStatus;
-}
-
-export interface AnidleGuessEvaluation {
-  title: string;
-  correct: boolean;
-  year: ScalarFeedback;
-  averageScore: ScalarFeedback;
-  popularity: ScalarFeedback;
-  genres: ListFeedbackItem[];
-  tags: ListFeedbackItem[];
-  studios: ListFeedbackItem[];
-  source: ListFeedbackItem[];
-}
 
 interface EvaluateAnidleGuessPayload {
   puzzleMediaId: number;
   guess: string;
   guessMediaId?: number;
-}
-
-function normalizeScalar(value: unknown): ScalarFeedback {
-  if (!value || typeof value !== "object") {
-    return { guess: null, target: null, status: "unknown" };
-  }
-  const record = value as {
-    guess?: unknown;
-    target?: unknown;
-    status?: unknown;
-    guess_season?: unknown;
-    target_season?: unknown;
-  };
-  const guess = typeof record.guess === "number" ? record.guess : null;
-  const target = typeof record.target === "number" ? record.target : null;
-  const status =
-    record.status === "match" ||
-    record.status === "higher" ||
-    record.status === "lower" ||
-    record.status === "unknown"
-      ? record.status
-      : "unknown";
-  const guessSeason =
-    typeof record.guess_season === "string" ? record.guess_season : null;
-  const targetSeason =
-    typeof record.target_season === "string" ? record.target_season : null;
-  return { guess, target, status, guessSeason, targetSeason };
-}
-
-function normalizeList(value: unknown): ListFeedbackItem[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map((item) => {
-      if (!item || typeof item !== "object") {
-        return null;
-      }
-      const record = item as { value?: unknown; status?: unknown };
-      const label = typeof record.value === "string" ? record.value : null;
-      const status =
-        record.status === "match" || record.status === "miss"
-          ? record.status
-          : "miss";
-      if (!label) {
-        return null;
-      }
-      return { value: label, status } satisfies ListFeedbackItem;
-    })
-    .filter((item): item is ListFeedbackItem => Boolean(item));
 }
 
 export async function evaluateAnidleGuess({
@@ -119,12 +48,14 @@ export async function evaluateAnidleGuess({
   return {
     title: typeof payload.title === "string" ? payload.title : guess,
     correct: Boolean(payload.correct),
-    year: normalizeScalar(payload.year),
-    averageScore: normalizeScalar(payload.average_score),
-    popularity: normalizeScalar(payload.popularity),
-    genres: normalizeList(payload.genres),
-    tags: normalizeList(payload.tags),
-    studios: normalizeList(payload.studios),
-    source: normalizeList(payload.source),
+    year: normalizeScalarFeedback(payload.year),
+    averageScore: normalizeScalarFeedback(payload.average_score ?? payload.averageScore),
+    popularity: normalizeScalarFeedback(payload.popularity),
+    genres: normalizeListFeedback(payload.genres),
+    tags: normalizeListFeedback(payload.tags),
+    studios: normalizeListFeedback(payload.studios),
+    source: normalizeListFeedback(payload.source),
   };
 }
+
+export { normalizeAnidleEvaluation };

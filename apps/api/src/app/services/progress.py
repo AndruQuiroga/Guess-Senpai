@@ -53,6 +53,10 @@ def _deserialize_progress(raw: Any) -> Dict[str, GameProgressPayload]:
                     if legacy_key in value:
                         fallback_payload["rounds"] = value.get(legacy_key)
                         break
+            if "anidleHistory" in value:
+                fallback_payload["anidleHistory"] = value.get("anidleHistory")
+            elif "anidle_history" in value:
+                fallback_payload["anidleHistory"] = value.get("anidle_history")
         try:
             progress[key] = GameProgressPayload.model_validate(fallback_payload)
         except Exception:

@@ -11,14 +11,16 @@ import {
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { AnidleGame as AnidlePayload } from "../types/puzzles";
-import {
-  evaluateAnidleGuess,
-  type AnidleGuessEvaluation,
-  type ListFeedbackItem,
-  type ListStatus,
-  type ScalarFeedback,
-  type ScalarStatus,
-} from "../utils/evaluateAnidleGuess";
+import { evaluateAnidleGuess } from "../utils/evaluateAnidleGuess";
+import type {
+  AnidleGuessEvaluation,
+  AnidleGuessHistoryEntry,
+  ListFeedbackItem,
+  ListStatus,
+  ScalarFeedback,
+  ScalarStatus,
+} from "../types/anidle";
+import { CURRENT_ANIDLE_EVALUATION_VERSION } from "../types/anidle";
 import NextPuzzleButton from "./NextPuzzleButton";
 import {
   TitleGuessField,
@@ -136,13 +138,18 @@ export default function Anidle({
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [guess, setGuess] = useState("");
-  const [guesses, setGuesses] = useState<string[]>(
-    initialProgress?.guesses ?? [],
+  const [historyEntries, setHistoryEntries] = useState<AnidleGuessHistoryEntry[]>(
+    () => {
+      if (initialProgress?.anidleHistory?.length) {
+        return initialProgress.anidleHistory.map((entry) => ({ ...entry }));
+      }
+      const storedGuesses = initialProgress?.guesses ?? [];
+      return storedGuesses.map((value) => ({ guess: value }));
+    },
   );
   const [completed, setCompleted] = useState(
     initialProgress?.completed ?? false,
   );
-  const [evaluations, setEvaluations] = useState<AnidleGuessEvaluation[]>([]);
   const [hydrating, setHydrating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -164,36 +171,34 @@ export default function Anidle({
   );
 
   useEffect(() => {
-    const storedGuesses = initialProgress?.guesses ?? [];
-    const hydrationKey = storedGuesses.join("||");
     const puzzleChanged = previousMediaIdRef.current !== mediaId;
-    const noStoredGuesses = storedGuesses.length === 0;
-    const guessListChanged = hydratedGuessesKeyRef.current !== hydrationKey;
+    const normalizedHistory =
+      initialProgress?.anidleHistory?.length
+        ? initialProgress.anidleHistory.map((entry) => ({ ...entry }))
+        : (initialProgress?.guesses ?? []).map((value) => ({ guess: value }));
+
+    setHistoryEntries(normalizedHistory);
 
     if (!initialProgress) {
       setRound(1);
-      setGuesses([]);
       setCompleted(false);
     } else {
       setRound(initialProgress.round ?? 1);
-      setGuesses(storedGuesses);
       setCompleted(initialProgress.completed ?? false);
     }
+
     setGuess("");
-    if (puzzleChanged || noStoredGuesses) {
-      setEvaluations([]);
-    }
     setErrorMessage(null);
     setHydrating(false);
-    setHydrationProgress({ completed: 0, total: 0 });
+    setHydrationProgress({ completed: 0, total: normalizedHistory.length });
     hydratedGuessesKeyRef.current = null;
 
-    if (puzzleChanged || guessListChanged) {
-      hydratedGuessesKeyRef.current = null;
+    if (puzzleChanged) {
+      evaluationCacheRef.current.clear();
     }
 
     previousMediaIdRef.current = mediaId;
-  }, [initialProgress, mediaId, payload.answer]);
+  }, [initialProgress, mediaId]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -202,9 +207,24 @@ export default function Anidle({
     });
   }, [registerRoundController]);
 
+  const guessValues = useMemo(
+    () => historyEntries.map((entry) => entry.guess),
+    [historyEntries],
+  );
+
   const incorrectGuessCount = useMemo(
-    () => Math.max(0, guesses.length - (completed ? 1 : 0)),
-    [completed, guesses.length],
+    () => Math.max(0, historyEntries.length - (completed ? 1 : 0)),
+    [completed, historyEntries.length],
+  );
+
+  const evaluations = useMemo(
+    () =>
+      historyEntries
+        .map((entry) => entry.evaluation)
+        .filter(
+          (entry): entry is AnidleGuessEvaluation => Boolean(entry),
+        ),
+    [historyEntries],
   );
 
   const aggregatedHints = useMemo<AggregatedHint[]>(() => {
@@ -327,8 +347,21 @@ export default function Anidle({
   );
 
   useEffect(() => {
-    onProgressChange({ completed, round, guesses });
-  }, [completed, round, guesses, onProgressChange]);
+    const historySnapshot = historyEntries.map((entry) => ({
+      guess: entry.guess,
+      guessMediaId: entry.guessMediaId ?? null,
+      evaluation: entry.evaluation,
+      evaluationVersion: entry.evaluationVersion,
+      evaluatedAt: entry.evaluatedAt,
+    }));
+
+    onProgressChange({
+      completed,
+      round,
+      guesses: guessValues,
+      anidleHistory: historySnapshot,
+    });
+  }, [completed, round, guessValues, historyEntries, onProgressChange]);
 
   const createFallbackEvaluation = useCallback(
     (title: string): AnidleGuessEvaluation => ({
@@ -360,6 +393,16 @@ export default function Anidle({
     [mediaId],
   );
 
+  const getHistoryKey = useCallback((entries: AnidleGuessHistoryEntry[]) => {
+    return entries
+      .map((entry) =>
+        `${entry.guess.trim().toLowerCase()}::${entry.guessMediaId ?? ""}::${
+          entry.evaluationVersion ?? ""
+        }`,
+      )
+      .join("||");
+  }, []);
+
   const yieldToMainThread = useCallback(async () => {
     await new Promise<void>((resolve) => {
       if (typeof window !== "undefined" && window.requestAnimationFrame) {
@@ -371,139 +414,181 @@ export default function Anidle({
   }, []);
 
   useEffect(() => {
-    const storedGuesses = initialProgress?.guesses ?? [];
-    const hydrationKey = storedGuesses.join("||");
-    if (storedGuesses.length === 0) {
+    const entries = historyEntries;
+    const hydrationKey = getHistoryKey(entries);
+
+    if (entries.length === 0) {
       hydratedGuessesKeyRef.current = "";
-      setEvaluations([]);
       setHydrating(false);
       setHydrationProgress({ completed: 0, total: 0 });
       return;
     }
+
     if (hydratedGuessesKeyRef.current === hydrationKey) {
       return;
     }
 
     let cancelled = false;
     hydratedGuessesKeyRef.current = hydrationKey;
+
+    const pending = entries
+      .map((entry, index) => ({ entry, index }))
+      .filter(
+        ({ entry }) =>
+          !entry.evaluation ||
+          entry.evaluationVersion !== CURRENT_ANIDLE_EVALUATION_VERSION,
+      );
+
+    const total = entries.length;
+    const initialCompleted = total - pending.length;
+
+    entries.forEach((entry) => {
+      if (
+        entry.evaluation &&
+        entry.evaluationVersion === CURRENT_ANIDLE_EVALUATION_VERSION
+      ) {
+        const cacheKey = getCacheKey(entry.guess, entry.guessMediaId ?? null);
+        evaluationCacheRef.current.set(cacheKey, entry.evaluation);
+      }
+    });
+
+    if (pending.length === 0) {
+      setHydrating(false);
+      setHydrationProgress({ completed: total, total });
+      return;
+    }
+
     setHydrating(true);
-    setHydrationProgress({ completed: 0, total: storedGuesses.length });
+    setHydrationProgress({ completed: initialCompleted, total });
 
-    async function hydrate() {
+    const pendingResults = new Map<
+      number,
+      { evaluation: AnidleGuessEvaluation; evaluatedAt: string }
+    >();
+
+    let completedCount = initialCompleted;
+    let lastFlushedCount = initialCompleted;
+    let cursor = 0;
+    const workerCount = Math.min(
+      HYDRATION_CONCURRENCY,
+      Math.max(pending.length, 1),
+    );
+
+    const flush = async (force = false) => {
+      if (cancelled) return;
+      if (
+        !force &&
+        completedCount - lastFlushedCount < HYDRATION_BATCH_SIZE
+      ) {
+        return;
+      }
+
+      lastFlushedCount = completedCount;
+      setHydrationProgress({ completed: completedCount, total });
+      await yieldToMainThread();
+    };
+
+    const hydrateEntry = async (
+      value: string,
+      guessMediaId: number | null,
+    ): Promise<AnidleGuessEvaluation> => {
+      const guessValue = value.trim();
+      if (!guessValue) {
+        return createFallbackEvaluation(value);
+      }
+
+      const cacheKey = getCacheKey(guessValue, guessMediaId);
+      const cached = evaluationCacheRef.current.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       try {
-        const total = storedGuesses.length;
-        const results: (AnidleGuessEvaluation | undefined)[] = new Array(total);
-        let completedCount = 0;
-        let lastFlushedCount = 0;
-
-        const flush = async (force = false) => {
-          if (cancelled) return;
-          if (
-            !force &&
-            completedCount - lastFlushedCount < HYDRATION_BATCH_SIZE
-          ) {
-            return;
-          }
-          lastFlushedCount = completedCount;
-          const hydrated = results.filter(
-            (entry): entry is AnidleGuessEvaluation => Boolean(entry),
-          );
-          setEvaluations(hydrated);
-          setHydrationProgress({
-            completed: completedCount,
-            total,
-          });
-          await yieldToMainThread();
-        };
-
-        const hydrateGuess = async (
-          value: string,
-        ): Promise<AnidleGuessEvaluation> => {
-          const guessValue = value.trim();
-          let evaluation: AnidleGuessEvaluation;
-          let cacheKey: string | null = null;
-
-          if (!guessValue) {
-            evaluation = createFallbackEvaluation(value);
-          } else {
-            cacheKey = getCacheKey(guessValue);
-            const cached = evaluationCacheRef.current.get(cacheKey);
-
-            if (cached) {
-              evaluation = cached;
-            } else {
-              try {
-                const fetched = await evaluateAnidleGuess({
-                  puzzleMediaId: mediaId,
-                  guess: guessValue,
-                });
-                evaluation = fetched;
-                if (!cancelled) {
-                  evaluationCacheRef.current.set(cacheKey, fetched);
-                }
-              } catch (error) {
-                if (!cancelled) {
-                  console.warn("Failed to rebuild Anidle evaluation", error);
-                }
-                evaluation = createFallbackEvaluation(value);
-              }
-            }
-
-            if (
-              !cancelled &&
-              cacheKey &&
-              !evaluationCacheRef.current.has(cacheKey)
-            ) {
-              evaluationCacheRef.current.set(cacheKey, evaluation);
-            }
-          }
-
-          return evaluation;
-        };
-
-        let cursor = 0;
-        const workerCount = Math.min(HYDRATION_CONCURRENCY, total);
-
-        async function worker() {
-          while (!cancelled) {
-            if (cursor >= total) {
-              break;
-            }
-            const index = cursor;
-            cursor += 1;
-            const value = storedGuesses[index];
-            const evaluation = await hydrateGuess(value);
-            if (cancelled) {
-              break;
-            }
-            results[index] = evaluation;
-            completedCount += 1;
-            if (completedCount % HYDRATION_YIELD_INTERVAL === 0) {
-              await yieldToMainThread();
-            }
-            await flush();
-          }
+        const fetched = await evaluateAnidleGuess({
+          puzzleMediaId: mediaId,
+          guess: guessValue,
+          guessMediaId: guessMediaId ?? undefined,
+        });
+        const resolvedCorrect =
+          fetched.correct || guessValue.toLowerCase() === normalizedAnswer;
+        const evaluationRecord: AnidleGuessEvaluation = resolvedCorrect
+          ? { ...fetched, correct: true }
+          : fetched;
+        evaluationCacheRef.current.set(cacheKey, evaluationRecord);
+        return evaluationRecord;
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to rebuild Anidle evaluation", error);
         }
+        const fallback = createFallbackEvaluation(value);
+        evaluationCacheRef.current.set(cacheKey, fallback);
+        return fallback;
+      }
+    };
 
-        const workers = Array.from({ length: workerCount }, () => worker());
+    async function worker() {
+      while (!cancelled) {
+        if (cursor >= pending.length) {
+          break;
+        }
+        const pendingIndex = cursor;
+        cursor += 1;
+        const { entry, index } = pending[pendingIndex];
+        const evaluation = await hydrateEntry(
+          entry.guess,
+          entry.guessMediaId ?? null,
+        );
+        if (cancelled) {
+          break;
+        }
+        completedCount += 1;
+        pendingResults.set(index, {
+          evaluation,
+          evaluatedAt: new Date().toISOString(),
+        });
+        if (completedCount % HYDRATION_YIELD_INTERVAL === 0) {
+          await yieldToMainThread();
+        }
+        await flush();
+      }
+    }
+
+    const workers = Array.from({ length: workerCount }, () => worker());
+
+    async function run() {
+      try {
         await Promise.all(workers);
-
         if (!cancelled) {
           completedCount = total;
           await flush(true);
+          if (pendingResults.size > 0) {
+            const mergedEntries = entries.map((entry, index) => {
+              const update = pendingResults.get(index);
+              if (!update) {
+                return entry;
+              }
+              return {
+                ...entry,
+                evaluation: update.evaluation,
+                evaluationVersion: CURRENT_ANIDLE_EVALUATION_VERSION,
+                evaluatedAt: update.evaluatedAt,
+              };
+            });
+            setHistoryEntries(mergedEntries);
+            hydratedGuessesKeyRef.current = getHistoryKey(mergedEntries);
+          } else {
+            hydratedGuessesKeyRef.current = hydrationKey;
+          }
         }
       } finally {
         if (!cancelled) {
           setHydrating(false);
-          setHydrationProgress((prev) => ({
-            completed: prev.total,
-            total: prev.total,
-          }));
+          setHydrationProgress({ completed: total, total });
         }
       }
     }
 
-    void hydrate();
+    void run();
 
     return () => {
       cancelled = true;
@@ -512,8 +597,10 @@ export default function Anidle({
   }, [
     createFallbackEvaluation,
     getCacheKey,
-    initialProgress,
+    getHistoryKey,
+    historyEntries,
     mediaId,
+    normalizedAnswer,
     yieldToMainThread,
   ]);
 
@@ -547,12 +634,18 @@ export default function Anidle({
           evaluationRecord,
         );
 
-        setGuesses((prev) => {
-          const next = [...prev, value];
-          hydratedGuessesKeyRef.current = next.join("||");
+        setHistoryEntries((prev) => {
+          const entry: AnidleGuessHistoryEntry = {
+            guess: value,
+            guessMediaId: suggestionId ?? null,
+            evaluation: evaluationRecord,
+            evaluationVersion: CURRENT_ANIDLE_EVALUATION_VERSION,
+            evaluatedAt: new Date().toISOString(),
+          };
+          const next = [...prev, entry];
+          hydratedGuessesKeyRef.current = getHistoryKey(next);
           return next;
         });
-        setEvaluations((prev) => [...prev, evaluationRecord]);
 
         if (resolvedCorrect) {
           setCompleted(true);
@@ -570,7 +663,14 @@ export default function Anidle({
         setSubmitting(false);
       }
     },
-    [advanceRound, getCacheKey, mediaId, normalizedAnswer, submitting],
+    [
+      advanceRound,
+      getCacheKey,
+      getHistoryKey,
+      mediaId,
+      normalizedAnswer,
+      submitting,
+    ],
   );
 
   const handleFieldSubmit = useCallback(

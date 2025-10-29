@@ -3,7 +3,12 @@ from __future__ import annotations
 import asyncio
 from datetime import date, timedelta
 
-from app.puzzles.models import DailyProgressPayload, GameProgressPayload, StreakPayload
+from app.puzzles.models import (
+    AnidleGuessHistoryEntryPayload,
+    DailyProgressPayload,
+    GameProgressPayload,
+    StreakPayload,
+)
 from app.services import progress
 
 def test_daily_progress_persistence_and_merge() -> None:
@@ -18,7 +23,18 @@ def test_daily_progress_persistence_and_merge() -> None:
         first = DailyProgressPayload(
             date=day,
             progress={
-                "anidle": GameProgressPayload(completed=True, round=3, guesses=["foo"]),
+                "anidle": GameProgressPayload(
+                    completed=True,
+                    round=3,
+                    guesses=["foo"],
+                    anidle_history=[
+                        AnidleGuessHistoryEntryPayload(
+                            guess="foo",
+                            evaluation={"title": "foo"},
+                            evaluation_version=1,
+                        )
+                    ],
+                ),
             },
         )
         await progress.store_daily_progress(user_id, first)
@@ -26,6 +42,8 @@ def test_daily_progress_persistence_and_merge() -> None:
         stored = await progress.load_daily_progress(user_id, day)
         assert stored.progress["anidle"].completed is True
         assert stored.progress["anidle"].round == 3
+        assert stored.progress["anidle"].anidle_history is not None
+        assert stored.progress["anidle"].anidle_history[0].guess == "foo"
 
         second = DailyProgressPayload(
             date=day,
@@ -50,6 +68,8 @@ def test_daily_progress_persistence_and_merge() -> None:
         overwritten = await progress.load_daily_progress(user_id, day)
         assert overwritten.progress["anidle"].completed is False
         assert overwritten.progress["anidle"].round == 2
+        assert overwritten.progress["anidle"].anidle_history is not None
+        assert overwritten.progress["anidle"].anidle_history[0].guess == "baz"
         assert overwritten.progress["poster"].round == 1
 
     asyncio.run(_scenario())

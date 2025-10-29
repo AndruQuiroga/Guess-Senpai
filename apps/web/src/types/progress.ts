@@ -1,3 +1,5 @@
+import type { AnidleGuessHistoryEntry } from "./anidle";
+
 export type GameKey =
   | "anidle"
   | "poster_zoomed"
@@ -32,6 +34,7 @@ export interface GameProgress {
   round: number;
   guesses: string[];
   rounds?: GameRoundProgress[];
+  anidleHistory?: AnidleGuessHistoryEntry[];
 }
 
 export type DailyProgress = Partial<Record<GameKey, GameProgress>>;
