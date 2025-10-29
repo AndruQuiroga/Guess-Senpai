@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
-from typing import Iterable, Sequence
+from dataclasses import dataclass
+from typing import Iterable, Optional, Sequence
 
 from sqlalchemy import func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -33,6 +34,18 @@ def normalize_name(value: str | None) -> str:
     text = re.sub(r"[^0-9A-Za-z]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text.casefold()
+
+
+@dataclass(frozen=True)
+class CharacterMatch:
+    character_id: int
+    name: str
+    normalized: str
+    source: str
+    priority: int
+    is_exact: bool
+    canonical_name: str
+    image: Optional[str]
 
 
 def _determine_source(value: str, character: Character) -> str:
@@ -274,3 +287,113 @@ async def ingest_characters(
             await ingest_character(session, character)
         except Exception:  # pragma: no cover - defensive logging
             logger.exception("Failed to ingest character %s", character.id)
+
+
+async def search_characters(
+    session: AsyncSession,
+    query: str,
+    limit: int = 8,
+) -> list[CharacterMatch]:
+    normalized_query = normalize_name(query)
+    results: dict[int, CharacterMatch] = {}
+
+    if normalized_query:
+        stmt = (
+            select(CharacterAlias, CharacterEntry)
+            .join(CharacterEntry, CharacterAlias.character_id == CharacterEntry.id)
+            .where(CharacterAlias.normalized_alias == normalized_query)
+            .order_by(CharacterAlias.priority.asc())
+            .limit(limit)
+        )
+        rows = await session.execute(stmt)
+        for alias_obj, entry in rows.all():
+            image = entry.image_large or entry.image_medium
+            results[alias_obj.character_id] = CharacterMatch(
+                character_id=alias_obj.character_id,
+                name=alias_obj.alias,
+                normalized=alias_obj.normalized_alias,
+                source=alias_obj.source,
+                priority=alias_obj.priority,
+                is_exact=True,
+                canonical_name=entry.canonical_name,
+                image=image,
+            )
+
+    if len(results) < limit:
+        pattern = f"%{query}%"
+        stmt = (
+            select(CharacterAlias, CharacterEntry)
+            .join(CharacterEntry, CharacterAlias.character_id == CharacterEntry.id)
+            .where(CharacterAlias.alias.ilike(pattern))
+            .order_by(CharacterAlias.priority.asc(), func.length(CharacterAlias.alias))
+            .limit(limit * 3)
+        )
+        rows = await session.execute(stmt)
+        for alias_obj, entry in rows.all():
+            if alias_obj.character_id in results:
+                continue
+            image = entry.image_large or entry.image_medium
+            results[alias_obj.character_id] = CharacterMatch(
+                character_id=alias_obj.character_id,
+                name=alias_obj.alias,
+                normalized=alias_obj.normalized_alias,
+                source=alias_obj.source,
+                priority=alias_obj.priority,
+                is_exact=alias_obj.normalized_alias == normalized_query,
+                canonical_name=entry.canonical_name,
+                image=image,
+            )
+            if len(results) >= limit:
+                break
+
+    if len(results) < limit:
+        pattern = f"%{query}%"
+        stmt = (
+            select(CharacterEntry)
+            .where(CharacterEntry.canonical_name.ilike(pattern))
+            .order_by(func.length(CharacterEntry.canonical_name))
+            .limit(limit * 2)
+        )
+        rows = await session.execute(stmt)
+        for entry in rows.scalars():
+            if entry.id in results:
+                continue
+            image = entry.image_large or entry.image_medium
+            results[entry.id] = CharacterMatch(
+                character_id=entry.id,
+                name=entry.canonical_name,
+                normalized=entry.normalized_name,
+                source="canonical",
+                priority=SOURCE_PRIORITY["canonical"],
+                is_exact=entry.normalized_name == normalized_query,
+                canonical_name=entry.canonical_name,
+                image=image,
+            )
+            if len(results) >= limit:
+                break
+
+    ordered = sorted(
+        results.values(),
+        key=lambda item: (
+            0 if item.is_exact else 1,
+            item.priority,
+            len(item.name),
+        ),
+    )
+    return ordered[:limit]
+
+
+async def load_character_aliases(
+    session: AsyncSession,
+    character_id: int,
+    *,
+    limit: int = 100,
+) -> list[str]:
+    stmt = (
+        select(CharacterAlias.alias)
+        .where(CharacterAlias.character_id == character_id)
+        .order_by(CharacterAlias.priority.asc(), func.length(CharacterAlias.alias))
+        .limit(limit)
+    )
+    rows = await session.execute(stmt)
+    return list(rows.scalars())

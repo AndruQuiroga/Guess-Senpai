@@ -22,7 +22,7 @@ from ..puzzles.models import (
     RecentMediaSummary,
     StreakPayload,
 )
-from ..services import title_index
+from ..services import character_index, title_index
 from ..services.cache import get_cache
 from ..services.progress import (
     load_daily_progress,
@@ -87,6 +87,17 @@ class TitleSuggestionResponse(BaseModel):
     results: list[TitleSuggestion]
 
 
+class CharacterSuggestion(BaseModel):
+    id: int
+    title: str
+    canonical: Optional[str] = None
+    image: Optional[str] = None
+
+
+class CharacterSuggestionResponse(BaseModel):
+    results: list[CharacterSuggestion]
+
+
 class ArchiveIndexResponse(BaseModel):
     dates: list[str]
 
@@ -126,11 +137,17 @@ class GuessVerificationPayload(BaseModel):
     media_id: int
     guess: str
     guess_media_id: Optional[int] = None
+    character_guess: Optional[str] = None
+    guess_character_id: Optional[int] = None
 
 
 class GuessVerificationResponse(BaseModel):
     correct: bool
+    anime_match: bool
+    character_match: Optional[bool] = None
     match: Optional[str] = None
+    character: Optional[str] = None
+    character_id: Optional[int] = None
 
 
 def _generate_archive_dates(history_days: int) -> list[str]:
@@ -337,6 +354,10 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
     if not guess:
         raise HTTPException(status_code=400, detail="Guess cannot be empty")
 
+    character_guess = (
+        payload.character_guess.strip() if payload.character_guess else None
+    )
+
     cache = await get_cache(settings.redis_url)
     try:
         media = await puzzle_engine._load_media_details(payload.media_id, cache, settings)
@@ -360,22 +381,98 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
             guess_media = None
 
     match = None
+    anime_match = False
     if guess_media is not None:
         guess_variants = _title_variants(guess_media)
         for variant in guess_variants:
             if variant and _normalize(variant) in normalized_variants:
                 match = variant
+                anime_match = True
                 break
         if guess_media.id == media.id and match is None:
             match = _choose_answer(media)
+            anime_match = True
 
     if match is None:
         for variant in variants:
             if variant and _normalize(variant) == normalized_guess:
                 match = variant
+                anime_match = True
                 break
 
-    return GuessVerificationResponse(correct=match is not None, match=match)
+    if match is not None:
+        anime_match = True
+
+    character_match: Optional[bool] = None
+    resolved_character: Optional[str] = None
+    resolved_character_id: Optional[int] = None
+    evaluate_character = (
+        payload.guess_character_id is not None or character_guess is not None
+    )
+
+    if evaluate_character:
+        target_edge = puzzle_engine._select_character_edge(media)
+        if target_edge and target_edge.node:
+            resolved_character_id = target_edge.node.id
+            resolved_character = (
+                target_edge.node.name.full
+                or target_edge.node.name.userPreferred
+                or target_edge.node.name.native
+                or None
+            )
+
+            matched = False
+            evaluated = False
+
+            if payload.guess_character_id is not None:
+                evaluated = True
+                if payload.guess_character_id == resolved_character_id:
+                    matched = True
+
+            normalized_targets: set[str] = set()
+            base_names = [
+                target_edge.node.name.full,
+                target_edge.node.name.userPreferred,
+                target_edge.node.name.native,
+            ]
+
+            alias_values: list[str] = []
+            if character_guess:
+                session_factory = get_session_factory()
+                async with session_factory() as session:
+                    alias_values = await character_index.load_character_aliases(
+                        session, resolved_character_id
+                    )
+            for value in base_names + alias_values:
+                normalized = character_index.normalize_name(value)
+                if normalized:
+                    normalized_targets.add(normalized)
+
+            if character_guess:
+                normalized_character_guess = character_index.normalize_name(
+                    character_guess
+                )
+                if normalized_character_guess:
+                    evaluated = True
+                    if normalized_character_guess in normalized_targets:
+                        matched = True
+
+            character_match = matched if evaluated else None
+        else:
+            character_match = None
+
+    correct = anime_match
+    if character_match is not None:
+        correct = correct and character_match
+
+    return GuessVerificationResponse(
+        correct=correct,
+        anime_match=anime_match,
+        character_match=character_match,
+        match=match,
+        character=resolved_character,
+        character_id=resolved_character_id,
+    )
 
 
 @router.post("/anidle/evaluate", response_model=AnidleGuessEvaluationResponse)
@@ -554,6 +651,31 @@ async def search_titles(
 
     # No matches even after remote lookup; return empty set.
     return TitleSuggestionResponse(results=[])
+
+
+@router.get("/search-characters", response_model=CharacterSuggestionResponse)
+async def search_characters(
+    q: str = Query(..., description="Search term for an anime character"),
+    limit: int = Query(default=8, ge=1, le=20),
+) -> CharacterSuggestionResponse:
+    search_term = q.strip()
+    if not search_term:
+        return CharacterSuggestionResponse(results=[])
+
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        matches = await character_index.search_characters(session, search_term, limit=limit)
+
+    suggestions = [
+        CharacterSuggestion(
+            id=match.character_id,
+            title=match.name,
+            canonical=match.canonical_name,
+            image=match.image,
+        )
+        for match in matches
+    ]
+    return CharacterSuggestionResponse(results=suggestions)
 
 
 @router.get("/archive", response_model=ArchiveIndexResponse)
