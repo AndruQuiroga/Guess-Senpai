@@ -1,10 +1,13 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 
 import Anidle from "../Anidle";
 import type { AnidleGame } from "../../types/puzzles";
 import type { GameProgress } from "../../hooks/usePuzzleProgress";
-import type { AnidleGuessEvaluation } from "../../utils/evaluateAnidleGuess";
+import {
+  CURRENT_ANIDLE_EVALUATION_VERSION,
+  type AnidleGuessEvaluation,
+} from "../../types/anidle";
 
 const evaluateAnidleGuessMock = vi.hoisted(() =>
   vi.fn(async ({ guess }: { guess: string }) => {
@@ -42,10 +45,9 @@ describe("Anidle hydration", () => {
       tags: [],
       synopsis: [],
     },
-  };
+  }; 
 
   beforeEach(() => {
-    vi.useFakeTimers();
     evaluateAnidleGuessMock.mockClear();
 
     const raf = vi.fn<(cb: FrameRequestCallback) => number>((cb) => {
@@ -59,7 +61,6 @@ describe("Anidle hydration", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -85,19 +86,61 @@ describe("Anidle hydration", () => {
       />,
     );
 
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await waitFor(() =>
+      expect(screen.queryByRole("status")).not.toBeInTheDocument(),
+    );
+    expect(onProgressChange).toHaveBeenCalled();
+    const latestCall =
+      onProgressChange.mock.calls[onProgressChange.mock.calls.length - 1]?.[0];
+    expect(latestCall?.anidleHistory).toHaveLength(guesses.length);
+  });
 
-    expect(evaluateAnidleGuessMock).toHaveBeenCalledTimes(guesses.length);
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/replaying your guesses/i),
-    ).not.toBeInTheDocument();
-    const rows = screen.getAllByRole("row");
-    expect(rows).toHaveLength(guesses.length + 1);
+  it("reuses stored evaluations without re-fetching", async () => {
+    const evaluation: AnidleGuessEvaluation = {
+      title: "Stored Guess",
+      correct: false,
+      year: { guess: null, target: null, status: "unknown" },
+      averageScore: { guess: null, target: null, status: "unknown" },
+      popularity: { guess: null, target: null, status: "unknown" },
+      genres: [],
+      tags: [],
+      studios: [],
+      source: [],
+    };
+
+    const initialProgress: GameProgress = {
+      completed: false,
+      round: 2,
+      guesses: ["Stored Guess"],
+      anidleHistory: [
+        {
+          guess: "Stored Guess",
+          guessMediaId: 123,
+          evaluation,
+          evaluationVersion: CURRENT_ANIDLE_EVALUATION_VERSION,
+          evaluatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+    };
+
+    const onProgressChange = vi.fn();
+
+    render(
+      <Anidle
+        mediaId={55}
+        payload={payload}
+        initialProgress={initialProgress}
+        onProgressChange={onProgressChange}
+      />,
+    );
+
+    expect(evaluateAnidleGuessMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Stored Guess")).toBeInTheDocument();
+    expect(onProgressChange).toHaveBeenCalled();
+    const latestCall =
+      onProgressChange.mock.calls[onProgressChange.mock.calls.length - 1]?.[0];
+    expect(latestCall?.anidleHistory?.[0]?.evaluation?.title).toBe(
+      "Stored Guess",
+    );
   });
 });

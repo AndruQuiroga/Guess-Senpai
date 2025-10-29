@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { AnidleGuessHistoryEntry } from "../types/anidle";
+import { normalizeAnidleEvaluation } from "../utils/normalizeAnidleEvaluation";
 import type {
   DailyProgress,
   GameKey,
@@ -112,6 +114,110 @@ function normalizeYearGuessList(value: unknown): number[] {
     }
   }
   return result;
+}
+
+function normalizeAnidleHistoryEntry(
+  value: unknown,
+): AnidleGuessHistoryEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const rawGuess =
+    record.guess ?? record.value ?? record.title ?? record["guessValue"];
+
+  let guess: string | null = null;
+  if (typeof rawGuess === "string") {
+    const trimmed = rawGuess.trim();
+    if (trimmed) {
+      guess = trimmed;
+    }
+  } else if (typeof rawGuess === "number" && Number.isFinite(rawGuess)) {
+    guess = String(Math.trunc(rawGuess));
+  }
+
+  if (!guess) {
+    return null;
+  }
+
+  const rawMediaId =
+    record.guessMediaId ??
+    record.guess_media_id ??
+    record.mediaId ??
+    record.media_id;
+  let guessMediaId: number | null = null;
+  if (typeof rawMediaId === "number" && Number.isFinite(rawMediaId)) {
+    guessMediaId = Math.trunc(rawMediaId);
+  }
+
+  const rawEvaluationVersion =
+    record.evaluationVersion ?? record.evaluation_version;
+  const evaluationVersion =
+    typeof rawEvaluationVersion === "number" &&
+    Number.isFinite(rawEvaluationVersion)
+      ? Math.trunc(rawEvaluationVersion)
+      : undefined;
+
+  const rawEvaluatedAt = record.evaluatedAt ?? record.evaluated_at;
+  const evaluatedAt =
+    typeof rawEvaluatedAt === "string" && rawEvaluatedAt.trim()
+      ? rawEvaluatedAt
+      : undefined;
+
+  const rawEvaluation =
+    record.evaluation ??
+    record.evaluationPayload ??
+    record.evaluation_payload ??
+    record.feedback;
+
+  const evaluation =
+    rawEvaluation === undefined || rawEvaluation === null
+      ? undefined
+      : normalizeAnidleEvaluation(rawEvaluation, guess) ?? undefined;
+
+  const entry: AnidleGuessHistoryEntry = {
+    guess,
+    guessMediaId: guessMediaId ?? null,
+  };
+
+  if (evaluationVersion !== undefined) {
+    entry.evaluationVersion = evaluationVersion;
+  }
+  if (evaluatedAt) {
+    entry.evaluatedAt = evaluatedAt;
+  }
+  if (evaluation) {
+    entry.evaluation = evaluation;
+  }
+
+  return entry;
+}
+
+function normalizeAnidleHistory(
+  value: unknown,
+): { entries: AnidleGuessHistoryEntry[]; hadInput: boolean } | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  if (value === null) {
+    return { entries: [], hadInput: true };
+  }
+
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => normalizeAnidleHistoryEntry(entry))
+      .filter((entry): entry is AnidleGuessHistoryEntry => Boolean(entry));
+    return { entries: normalized, hadInput: true };
+  }
+
+  if (typeof value === "object") {
+    const single = normalizeAnidleHistoryEntry(value);
+    return { entries: single ? [single] : [], hadInput: true };
+  }
+
+  return { entries: [], hadInput: true };
 }
 
 function normalizeGameRoundProgress(value: unknown): GameRoundProgress | null {
@@ -322,6 +428,23 @@ function normalizeGameProgressEntry(value: unknown): GameProgress | null {
     }
   }
 
+  const rawAnidleHistory =
+    recordEntries["anidleHistory"] ?? recordEntries["anidle_history"];
+  const normalizedHistoryResult = normalizeAnidleHistory(rawAnidleHistory);
+  let anidleHistory: AnidleGuessHistoryEntry[] | undefined;
+
+  if (normalizedHistoryResult) {
+    if (normalizedHistoryResult.entries.length > 0) {
+      anidleHistory = normalizedHistoryResult.entries;
+    } else if (normalizedHistoryResult.hadInput) {
+      anidleHistory = [];
+    }
+  }
+
+  if (!anidleHistory && guesses.length > 0) {
+    anidleHistory = guesses.map((guess) => ({ guess }));
+  }
+
   const normalized: GameProgress = {
     completed,
     round,
@@ -330,6 +453,10 @@ function normalizeGameProgressEntry(value: unknown): GameProgress | null {
 
   if (rounds) {
     normalized.rounds = rounds;
+  }
+
+  if (anidleHistory !== undefined) {
+    normalized.anidleHistory = anidleHistory;
   }
 
   return normalized;

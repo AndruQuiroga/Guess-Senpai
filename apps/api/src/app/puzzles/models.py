@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
-from typing import Dict, List, Optional
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
@@ -339,6 +339,64 @@ class GameRoundProgressPayload(BaseModel):
         return self
 
 
+class AnidleGuessHistoryEntryPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    guess: str
+    guess_media_id: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("guess_media_id", "guessMediaId"),
+        serialization_alias="guessMediaId",
+    )
+    evaluation: Optional[Dict[str, Any]] = None
+    evaluation_version: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("evaluation_version", "evaluationVersion"),
+        serialization_alias="evaluationVersion",
+    )
+    evaluated_at: Optional[datetime] = Field(
+        default=None,
+        validation_alias=AliasChoices("evaluated_at", "evaluatedAt"),
+        serialization_alias="evaluatedAt",
+    )
+
+    @model_validator(mode="after")
+    def _normalize(self) -> "AnidleGuessHistoryEntryPayload":
+        if isinstance(self.guess, str):
+            self.guess = self.guess.strip()
+        else:
+            try:
+                self.guess = str(self.guess).strip()
+            except Exception:
+                self.guess = ""
+
+        if not self.guess:
+            self.guess = ""
+
+        media_id = self.guess_media_id
+        if isinstance(media_id, bool):
+            media_id = None
+        if isinstance(media_id, (int, float)):
+            try:
+                media_id = int(media_id)
+            except (TypeError, ValueError):
+                media_id = None
+        elif media_id is not None:
+            try:
+                media_id = int(str(media_id))
+            except (TypeError, ValueError):
+                media_id = None
+        self.guess_media_id = media_id
+
+        if self.evaluation_version is not None:
+            try:
+                self.evaluation_version = int(self.evaluation_version)
+            except (TypeError, ValueError):
+                self.evaluation_version = None
+
+        return self
+
+
 class GameProgressPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -349,6 +407,11 @@ class GameProgressPayload(BaseModel):
         default=None,
         validation_alias=AliasChoices("rounds", "round_progress", "rounds_progress"),
         serialization_alias="rounds",
+    )
+    anidle_history: Optional[List[AnidleGuessHistoryEntryPayload]] = Field(
+        default=None,
+        validation_alias=AliasChoices("anidle_history", "anidleHistory"),
+        serialization_alias="anidleHistory",
     )
 
     @model_validator(mode="after")
@@ -404,6 +467,55 @@ class GameProgressPayload(BaseModel):
             self.rounds = []
         else:
             self.rounds = None
+
+        raw_history = self.anidle_history
+        normalized_history: List[AnidleGuessHistoryEntryPayload] = []
+        if isinstance(raw_history, list):
+            for entry in raw_history:
+                if isinstance(entry, AnidleGuessHistoryEntryPayload):
+                    if entry.guess:
+                        normalized_history.append(entry)
+                    continue
+                if isinstance(entry, dict):
+                    try:
+                        parsed = AnidleGuessHistoryEntryPayload.model_validate(
+                            entry
+                        )
+                    except Exception:
+                        continue
+                    if parsed.guess:
+                        normalized_history.append(parsed)
+        elif raw_history is not None:
+            try:
+                parsed = AnidleGuessHistoryEntryPayload.model_validate(raw_history)
+                if parsed.guess:
+                    normalized_history.append(parsed)
+            except Exception:
+                pass
+
+        if normalized_history:
+            self.anidle_history = normalized_history
+        elif isinstance(raw_history, list) and len(raw_history) > 0:
+            self.anidle_history = []
+        else:
+            self.anidle_history = None
+
+        if (self.anidle_history is None or len(self.anidle_history) == 0) and self.guesses:
+            generated_history: List[AnidleGuessHistoryEntryPayload] = []
+            for guess in self.guesses:
+                if isinstance(guess, str):
+                    text = guess.strip()
+                else:
+                    try:
+                        text = str(guess).strip()
+                    except Exception:
+                        text = ""
+                if text:
+                    generated_history.append(
+                        AnidleGuessHistoryEntryPayload(guess=text)
+                    )
+            if generated_history:
+                self.anidle_history = generated_history
 
         return self
 
