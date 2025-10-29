@@ -56,7 +56,7 @@ from .models import (
     SynopsisHint,
 )
 
-ANIDLE_SYNOPSIS_REVEAL_LEVELS: Sequence[float] = (0.3, 0.5, 0.7)
+ANIDLE_SYNOPSIS_REVEAL_LEVELS: Sequence[float] = (0.2, 0.35, 0.5, 0.65, 0.8, 1.0)
 
 ANIDLE_ROUNDS = [
     RoundSpec(difficulty=1, hints=["synopsis:0"]),
@@ -278,6 +278,7 @@ def _generate_synopsis_levels(
         return [SynopsisHint(ratio=max(0.0, min(level, 1.0)), text=base_text) for level in reveal_levels]
 
     hints: List[SynopsisHint] = []
+    last_reveal_count = 0
     for level in reveal_levels:
         ratio = max(0.0, min(level, 1.0))
         if ratio <= 0.0:
@@ -285,7 +286,11 @@ def _generate_synopsis_levels(
         elif ratio >= 1.0:
             reveal_count = total_masked
         else:
-            reveal_count = max(1, int(round(total_masked * ratio)))
+            target = max(1, int(math.ceil(total_masked * ratio)))
+            if target <= last_reveal_count:
+                reveal_count = min(total_masked, last_reveal_count + 1)
+            else:
+                reveal_count = min(total_masked, target)
 
         revealed = set(masked_word_indices[: min(reveal_count, total_masked)])
 
@@ -297,6 +302,9 @@ def _generate_synopsis_levels(
                 pieces.append(segment.text)
 
         redacted_text = "".join(pieces).strip()
+        last_reveal_count = reveal_count
+        if hints and hints[-1].text == redacted_text:
+            continue
         hints.append(SynopsisHint(ratio=ratio, text=redacted_text))
 
     return hints

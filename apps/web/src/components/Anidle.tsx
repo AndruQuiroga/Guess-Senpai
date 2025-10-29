@@ -11,7 +11,6 @@ import {
 
 import { GameProgress } from "../hooks/usePuzzleProgress";
 import { AnidleGame as AnidlePayload } from "../types/puzzles";
-import { resolveHintRound } from "../utils/difficulty";
 import {
   evaluateAnidleGuess,
   type AnidleGuessEvaluation,
@@ -38,6 +37,8 @@ interface Props {
 }
 
 const TOTAL_ROUNDS = 3;
+const MIN_INCORRECT_GUESSES_FOR_HINT = 10;
+const INCORRECT_GUESS_INTERVAL = 2;
 
 type AggregatedHint =
   | {
@@ -92,7 +93,7 @@ export default function Anidle({
   onProgressChange,
   registerRoundController,
   nextSlug,
-  accountDifficulty,
+  accountDifficulty: _accountDifficulty,
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [guess, setGuess] = useState("");
@@ -147,43 +148,40 @@ export default function Anidle({
     });
   }, [registerRoundController]);
 
-  const hintRound = useMemo(
-    () =>
-      completed
-        ? TOTAL_ROUNDS
-        : resolveHintRound(round, TOTAL_ROUNDS, accountDifficulty),
-    [accountDifficulty, completed, round],
+  const incorrectGuessCount = useMemo(
+    () => Math.max(0, guesses.length - (completed ? 1 : 0)),
+    [completed, guesses.length],
   );
 
   const aggregatedHints = useMemo<AggregatedHint[]>(() => {
-    const hints: AggregatedHint[] = [];
-    const activeSpecs = payload.spec.filter(
-      (spec) => spec.difficulty <= hintRound,
-    );
+    if (incorrectGuessCount < MIN_INCORRECT_GUESSES_FOR_HINT) {
+      return [];
+    }
 
-    let synopsisHint: AggregatedHint | null = null;
-    const fallbackHints: AggregatedHint[] = [];
     const synopsisEntries = payload.hints.synopsis ?? [];
+    if (synopsisEntries.length > 0) {
+      const stage = Math.floor(
+        (incorrectGuessCount - MIN_INCORRECT_GUESSES_FOR_HINT) /
+          INCORRECT_GUESS_INTERVAL,
+      );
+      const entry = synopsisEntries[
+        Math.min(stage, synopsisEntries.length - 1)
+      ];
+      if (entry && entry.text.trim().length > 0) {
+        return [
+          {
+            type: "synopsis",
+            label: "Redacted Synopsis",
+            ratio: entry.ratio,
+            text: entry.text,
+          },
+        ];
+      }
+    }
 
-    for (const spec of activeSpecs) {
+    const fallbackHints: AggregatedHint[] = [];
+    for (const spec of payload.spec) {
       for (const hintKey of spec.hints) {
-        if (hintKey.startsWith("synopsis:")) {
-          const index = Number.parseInt(hintKey.split(":")[1] ?? "", 10);
-          const entry =
-            Number.isFinite(index) && index >= 0
-              ? synopsisEntries[index]
-              : undefined;
-          if (entry && entry.text.trim().length > 0) {
-            synopsisHint = {
-              type: "synopsis",
-              label: "Redacted Synopsis",
-              ratio: entry.ratio,
-              text: entry.text,
-            };
-          }
-          continue;
-        }
-
         switch (hintKey) {
           case "genres":
             if (payload.hints.genres.length > 0) {
@@ -254,26 +252,8 @@ export default function Anidle({
       }
     }
 
-    if (!synopsisHint && synopsisEntries.length > 0) {
-      const lastEntry = synopsisEntries[synopsisEntries.length - 1];
-      if (lastEntry && lastEntry.text.trim().length > 0) {
-        synopsisHint = {
-          type: "synopsis",
-          label: "Redacted Synopsis",
-          ratio: lastEntry.ratio,
-          text: lastEntry.text,
-        };
-      }
-    }
-
-    if (synopsisHint) {
-      hints.push(synopsisHint);
-    } else {
-      hints.push(...fallbackHints);
-    }
-
-    return hints;
-  }, [hintRound, payload]);
+    return fallbackHints;
+  }, [incorrectGuessCount, payload]);
 
   const synopsisHints = useMemo(
     () =>
