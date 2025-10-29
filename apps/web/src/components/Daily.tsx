@@ -81,6 +81,7 @@ export default function Daily({ data }: Props) {
   const silhouetteBundle = data.games.character_silhouette;
   const synopsisBundle = data.games.redacted_synopsis;
   const guessOpeningBundle = data.games.guess_the_opening ?? null;
+  const posterProgress = progress.poster_zoomed ?? null;
 
   const bundleByKey = useMemo<GamePayloadRecord>(
     () => ({
@@ -151,9 +152,13 @@ export default function Daily({ data }: Props) {
   ]);
 
   const mediaIdLabel = useMemo(() => {
+    const posterRoundIds = (posterBundle?.puzzle.rounds ?? [])
+      .map((round) => round?.mediaId)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
     const ids = [
       anidleBundle?.mediaId ?? null,
       posterBundle?.mediaId ?? null,
+      ...posterRoundIds,
       silhouetteBundle?.mediaId ?? null,
       synopsisBundle?.mediaId ?? null,
       includeGuessTheOpening && guessOpeningBundle
@@ -241,7 +246,9 @@ export default function Daily({ data }: Props) {
   const previewComponents = useMemo<Partial<Record<GameKey, ReactNode>>>(
     () => ({
       anidle: <AnidlePreview bundle={anidleBundle} />,
-      poster_zoomed: <PosterZoomPreview bundle={posterBundle} />,
+      poster_zoomed: (
+        <PosterZoomPreview bundle={posterBundle} progress={posterProgress} />
+      ),
       character_silhouette: <CharacterSilhouettePreview bundle={silhouetteBundle} />,
       redacted_synopsis: <RedactedSynopsisPreview bundle={synopsisBundle} />,
       guess_the_opening:
@@ -256,6 +263,7 @@ export default function Daily({ data }: Props) {
       synopsisBundle,
       includeGuessTheOpening,
       guessOpeningBundle,
+      posterProgress,
     ],
   );
 

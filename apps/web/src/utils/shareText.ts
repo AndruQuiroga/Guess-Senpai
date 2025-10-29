@@ -134,6 +134,42 @@ function buildRoundStates(
   return rounds;
 }
 
+function collectPosterAttemptBreakdown(rounds?: GameRoundProgress[]) {
+  const normalized = Array.isArray(rounds)
+    ? rounds.filter((entry): entry is GameRoundProgress => Boolean(entry))
+    : [];
+
+  let titleAttempts = 0;
+  let yearAttempts = 0;
+
+  normalized.forEach((round) => {
+    const titleSource = Array.isArray(round.titleGuesses)
+      ? round.titleGuesses
+      : round.guesses;
+    titleAttempts += titleSource?.length ?? 0;
+    yearAttempts += round.yearGuesses?.length ?? 0;
+  });
+
+  const attemptSummaryParts: string[] = [];
+  if (titleAttempts > 0) {
+    attemptSummaryParts.push(
+      `${titleAttempts} title ${titleAttempts === 1 ? "guess" : "guesses"}`,
+    );
+  }
+  if (yearAttempts > 0) {
+    attemptSummaryParts.push(
+      `${yearAttempts} year ${yearAttempts === 1 ? "guess" : "guesses"}`,
+    );
+  }
+
+  return {
+    titleAttempts,
+    yearAttempts,
+    totalAttempts: titleAttempts + yearAttempts,
+    attemptSummary: attemptSummaryParts.join(" · "),
+  };
+}
+
 export function buildShareEvent(
   dateIso: string,
   progress: DailyProgress,
@@ -222,6 +258,42 @@ export function buildShareEvent(
         status: "pending" as const,
         rounds,
         summary: `${label} — ⏳`,
+      };
+    }
+
+    if (key === "poster_zoomed") {
+      const posterRounds = (gameProgress.rounds ?? []).filter(
+        (entry): entry is GameRoundProgress => Boolean(entry),
+      );
+      const clearedFromProgress = posterRounds.reduce(
+        (count, entry) => (entry.completed ? count + 1 : count),
+        0,
+      );
+      const resolvedCleared = Math.max(
+        clearedFromProgress,
+        rounds.filter((round) => round.state === "cleared").length,
+      );
+      const { totalAttempts, attemptSummary } = collectPosterAttemptBreakdown(
+        posterRounds,
+      );
+      const totalRoundLabel = totalRounds === 1 ? "round" : "rounds";
+      const clearedRoundLabel = resolvedCleared === 1 ? "round" : "rounds";
+
+      const baseSummary = gameProgress.completed
+        ? `${label} — ✅ (${totalRounds}/${totalRounds} ${totalRoundLabel})`
+        : `${label} — ${resolvedCleared}/${totalRounds} ${clearedRoundLabel}`;
+      const summary = attemptSummary
+        ? `${baseSummary} · ${attemptSummary}`
+        : baseSummary;
+
+      return {
+        key,
+        label,
+        totalRounds,
+        status: gameProgress.completed ? ("completed" as const) : ("in_progress" as const),
+        rounds,
+        attempts: totalAttempts > 0 ? totalAttempts : undefined,
+        summary,
       };
     }
 
