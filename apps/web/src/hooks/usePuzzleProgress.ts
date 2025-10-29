@@ -191,11 +191,11 @@ export function usePuzzleProgress(date: string) {
     };
   }, [date, fetchProgressFromServer]);
 
-  const pendingUpdatesRef = useRef<Record<GameKey, GameProgress>>({});
+  const pendingUpdatesRef = useRef<DailyProgress>({});
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pushUpdatesToServer = useCallback(
-    async (updates: Record<GameKey, GameProgress>): Promise<boolean> => {
+    async (updates: DailyProgress): Promise<boolean> => {
       if (!date || Object.keys(updates).length === 0) {
         return true;
       }
