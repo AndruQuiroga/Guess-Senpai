@@ -39,6 +39,12 @@ export function PosterZoomPreview({ bundle }: PosterZoomPreviewProps) {
             <dd>{formatMediaFormatLabel(meta.format)}</dd>
           </div>
         ) : null}
+        {meta.season ? (
+          <div>
+            <dt className="font-semibold text-neutral-200">Season</dt>
+            <dd>{meta.season}</dd>
+          </div>
+        ) : null}
         {meta.year ? (
           <div>
             <dt className="font-semibold text-neutral-200">Year</dt>

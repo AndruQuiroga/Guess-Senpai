@@ -28,6 +28,7 @@ export interface AnidleGame {
 export interface PosterZoomMeta {
   genres: string[];
   year?: number | null;
+  season?: string | null;
   format?: string | null;
 }
 

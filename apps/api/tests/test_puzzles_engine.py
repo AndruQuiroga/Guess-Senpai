@@ -19,6 +19,7 @@ from app.puzzles.models import (
     GuessOpeningRound,
     OpeningClip,
     PosterZoomPuzzleBundle,
+    PosterZoomGame,
     RedactedSynopsisSegment,
     RoundSpec,
     SolutionPayload,
@@ -248,7 +249,16 @@ def test_build_poster_bundle_without_cover_image() -> None:
 
     bundle = PosterZoomPuzzleBundle(
         mediaId=media.id,
-        puzzle=engine._build_poster(media),
+        puzzle=PosterZoomGame(
+            spec=engine.POSTER_ROUNDS,
+            rounds=[
+                engine._build_poster_round(
+                    media=media,
+                    order=1,
+                    difficulty=engine.POSTER_ROUNDS[0].difficulty,
+                )
+            ],
+        ),
         solution=engine._build_solution(media),
     )
 
@@ -256,6 +266,7 @@ def test_build_poster_bundle_without_cover_image() -> None:
     assert bundle.puzzle.rounds
     primary_round = bundle.puzzle.rounds[0]
     assert primary_round.mediaId == media.id
+    assert primary_round.meta.season == "Spring 2024"
 
 
 def test_redacted_synopsis_masks_majority_of_words() -> None:
@@ -341,12 +352,18 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
     assert result.guess_the_opening_enabled is bool(result.games.guess_the_opening)
     assert result.games.character_silhouette is not None
 
+    poster_rounds = result.games.poster_zoomed.puzzle.rounds
+    assert poster_rounds
+    assert len(poster_rounds) == len(engine.POSTER_ROUNDS)
+    poster_round_ids = [round.mediaId for round in poster_rounds]
+    assert len(poster_round_ids) == len(set(poster_round_ids))
+
     bundle_ids = [
         result.games.anidle.mediaId,
-        result.games.poster_zoomed.mediaId,
         result.games.redacted_synopsis.mediaId,
         result.games.character_silhouette.mediaId,
     ]
+    bundle_ids.extend(poster_round_ids)
     if result.games.guess_the_opening:
         rounds = result.games.guess_the_opening.puzzle.rounds
         assert len(rounds) == 3
@@ -411,12 +428,18 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
         cache=cache,
     )
 
+    poster_rounds = result.games.poster_zoomed.puzzle.rounds
+    assert poster_rounds
+    assert len(poster_rounds) == len(engine.POSTER_ROUNDS)
+    poster_ids = [round.mediaId for round in poster_rounds]
+    assert len(poster_ids) == len(set(poster_ids))
+
     bundle_ids = [
         result.games.anidle.mediaId,
-        result.games.poster_zoomed.mediaId,
         result.games.redacted_synopsis.mediaId,
         result.games.character_silhouette.mediaId,
     ]
+    bundle_ids.extend(poster_ids)
     if result.games.guess_the_opening:
         rounds = result.games.guess_the_opening.puzzle.rounds
         assert len(rounds) == 3
