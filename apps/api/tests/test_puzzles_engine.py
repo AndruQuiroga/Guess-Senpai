@@ -206,10 +206,10 @@ def test_anidle_synopsis_uses_redacted_masking(monkeypatch: pytest.MonkeyPatch) 
 
     hints = engine._build_anidle_synopsis(media)
 
-    assert [hint.ratio for hint in hints] == [0.3, 0.5, 0.7]
+    assert [hint.ratio for hint in hints] == [0.2, 0.35, 0.5]
     assert hints[0].text == "First [REDACTED] [REDACTED]"
     assert hints[1].text == "First Second [REDACTED]"
-    assert hints[2].text == "First Second [REDACTED]"
+    assert hints[2].text == "First Second Third"
 
 @pytest.mark.asyncio
 async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPatch) -> None:
