@@ -50,9 +50,18 @@ export default function HowToPlayPage() {
             </p>
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
-            <li>The poster starts heavily cropped; reveal more to zoom out.</li>
-            <li>Extra hints add genres, year, and format details.</li>
-            <li>Mark it solved once you&apos;re confident in your answer.</li>
+            <li>
+              Three rounds progressively zoom the poster out—from a tight crop
+              to the full key art.
+            </li>
+            <li>
+              Each new round unlocks additional context like genres, format,
+              and release metadata.
+            </li>
+            <li>
+              Submit both the anime title and its release season or year to
+              secure the clear.
+            </li>
           </ul>
         </GlassSection>
 

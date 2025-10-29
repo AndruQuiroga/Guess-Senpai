@@ -9,7 +9,7 @@ GuessSenpai is a glassy, modern web experience for daily anime guessing challeng
 - **Daily curated puzzles** sourced from AniList, balanced across four core rounds with deterministic selection and personalization for signed-in players.
 - **Game modes**
   - **Anidle** – progressive textual hints (genres, stats, score) with redaction-aware unmasking.
-  - **Poster Zoomed** – cinematic crop reveals with metadata hints.
+  - **Poster Zoomed** – three escalating zoom rounds that demand the anime title and its release season/year.
   - **Redacted Synopsis** – masked descriptions that uncloak over rounds.
   - **Character Silhouette** – dual-guess showdowns that demand both the anime title and the featured character to clear each card.
   - **Guess the Opening** – optional OP/ED audio clips fetched from AnimeThemes.
