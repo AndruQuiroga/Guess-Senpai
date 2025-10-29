@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import CharacterSilhouette from "../CharacterSilhouette";
 import GameSwitcher from "../GameSwitcher";
@@ -14,6 +14,8 @@ interface Props {
   payload: CharacterSilhouetteGame;
   progress?: GameProgress;
   dailyProgress?: DailyProgress;
+  accountDifficulty?: number;
+  difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
@@ -24,9 +26,14 @@ export function CharacterSilhouettePage({
   payload,
   progress,
   dailyProgress,
+  accountDifficulty,
+  difficultyHint,
   onProgressChange,
   nextSlug,
 }: Props) {
+  const controller = useRef<((round: number) => void) | null>(null);
+  const [controllerReady, setControllerReady] = useState(false);
+
   const totalRounds = useMemo(
     () => Math.max(payload.rounds?.length ?? payload.spec.length ?? 1, 1),
     [payload.rounds?.length, payload.spec.length],
@@ -43,11 +50,39 @@ export function CharacterSilhouettePage({
     [totalRounds],
   );
 
-  const [displayRound, setDisplayRound] = useState(() => clampRound(progress?.round ?? 1));
+  const clampDifficulty = useCallback(
+    (value: number | undefined | null) => {
+      if (typeof value !== "number" || Number.isNaN(value)) {
+        return undefined;
+      }
+      const rounded = Math.round(value);
+      return Math.max(1, Math.min(totalRounds, rounded));
+    },
+    [totalRounds],
+  );
+
+  const selectedDifficulty = clampDifficulty(accountDifficulty);
+  const recommendedDifficulty = clampDifficulty(difficultyHint);
+  const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
+
+  const [displayRound, setDisplayRound] = useState(() =>
+    clampRound(progress?.round ?? highlightDifficulty),
+  );
 
   useEffect(() => {
-    setDisplayRound(clampRound(progress?.round ?? 1));
-  }, [clampRound, progress?.round]);
+    controller.current = null;
+    setControllerReady(false);
+  }, [mediaId]);
+
+  useEffect(() => {
+    if (!controllerReady) return;
+    if (progress?.completed) return;
+    controller.current?.(highlightDifficulty);
+  }, [controllerReady, highlightDifficulty, progress?.completed]);
+
+  useEffect(() => {
+    setDisplayRound(clampRound(progress?.round ?? highlightDifficulty));
+  }, [clampRound, progress?.round, highlightDifficulty]);
 
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
@@ -70,6 +105,10 @@ export function CharacterSilhouettePage({
           payload={payload}
           initialProgress={progress}
           onProgressChange={handleProgressChange}
+          registerRoundController={(fn) => {
+            controller.current = fn;
+            setControllerReady(true);
+          }}
           nextSlug={nextSlug}
         />
       </GameShell>
