@@ -81,7 +81,6 @@ export function AnidlePage({
         title="Anidle"
         round={displayRound}
         totalRounds={totalRounds}
-        onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <Anidle

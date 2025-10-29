@@ -80,7 +80,6 @@ export function CharacterSilhouettePage({
         title="Character Silhouette"
         round={displayRound}
         totalRounds={totalRounds}
-        onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <CharacterSilhouette

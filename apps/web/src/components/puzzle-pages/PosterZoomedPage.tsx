@@ -89,7 +89,6 @@ export function PosterZoomedPage({
         title="Poster Zoomed"
         round={displayRound}
         totalRounds={totalRounds}
-        onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <PosterZoom

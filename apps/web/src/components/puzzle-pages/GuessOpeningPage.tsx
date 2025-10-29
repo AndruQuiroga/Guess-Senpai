@@ -105,7 +105,6 @@ export function GuessOpeningPage({
         round={displayRound}
         totalRounds={totalRounds}
         roundLabel="Opening"
-        onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <GuessOpening
