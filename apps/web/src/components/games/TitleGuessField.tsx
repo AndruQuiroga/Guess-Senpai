@@ -256,7 +256,7 @@ export const TitleGuessField = forwardRef<
           }
         />
         {suggestionsVisible && (
-          <div className="absolute left-0 right-0 z-20 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl backdrop-blur">
+          <div className="absolute left-0 right-0 z-20 mt-2 min-h-[12rem] overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl backdrop-blur">
             {loading ? (
               <div className="px-4 py-3 text-sm text-neutral-300">
                 {loadingText}
