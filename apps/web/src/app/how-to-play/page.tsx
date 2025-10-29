@@ -8,31 +8,46 @@ export default function HowToPlayPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-12">
       <header className="space-y-4">
-        <h1 className="text-4xl font-display font-semibold tracking-tight text-white sm:text-5xl">How to Play</h1>
+        <h1 className="text-4xl font-display font-semibold tracking-tight text-white sm:text-5xl">
+          How to Play
+        </h1>
         <p className="text-lg leading-relaxed text-neutral-200">
-          GuessSenpai serves three daily anime challenges using data from AniList and AnimeThemes. Each puzzle unfolds
-          across three rounds of progressively revealing hints—see how quickly you can identify the show before every
-          clue is revealed.
+          GuessSenpai delivers a core lineup of four daily anime challenges,
+          plus an optional audio bonus round sourced from AniList and
+          AnimeThemes. Each puzzle escalates across three rounds of hints, and
+          the new Character Silhouette mode asks you to lock in both the
+          featured anime and the highlighted character before the spotlights
+          turn on.
         </p>
       </header>
 
       <div className="space-y-8">
         <GlassSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">Anidle</h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">Metadata speedrun</p>
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+              Anidle
+            </h2>
+            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+              Metadata speedrun
+            </p>
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
             <li>Type your guess and press Enter to submit.</li>
             <li>Each incorrect guess unlocks another round of hints.</li>
-            <li>Hints include genres, release year, episode count, and popularity.</li>
+            <li>
+              Hints include genres, release year, episode count, and popularity.
+            </li>
           </ul>
         </GlassSection>
 
         <GlassSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">Poster Zoomed</h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">Reveal the key art</p>
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+              Poster Zoomed
+            </h2>
+            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+              Reveal the key art
+            </p>
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
             <li>The poster starts heavily cropped; reveal more to zoom out.</li>
@@ -43,12 +58,17 @@ export default function HowToPlayPage() {
 
         <GlassSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">Redacted Synopsis</h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">Decode the story</p>
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+              Redacted Synopsis
+            </h2>
+            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+              Decode the story
+            </p>
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
             <li>
-              Synonyms and titles are obscured with <span className="font-mono text-brand-100">[REDACTED]</span>.
+              Synonyms and titles are obscured with{" "}
+              <span className="font-mono text-brand-100">[REDACTED]</span>.
             </li>
             <li>Each round unmasks additional tokens to guide your guess.</li>
           </ul>
@@ -56,21 +76,61 @@ export default function HowToPlayPage() {
 
         <GlassSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">Guess the Opening</h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">Name that tune</p>
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+              Character Silhouette
+            </h2>
+            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+              Dual-guess spotlight
+            </p>
+          </div>
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
+            <li>Four silhouettes from the same anime appear in each round.</li>
+            <li>
+              Submit both the anime title and the character&apos;s name to clear
+              a card.
+            </li>
+            <li>
+              Correct anime guesses without the right character keep the card
+              locked until you nail both answers.
+            </li>
+          </ul>
+        </GlassSection>
+
+        <GlassSection innerClassName="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+              Guess the Opening
+            </h2>
+            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+              Name that tune
+            </p>
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
             <li>Listen to a short OP/ED clip sourced from AnimeThemes.moe.</li>
-            <li>Three openings drop each day—clear all of them to secure the daily win.</li>
-            <li>Hints reveal the season, artist, and song title across rounds.</li>
+            <li>
+              Three openings drop each day—clear all of them to secure the daily
+              win.
+            </li>
+            <li>
+              Hints reveal the season, artist, and song title across rounds.
+            </li>
           </ul>
         </GlassSection>
       </div>
 
       <p className="text-sm leading-relaxed text-neutral-400">
-        Tip: use <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">Ctrl</kbd>
-        /<kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">⌘</kbd>{" "}
-        + <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">Backspace</kbd>{" "}
+        Tip: use{" "}
+        <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">
+          Ctrl
+        </kbd>
+        /
+        <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">
+          ⌘
+        </kbd>{" "}
+        +{" "}
+        <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">
+          Backspace
+        </kbd>{" "}
         to clear your current guess field quickly.
       </p>
     </div>

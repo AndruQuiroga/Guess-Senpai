@@ -41,6 +41,90 @@ describe("CharacterSilhouette autocomplete", () => {
     vi.clearAllMocks();
   });
 
+  it("prompts players to enter both guesses before submitting", async () => {
+    const payload: CharacterSilhouetteGame = {
+      spec: [
+        { difficulty: 1, label: "Outline", filter: "grayscale(1)" },
+        { difficulty: 2, label: "Midlight", filter: "grayscale(0.6)" },
+        { difficulty: 3, label: "Full reveal", filter: "none" },
+      ],
+      rounds: [
+        {
+          order: 1,
+          difficulty: 1,
+          entries: [
+            {
+              character: {
+                id: 100,
+                name: "Edward Elric",
+                image: "https://example.com/edward.jpg",
+                role: "Protagonist",
+              },
+              characterAnswer: "Edward Elric",
+              characterAliases: [],
+              animeAnswer: "Fullmetal Alchemist",
+              animeAliases: ["FMA"],
+              reveal: {
+                label: "Outline",
+                filter: "grayscale(1)",
+                description: "High contrast silhouette",
+              },
+            },
+            ...Array.from({ length: 3 }).map((_, index) => ({
+              character: {
+                id: 101 + index,
+                name: `Supporting ${index + 1}`,
+                image: "https://example.com/support.jpg",
+                role: null,
+              },
+              characterAnswer: `Supporting ${index + 1}`,
+              characterAliases: [],
+              animeAnswer: "Fullmetal Alchemist",
+              animeAliases: ["FMA"],
+              reveal: {
+                label: `Outline ${index + 1}`,
+                filter: "grayscale(1)",
+              },
+            })),
+          ],
+        },
+        { order: 2, difficulty: 2, entries: [] },
+        { order: 3, difficulty: 3, entries: [] },
+      ],
+      answer: "Fullmetal Alchemist",
+      character: {
+        id: 1,
+        name: "Edward Elric",
+        image: "https://example.com/edward.jpg",
+        role: "Protagonist",
+      },
+    };
+
+    const user = userEvent.setup();
+
+    render(
+      <CharacterSilhouette
+        mediaId={512}
+        payload={payload}
+        onProgressChange={() => {}}
+      />,
+    );
+
+    const animeField = screen.getByLabelText("Anime guess for card 1");
+    const submitButton = screen.getAllByRole("button", {
+      name: /submit guess/i,
+    })[0];
+
+    await user.clear(animeField);
+    await user.type(animeField, "Fullmetal Alchemist");
+    await user.click(submitButton);
+
+    expect(
+      await screen.findByText(/enter the character name before submitting/i),
+    ).toBeInTheDocument();
+    expect(verifyGuessMock).not.toHaveBeenCalled();
+  });
+
   it("requires both anime and character guesses to clear a card", async () => {
     const payload: CharacterSilhouetteGame = {
       spec: [
@@ -59,7 +143,8 @@ describe("CharacterSilhouette autocomplete", () => {
               image: "https://example.com/edward.jpg",
               role: index === 0 ? "Protagonist" : null,
             },
-            characterAnswer: index === 0 ? "Edward Elric" : `Supporting ${index}`,
+            characterAnswer:
+              index === 0 ? "Edward Elric" : `Supporting ${index}`,
             characterAliases: [],
             animeAnswer: "Fullmetal Alchemist",
             animeAliases: ["FMA"],
@@ -107,14 +192,21 @@ describe("CharacterSilhouette autocomplete", () => {
     await user.type(animeField, "Fullmetal Alchemist");
     await user.type(characterField, "Edward Elric");
 
-    const submitButton = screen.getAllByRole("button", { name: /submit guess/i })[0];
+    const submitButton = screen.getAllByRole("button", {
+      name: /submit guess/i,
+    })[0];
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledWith(512, "Fullmetal Alchemist", 300, {
-        characterGuess: "Edward Elric",
-        characterId: 100,
-      });
+      expect(verifyGuessMock).toHaveBeenCalledWith(
+        512,
+        "Fullmetal Alchemist",
+        300,
+        {
+          characterGuess: "Edward Elric",
+          characterId: 100,
+        },
+      );
     });
 
     expect(

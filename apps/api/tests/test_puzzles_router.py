@@ -9,9 +9,17 @@ from app.core.database import get_session_factory
 from app.puzzles import engine as puzzle_engine
 from app.puzzles.engine import _title_variants
 from app.routers import puzzles as puzzles_router
-from app.routers.puzzles import AnidleGuessEvaluationPayload
-from app.services import title_index
-from app.services.anilist import Media, MediaTitlePair, Title
+from app.routers.puzzles import AnidleGuessEvaluationPayload, GuessVerificationPayload
+from app.services import character_index, title_index
+from app.services.anilist import (
+    Character,
+    CharacterImage,
+    CharacterName,
+    Media,
+    MediaCharacterEdge,
+    MediaTitlePair,
+    Title,
+)
 from app.puzzles.models import DailyProgressPayload, GameProgressPayload
 
 
@@ -161,3 +169,71 @@ async def test_put_progress_without_session_returns_request_payload(monkeypatch:
     assert response.date == payload.date
     assert response.progress == payload.progress
     assert called is False
+
+
+@pytest.mark.asyncio
+async def test_verify_guess_requires_dual_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    target_media = make_media(222, "Legendary Show")
+    target_character = MediaCharacterEdge(
+        role="MAIN",
+        node=Character(
+            id=777,
+            name=CharacterName(
+                full="Protagonist",
+                userPreferred="Protagonist",
+                native=None,
+            ),
+            image=CharacterImage(large="https://cdn.example.com/protagonist.jpg"),
+        ),
+    )
+
+    class DummyCache:
+        async def remember(self, _key, _ttl, creator):  # type: ignore[override]
+            return await creator()
+
+    dummy_cache = DummyCache()
+
+    async def fake_get_cache(_url):  # type: ignore[override]
+        return dummy_cache
+
+    media_by_id = {target_media.id: target_media}
+
+    async def fake_load_media_details(media_id: int, _cache, _settings):
+        return media_by_id[media_id]
+
+    async def fake_load_aliases(_session, _character_id):  # type: ignore[override]
+        return ["Protagonist"]
+
+    monkeypatch.setattr(puzzles_router, "get_cache", fake_get_cache)
+    monkeypatch.setattr(puzzle_engine, "_load_media_details", fake_load_media_details)
+    monkeypatch.setattr(
+        puzzle_engine,
+        "_select_character_edge",
+        lambda _media: target_character,
+        raising=False,
+    )
+    monkeypatch.setattr(character_index, "load_character_aliases", fake_load_aliases)
+
+    payload = GuessVerificationPayload(
+        media_id=target_media.id,
+        guess=target_media.title.english or "Legendary Show",
+        character_guess="Incorrect",  # wrong character
+    )
+
+    response = await puzzles_router.verify_guess(payload)
+
+    assert response.anime_match is True
+    assert response.character_match is False
+    assert response.correct is False
+
+    success_payload = GuessVerificationPayload(
+        media_id=target_media.id,
+        guess=target_media.title.english or "Legendary Show",
+        guess_character_id=target_character.node.id,
+    )
+
+    success = await puzzles_router.verify_guess(success_payload)
+
+    assert success.correct is True
+    assert success.character_match is True
+    assert success.character == "Protagonist"
