@@ -25,27 +25,18 @@ export function PosterZoomedPage({
   progress,
   dailyProgress,
   accountDifficulty,
-  difficultyHint,
   onProgressChange,
   nextSlug,
 }: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
   const [controllerReady, setControllerReady] = useState(false);
 
-  const primaryRound = useMemo(() => payload.rounds[0] ?? null, [payload.rounds]);
-  const mediaId = primaryRound?.mediaId ?? null;
+  const totalRounds = useMemo(
+    () => (payload.rounds.length > 0 ? payload.rounds.length : 1),
+    [payload.rounds.length],
+  );
 
-  const totalRounds = useMemo(() => {
-    if (payload.spec.length > 0) {
-      return payload.spec.length;
-    }
-    if (primaryRound?.cropStages && primaryRound.cropStages.length > 0) {
-      return primaryRound.cropStages.length;
-    }
-    return 3;
-  }, [payload.spec.length, primaryRound]);
-
-  const clampDifficulty = useCallback(
+  const clampRound = useCallback(
     (value: number | undefined | null) => {
       if (typeof value !== "number" || Number.isNaN(value)) {
         return undefined;
@@ -56,25 +47,23 @@ export function PosterZoomedPage({
     [totalRounds],
   );
 
-  const selectedDifficulty = clampDifficulty(accountDifficulty);
-  const recommendedDifficulty = clampDifficulty(difficultyHint);
-  const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
-  const [displayRound, setDisplayRound] = useState(progress?.round ?? highlightDifficulty);
+  const highlightedRound = clampRound(progress?.round) ?? 1;
+  const [displayRound, setDisplayRound] = useState(highlightedRound);
 
   useEffect(() => {
     controller.current = null;
     setControllerReady(false);
-  }, [mediaId]);
+  }, [payload.rounds]);
 
   useEffect(() => {
     if (!controllerReady) return;
     if (progress?.completed) return;
-    controller.current?.(highlightDifficulty);
-  }, [controllerReady, highlightDifficulty, progress?.completed]);
+    controller.current?.(highlightedRound);
+  }, [controllerReady, highlightedRound, progress?.completed]);
 
   useEffect(() => {
-    setDisplayRound(progress?.round ?? highlightDifficulty);
-  }, [progress?.round, highlightDifficulty]);
+    setDisplayRound(highlightedRound);
+  }, [highlightedRound]);
 
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
@@ -101,7 +90,7 @@ export function PosterZoomedPage({
             setControllerReady(true);
           }}
           nextSlug={nextSlug}
-          accountDifficulty={selectedDifficulty}
+          accountDifficulty={accountDifficulty}
         />
       </GameShell>
     </div>
