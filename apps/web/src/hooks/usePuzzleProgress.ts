@@ -45,20 +45,232 @@ export interface RefreshResult {
 
 const EMPTY_STATE: PersistedDailyState = { progress: {} };
 
-function cloneState(state: PersistedDailyState | null | undefined): PersistedDailyState {
-  if (!state) {
-    return { progress: {} };
+function coerceInteger(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
   }
-  return {
-    progress: { ...(state.progress ?? {}) },
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function coercePositiveInteger(
+  value: unknown,
+  minimum = 1,
+): number | undefined {
+  const parsed = coerceInteger(value);
+  if (parsed === undefined) {
+    return undefined;
+  }
+  return Math.max(minimum, parsed);
+}
+
+function normalizeGuessList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const result: string[] = [];
+  for (const entry of value) {
+    if (typeof entry === "string") {
+      const trimmed = entry.trim();
+      if (trimmed) {
+        result.push(trimmed);
+      }
+    } else if (typeof entry === "number" && Number.isFinite(entry)) {
+      result.push(String(Math.trunc(entry)));
+    }
+  }
+  return result;
+}
+
+function normalizeYearGuessList(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const result: number[] = [];
+  for (const entry of value) {
+    if (typeof entry === "number" && Number.isFinite(entry)) {
+      result.push(Math.trunc(entry));
+    } else if (typeof entry === "string") {
+      const trimmed = entry.trim();
+      if (!trimmed) continue;
+      const parsed = Number.parseInt(trimmed, 10);
+      if (Number.isFinite(parsed)) {
+        result.push(parsed);
+      }
+    }
+  }
+  return result;
+}
+
+function normalizeGameRoundProgress(value: unknown): GameRoundProgress | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const round = coercePositiveInteger(record.round, 1) ?? 1;
+  const guesses = normalizeGuessList(record.guesses);
+  const rawTitleGuesses =
+    record.titleGuesses ?? (record as Record<string, unknown>)["title_guesses"];
+  const titleGuessesSource =
+    Array.isArray(rawTitleGuesses) && rawTitleGuesses.length > 0
+      ? rawTitleGuesses
+      : guesses;
+  const titleGuesses = normalizeGuessList(titleGuessesSource);
+  const yearGuesses = normalizeYearGuessList(
+    record.yearGuesses ?? (record as Record<string, unknown>)["year_guesses"],
+  );
+  const stage = coercePositiveInteger(record.stage, 1);
+
+  let completed: boolean | undefined;
+  if (typeof record.completed === "boolean") {
+    completed = record.completed;
+  }
+
+  let hintUsed: boolean | undefined;
+  if (typeof record.hintUsed === "boolean") {
+    hintUsed = record.hintUsed;
+  } else if (
+    typeof (record as Record<string, unknown>)["hint_used"] === "boolean"
+  ) {
+    hintUsed = Boolean((record as Record<string, unknown>)["hint_used"]);
+  }
+
+  const resolvedAnswer =
+    typeof record.resolvedAnswer === "string"
+      ? record.resolvedAnswer
+      : typeof (record as Record<string, unknown>)["resolved_answer"] ===
+          "string"
+        ? String((record as Record<string, unknown>)["resolved_answer"])
+        : undefined;
+  const resolvedTitle =
+    typeof record.resolvedTitle === "string"
+      ? record.resolvedTitle
+      : typeof (record as Record<string, unknown>)["resolved_title"] ===
+          "string"
+        ? String((record as Record<string, unknown>)["resolved_title"])
+        : undefined;
+  const resolvedYear =
+    coerceInteger(record.resolvedYear) ??
+    coerceInteger((record as Record<string, unknown>)["resolved_year"]);
+
+  const normalized: GameRoundProgress = {
+    round,
+    guesses,
   };
+
+  if (titleGuesses.length > 0) {
+    normalized.titleGuesses = titleGuesses;
+  } else if (guesses.length > 0) {
+    normalized.titleGuesses = [...guesses];
+  }
+
+  if (yearGuesses.length > 0) {
+    normalized.yearGuesses = yearGuesses;
+  }
+
+  if (stage !== undefined) {
+    normalized.stage = stage;
+  }
+
+  if (completed !== undefined) {
+    normalized.completed = completed;
+  }
+
+  if (hintUsed !== undefined) {
+    normalized.hintUsed = hintUsed;
+  }
+
+  if (resolvedAnswer && resolvedAnswer.trim()) {
+    normalized.resolvedAnswer = resolvedAnswer;
+  }
+
+  if (resolvedTitle && resolvedTitle.trim()) {
+    normalized.resolvedTitle = resolvedTitle;
+  }
+
+  if (resolvedYear !== undefined) {
+    normalized.resolvedYear = resolvedYear;
+  }
+
+  return normalized;
+}
+
+function normalizeGameProgressEntry(value: unknown): GameProgress | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  let completed = false;
+  if (typeof record.completed === "boolean") {
+    completed = record.completed;
+  } else if (typeof record.completed === "number") {
+    completed = record.completed > 0;
+  } else if (typeof record.completed === "string") {
+    completed = record.completed.trim().toLowerCase() === "true";
+  }
+
+  const round = coercePositiveInteger(record.round, 1) ?? 1;
+  const guesses = normalizeGuessList(record.guesses);
+
+  let rounds: GameRoundProgress[] | undefined;
+  if (Array.isArray(record.rounds)) {
+    const normalizedRounds = record.rounds
+      .map((entry) => normalizeGameRoundProgress(entry))
+      .filter((entry): entry is GameRoundProgress => entry !== null);
+    if (normalizedRounds.length > 0) {
+      rounds = normalizedRounds;
+    } else if (record.rounds.length > 0) {
+      rounds = [];
+    }
+  }
+
+  const normalized: GameProgress = {
+    completed,
+    round,
+    guesses,
+  };
+
+  if (rounds) {
+    normalized.rounds = rounds;
+  }
+
+  return normalized;
 }
 
 function normalizeProgress(value: unknown): DailyProgress {
   if (!value || typeof value !== "object") {
     return {};
   }
-  return { ...(value as DailyProgress) };
+  const result: DailyProgress = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!key) continue;
+    const normalized = normalizeGameProgressEntry(entry);
+    if (normalized) {
+      result[key as keyof DailyProgress] = normalized;
+    }
+  }
+  return result;
+}
+
+function cloneState(
+  state: PersistedDailyState | null | undefined,
+): PersistedDailyState {
+  if (!state) {
+    return { progress: {} };
+  }
+  return {
+    progress: normalizeProgress(state.progress),
+  };
 }
 
 function readLocalStorageState(date: string): PersistedDailyState | null {
@@ -213,9 +425,13 @@ function writeStoredState(date: string, value: PersistedDailyState) {
 }
 
 export function usePuzzleProgress(date: string) {
-  const [state, setState] = useState<PersistedDailyState>(() => readStoredState(date));
+  const [state, setState] = useState<PersistedDailyState>(() =>
+    readStoredState(date),
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<ProgressFetchError | null>(null);
+  const [refreshError, setRefreshError] = useState<ProgressFetchError | null>(
+    null,
+  );
 
   useEffect(() => {
     setState(readStoredState(date));
@@ -411,7 +627,9 @@ export function usePuzzleProgress(date: string) {
 
   const refresh = useCallback(async (): Promise<RefreshResult> => {
     if (!date) {
-      const error = new Error("No date available to refresh progress") as ProgressFetchError;
+      const error = new Error(
+        "No date available to refresh progress",
+      ) as ProgressFetchError;
       setRefreshError(error);
       return { success: false, error };
     }
@@ -422,7 +640,9 @@ export function usePuzzleProgress(date: string) {
     try {
       const serverProgress = await fetchProgressFromServer();
       if (!serverProgress) {
-        const error = new Error("No remote progress available") as ProgressFetchError;
+        const error = new Error(
+          "No remote progress available",
+        ) as ProgressFetchError;
         setRefreshError(error);
         return { success: false, error };
       }

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from ..services.anilist import Title
 
@@ -237,10 +237,154 @@ class DailyPuzzleResponse(BaseModel):
     guess_the_opening_enabled: bool = False
 
 
+class GameRoundProgressPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    round: int = 1
+    guesses: List[str] = Field(default_factory=list)
+    stage: Optional[int] = None
+    completed: Optional[bool] = None
+    hint_used: Optional[bool] = Field(
+        default=None,
+        validation_alias=AliasChoices("hintUsed", "hint_used"),
+        serialization_alias="hintUsed",
+    )
+    resolved_answer: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("resolvedAnswer", "resolved_answer"),
+        serialization_alias="resolvedAnswer",
+    )
+    title_guesses: List[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("titleGuesses", "title_guesses"),
+        serialization_alias="titleGuesses",
+    )
+    year_guesses: List[int] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("yearGuesses", "year_guesses"),
+        serialization_alias="yearGuesses",
+    )
+    resolved_title: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("resolvedTitle", "resolved_title"),
+        serialization_alias="resolvedTitle",
+    )
+    resolved_year: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("resolvedYear", "resolved_year"),
+        serialization_alias="resolvedYear",
+    )
+
+    @model_validator(mode="after")
+    def _normalize(self) -> "GameRoundProgressPayload":
+        try:
+            self.round = max(int(self.round or 1), 1)
+        except (TypeError, ValueError):
+            self.round = 1
+
+        normalized_guesses: List[str] = []
+        for guess in self.guesses:
+            if isinstance(guess, bool):
+                continue
+            text: Optional[str]
+            if isinstance(guess, (int, float)):
+                text = str(int(guess))
+            elif isinstance(guess, str):
+                text = guess
+            else:
+                text = None
+            if not text:
+                continue
+            normalized = text.strip()
+            if normalized:
+                normalized_guesses.append(normalized)
+        self.guesses = normalized_guesses
+
+        normalized_titles: List[str] = []
+        source_titles = self.title_guesses or self.guesses
+        for guess in source_titles:
+            if isinstance(guess, bool):
+                continue
+            text = str(guess).strip() if isinstance(guess, (str, int)) else None
+            if text:
+                normalized_titles.append(text)
+        self.title_guesses = normalized_titles or list(self.guesses)
+
+        normalized_years: List[int] = []
+        for guess in self.year_guesses:
+            if isinstance(guess, bool):
+                continue
+            if isinstance(guess, int):
+                normalized_years.append(guess)
+                continue
+            try:
+                parsed = int(str(guess).strip())
+            except (TypeError, ValueError):
+                continue
+            normalized_years.append(parsed)
+        self.year_guesses = normalized_years
+
+        if self.stage is not None:
+            try:
+                self.stage = max(int(self.stage), 1)
+            except (TypeError, ValueError):
+                self.stage = None
+
+        if self.resolved_year is not None:
+            try:
+                self.resolved_year = int(self.resolved_year)
+            except (TypeError, ValueError):
+                self.resolved_year = None
+
+        return self
+
+
 class GameProgressPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     completed: bool = False
     round: int = 1
     guesses: List[str] = Field(default_factory=list)
+    rounds: Optional[List[GameRoundProgressPayload]] = None
+
+    @model_validator(mode="after")
+    def _normalize(self) -> "GameProgressPayload":
+        try:
+            self.round = max(int(self.round or 1), 1)
+        except (TypeError, ValueError):
+            self.round = 1
+
+        normalized_guesses: List[str] = []
+        for guess in self.guesses:
+            if isinstance(guess, bool):
+                continue
+            text: Optional[str]
+            if isinstance(guess, (int, float)):
+                text = str(int(guess))
+            elif isinstance(guess, str):
+                text = guess
+            else:
+                text = None
+            if not text:
+                continue
+            normalized = text.strip()
+            if normalized:
+                normalized_guesses.append(normalized)
+        self.guesses = normalized_guesses
+
+        if self.rounds:
+            normalized_rounds: List[GameRoundProgressPayload] = []
+            for entry in self.rounds:
+                if isinstance(entry, GameRoundProgressPayload):
+                    normalized_rounds.append(entry)
+                elif isinstance(entry, dict):
+                    try:
+                        normalized_rounds.append(GameRoundProgressPayload.model_validate(entry))
+                    except Exception:
+                        continue
+            self.rounds = normalized_rounds or None
+
+        return self
 
 
 class DailyProgressPayload(BaseModel):

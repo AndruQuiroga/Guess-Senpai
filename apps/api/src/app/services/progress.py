@@ -30,6 +30,26 @@ def _deserialize_progress(raw: Any) -> Dict[str, GameProgressPayload]:
             continue
         try:
             progress[key] = GameProgressPayload.model_validate(value)
+            continue
+        except Exception:
+            pass
+
+        if isinstance(value, GameProgressPayload):
+            progress[key] = value
+            continue
+
+        fallback_payload: Dict[str, Any] = {}
+        if isinstance(value, dict):
+            if "completed" in value:
+                fallback_payload["completed"] = value.get("completed")
+            if "round" in value:
+                fallback_payload["round"] = value.get("round")
+            if "guesses" in value:
+                fallback_payload["guesses"] = value.get("guesses")
+            if "rounds" in value:
+                fallback_payload["rounds"] = value.get("rounds")
+        try:
+            progress[key] = GameProgressPayload.model_validate(fallback_payload)
         except Exception:
             continue
     return progress
@@ -55,7 +75,17 @@ async def load_daily_progress(user_id: int, day: date) -> DailyProgressPayload:
 
 
 async def store_daily_progress(user_id: int, payload: DailyProgressPayload) -> DailyProgressPayload:
-    serializable = {k: v.model_dump(mode="json") for k, v in payload.progress.items()}
+    serializable: Dict[str, Dict[str, Any]] = {}
+    for key, value in payload.progress.items():
+        if isinstance(value, GameProgressPayload):
+            serializable[key] = value.model_dump(
+                mode="json", by_alias=True, exclude_none=True
+            )
+        else:
+            validated = GameProgressPayload.model_validate(value)
+            serializable[key] = validated.model_dump(
+                mode="json", by_alias=True, exclude_none=True
+            )
     session_factory = get_session_factory()
     async with session_factory() as session:
         try:

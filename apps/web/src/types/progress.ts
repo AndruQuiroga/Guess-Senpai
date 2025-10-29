@@ -8,10 +8,14 @@ export type GameKey =
 export interface GameRoundProgress {
   round: number;
   guesses: string[];
+  titleGuesses?: string[];
+  yearGuesses?: number[];
   stage?: number;
   completed?: boolean;
   hintUsed?: boolean;
   resolvedAnswer?: string;
+  resolvedTitle?: string;
+  resolvedYear?: number;
 }
 
 export interface GameProgress {
