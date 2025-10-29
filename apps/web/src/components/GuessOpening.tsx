@@ -89,13 +89,41 @@ export default function GuessOpening({
         ? Math.max(1, Math.floor(entry.round))
         : null;
       if (!normalizedRound) return;
+      const storedTitleGuesses = Array.isArray(entry.titleGuesses)
+        ? entry.titleGuesses.filter(
+            (guess): guess is string =>
+              typeof guess === "string" && guess.trim().length > 0,
+          )
+        : null;
+      const storedGuesses = storedTitleGuesses?.length
+        ? storedTitleGuesses
+        : Array.isArray(entry.guesses)
+          ? entry.guesses.filter(
+              (guess): guess is string =>
+                typeof guess === "string" && guess.trim().length > 0,
+            )
+          : [];
+      const storedYearGuesses = Array.isArray(entry.yearGuesses)
+        ? entry.yearGuesses.filter(
+            (guess): guess is number =>
+              typeof guess === "number" && Number.isFinite(guess),
+          )
+        : null;
       map.set(normalizedRound, {
         round: normalizedRound,
-        guesses: Array.isArray(entry.guesses) ? [...entry.guesses] : [],
+        guesses: [...storedGuesses],
+        titleGuesses: storedTitleGuesses?.length
+          ? [...storedTitleGuesses]
+          : undefined,
+        yearGuesses: storedYearGuesses?.length
+          ? [...storedYearGuesses]
+          : undefined,
         stage: entry.stage,
         completed: entry.completed,
         hintUsed: entry.hintUsed,
-        resolvedAnswer: entry.resolvedAnswer,
+        resolvedAnswer: entry.resolvedTitle ?? entry.resolvedAnswer,
+        resolvedTitle: entry.resolvedTitle ?? entry.resolvedAnswer,
+        resolvedYear: entry.resolvedYear,
       });
     });
     return map;
@@ -122,7 +150,18 @@ export default function GuessOpening({
 
         let guesses = previous.guesses;
         if (stored) {
-          guesses = Array.isArray(stored.guesses) ? [...stored.guesses] : [];
+          const storedGuesses = Array.isArray(stored.titleGuesses)
+            ? stored.titleGuesses.filter(
+                (guess): guess is string =>
+                  typeof guess === "string" && guess.trim().length > 0,
+              )
+            : Array.isArray(stored.guesses)
+              ? stored.guesses.filter(
+                  (guess): guess is string =>
+                    typeof guess === "string" && guess.trim().length > 0,
+                )
+              : [];
+          guesses = [...storedGuesses];
         } else if (
           initialProgress &&
           storedRoundMap.size === 0 &&
@@ -157,7 +196,9 @@ export default function GuessOpening({
           hintUsed = true;
         }
 
-        const resolvedAnswer = stored?.resolvedAnswer?.trim();
+        const resolvedAnswer = (
+          stored?.resolvedTitle ?? stored?.resolvedAnswer
+        )?.trim();
         const canonicalTitle = resolvedAnswer
           ? resolvedAnswer
           : completed
@@ -399,10 +440,15 @@ export default function GuessOpening({
       (state, index) => ({
         round: index + 1,
         guesses: [...state.guesses],
+        titleGuesses: [...state.guesses],
         stage: state.stage,
         completed: state.completed,
         hintUsed: state.hintUsed,
         resolvedAnswer: state.completed ? state.canonicalTitle : undefined,
+        resolvedTitle: state.completed ? state.canonicalTitle : undefined,
+        yearGuesses: storedRoundMap.get(index + 1)?.yearGuesses?.length
+          ? [...(storedRoundMap.get(index + 1)?.yearGuesses ?? [])]
+          : undefined,
       }),
     );
     onProgressChange({
@@ -411,7 +457,13 @@ export default function GuessOpening({
       guesses: aggregatedGuesses,
       rounds: roundsProgress,
     });
-  }, [activeRoundIndex, onProgressChange, puzzleCompleted, roundStates]);
+  }, [
+    activeRoundIndex,
+    onProgressChange,
+    puzzleCompleted,
+    roundStates,
+    storedRoundMap,
+  ]);
 
   useEffect(() => {
     setGuess("");
