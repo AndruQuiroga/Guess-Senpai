@@ -345,7 +345,11 @@ class GameProgressPayload(BaseModel):
     completed: bool = False
     round: int = 1
     guesses: List[str] = Field(default_factory=list)
-    rounds: Optional[List[GameRoundProgressPayload]] = None
+    rounds: Optional[List[GameRoundProgressPayload]] = Field(
+        default=None,
+        validation_alias=AliasChoices("rounds", "round_progress", "rounds_progress"),
+        serialization_alias="rounds",
+    )
 
     @model_validator(mode="after")
     def _normalize(self) -> "GameProgressPayload":
@@ -372,17 +376,34 @@ class GameProgressPayload(BaseModel):
                 normalized_guesses.append(normalized)
         self.guesses = normalized_guesses
 
-        if self.rounds:
-            normalized_rounds: List[GameRoundProgressPayload] = []
-            for entry in self.rounds:
+        raw_rounds = self.rounds
+        normalized_rounds: List[GameRoundProgressPayload] = []
+        if isinstance(raw_rounds, list):
+            for entry in raw_rounds:
                 if isinstance(entry, GameRoundProgressPayload):
                     normalized_rounds.append(entry)
-                elif isinstance(entry, dict):
+                    continue
+                if isinstance(entry, dict):
                     try:
-                        normalized_rounds.append(GameRoundProgressPayload.model_validate(entry))
+                        normalized_rounds.append(
+                            GameRoundProgressPayload.model_validate(entry)
+                        )
                     except Exception:
                         continue
-            self.rounds = normalized_rounds or None
+        elif raw_rounds is not None:
+            try:
+                normalized_rounds.append(
+                    GameRoundProgressPayload.model_validate(raw_rounds)
+                )
+            except Exception:
+                pass
+
+        if normalized_rounds:
+            self.rounds = normalized_rounds
+        elif isinstance(raw_rounds, list) and len(raw_rounds) > 0:
+            self.rounds = []
+        else:
+            self.rounds = None
 
         return self
 

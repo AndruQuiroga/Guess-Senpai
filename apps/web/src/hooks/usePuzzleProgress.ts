@@ -223,14 +223,24 @@ function normalizeGameProgressEntry(value: unknown): GameProgress | null {
   const guesses = normalizeGuessList(record.guesses);
 
   let rounds: GameRoundProgress[] | undefined;
-  if (Array.isArray(record.rounds)) {
-    const normalizedRounds = record.rounds
+  const recordEntries = record as Record<string, unknown>;
+  const rawRounds =
+    recordEntries["rounds"] ??
+    recordEntries["round_progress"] ??
+    recordEntries["roundProgress"];
+  if (Array.isArray(rawRounds)) {
+    const normalizedRounds = rawRounds
       .map((entry) => normalizeGameRoundProgress(entry))
       .filter((entry): entry is GameRoundProgress => entry !== null);
     if (normalizedRounds.length > 0) {
       rounds = normalizedRounds;
-    } else if (record.rounds.length > 0) {
+    } else if (rawRounds.length > 0) {
       rounds = [];
+    }
+  } else if (rawRounds && typeof rawRounds === "object") {
+    const normalized = normalizeGameRoundProgress(rawRounds);
+    if (normalized) {
+      rounds = [normalized];
     }
   }
 
@@ -479,10 +489,11 @@ export function usePuzzleProgress(date: string) {
       }
 
       const serverProgress = payload.progress ?? {};
+      const normalized = normalizeProgress(serverProgress);
       persist(() => ({
-        progress: serverProgress,
+        progress: normalized,
       }));
-      return serverProgress;
+      return normalized;
     },
     [date, persist],
   );
@@ -525,13 +536,14 @@ export function usePuzzleProgress(date: string) {
       }
 
       try {
+        const normalizedUpdates = normalizeProgress(updates);
         const response = await fetch(`${API_BASE}/puzzles/progress`, {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             date,
-            progress: updates,
+            progress: normalizedUpdates,
           }),
         });
 
@@ -613,12 +625,17 @@ export function usePuzzleProgress(date: string) {
 
   const recordGame = useCallback(
     (game: GameKey, progressState: GameProgress) => {
+      const normalized = normalizeGameProgressEntry(progressState);
+      if (!normalized) {
+        return;
+      }
+
       persist((prev) => ({
-        progress: { ...prev.progress, [game]: progressState },
+        progress: { ...prev.progress, [game]: normalized },
       }));
       pendingUpdatesRef.current = {
         ...pendingUpdatesRef.current,
-        [game]: progressState,
+        [game]: normalized,
       };
       scheduleFlush();
     },
