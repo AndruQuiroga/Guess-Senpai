@@ -48,6 +48,11 @@ def _deserialize_progress(raw: Any) -> Dict[str, GameProgressPayload]:
                 fallback_payload["guesses"] = value.get("guesses")
             if "rounds" in value:
                 fallback_payload["rounds"] = value.get("rounds")
+            else:
+                for legacy_key in ("round_progress", "rounds_progress"):
+                    if legacy_key in value:
+                        fallback_payload["rounds"] = value.get(legacy_key)
+                        break
         try:
             progress[key] = GameProgressPayload.model_validate(fallback_payload)
         except Exception:
