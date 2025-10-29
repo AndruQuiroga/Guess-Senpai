@@ -3,8 +3,10 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from httpx import AsyncClient
 from starlette.requests import Request
 
+from app import main as app_main
 from app.core.database import get_session_factory
 from app.puzzles import engine as puzzle_engine
 from app.puzzles.engine import _title_variants
@@ -237,3 +239,79 @@ async def test_verify_guess_requires_dual_match(monkeypatch: pytest.MonkeyPatch)
     assert success.correct is True
     assert success.character_match is True
     assert success.character == "Protagonist"
+
+
+@pytest.mark.asyncio
+async def test_verify_endpoint_reports_season_flags(monkeypatch: pytest.MonkeyPatch) -> None:
+    target_media = make_media(333, "Seasoned Story")
+    target_media.season = "SPRING"
+    target_media.seasonYear = 2010
+
+    class DummyCache:
+        async def remember(self, key, ttl, creator):  # type: ignore[override]
+            return await creator()
+
+        async def set(self, key, value, ttl):  # type: ignore[override]
+            return None
+
+        async def get(self, key):  # type: ignore[override]
+            return None
+
+    dummy_cache = DummyCache()
+
+    async def fake_get_cache(_url):  # type: ignore[override]
+        return dummy_cache
+
+    media_by_id = {target_media.id: target_media}
+
+    async def fake_load_media_details(media_id: int, cache, settings):
+        return media_by_id[media_id]
+
+    monkeypatch.setattr(app_main, "register_database", lambda app: None)
+    monkeypatch.setattr(puzzles_router, "get_cache", fake_get_cache)
+    monkeypatch.setattr(puzzle_engine, "_load_media_details", fake_load_media_details)
+
+    app = app_main.create_app()
+
+    async with AsyncClient(app=app, base_url="http://testserver") as client:
+        response_title = await client.post(
+            "/puzzles/verify",
+            json={
+                "media_id": target_media.id,
+                "guess": target_media.title.english,
+            },
+        )
+        assert response_title.status_code == 200
+        payload = response_title.json()
+        assert payload["anime_match"] is True
+        assert payload["season_match"] is None
+        assert payload["season_year_match"] is None
+
+        response_year_only = await client.post(
+            "/puzzles/verify",
+            json={
+                "media_id": target_media.id,
+                "guess": target_media.title.english,
+                "season_year": target_media.seasonYear - 5,
+            },
+        )
+        assert response_year_only.status_code == 200
+        year_payload = response_year_only.json()
+        assert year_payload["anime_match"] is True
+        assert year_payload["season_match"] is None
+        assert year_payload["season_year_match"] is False
+
+        response_combined = await client.post(
+            "/puzzles/verify",
+            json={
+                "media_id": target_media.id,
+                "guess": target_media.title.english,
+                "season": "spring",
+                "season_year": target_media.seasonYear,
+            },
+        )
+        assert response_combined.status_code == 200
+        combined_payload = response_combined.json()
+        assert combined_payload["anime_match"] is True
+        assert combined_payload["season_match"] is True
+        assert combined_payload["season_year_match"] is True
