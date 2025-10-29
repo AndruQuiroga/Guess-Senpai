@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { useAccount } from "../hooks/useAccount";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
 const MIN_INTERVAL_MS = 60 * 1000;
@@ -14,23 +16,43 @@ type RefreshResponse = {
 
 export default function SessionRefresher() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { account, refresh: refreshAccount } = useAccount();
 
   useEffect(() => {
     let cancelled = false;
+
+    const clearScheduled = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+
+    const cleanup = () => {
+      cancelled = true;
+      clearScheduled();
+    };
+
+    const handleUnauthorized = () => {
+      clearScheduled();
+      if (!cancelled) {
+        void refreshAccount();
+      }
+    };
 
     const schedule = (delay: number) => {
       if (cancelled) {
         return;
       }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearScheduled();
       const clampedDelay = Math.max(delay, MIN_INTERVAL_MS);
-      timeoutRef.current = setTimeout(runRefresh, clampedDelay);
+      timeoutRef.current = setTimeout(() => {
+        void runRefresh();
+      }, clampedDelay);
     };
 
     const runRefresh = async () => {
-      if (cancelled) {
+      if (cancelled || !account.authenticated) {
         return;
       }
       try {
@@ -38,6 +60,11 @@ export default function SessionRefresher() {
           method: "POST",
           credentials: "include",
         });
+
+        if (response.status === 401) {
+          handleUnauthorized();
+          return;
+        }
 
         if (!response.ok) {
           schedule(FALLBACK_INTERVAL_MS);
@@ -66,15 +93,15 @@ export default function SessionRefresher() {
       }
     };
 
+    if (!account.authenticated) {
+      clearScheduled();
+      return cleanup;
+    }
+
     void runRefresh();
 
-    return () => {
-      cancelled = true;
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
+    return cleanup;
+  }, [account.authenticated, refreshAccount]);
 
   return null;
 }
