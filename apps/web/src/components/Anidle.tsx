@@ -143,10 +143,15 @@ export default function Anidle({
   const [hydrating, setHydrating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hydrationProgress, setHydrationProgress] = useState({
+    completed: 0,
+    total: 0,
+  });
 
   const hydratedGuessesKeyRef = useRef<string | null>(null);
   const previousMediaIdRef = useRef<number | null>(null);
   const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
+  const evaluationCacheRef = useRef<Map<string, AnidleGuessEvaluation>>(new Map());
 
   const normalizedAnswer = useMemo(
     () => payload.answer.trim().toLowerCase(),
@@ -173,7 +178,11 @@ export default function Anidle({
     }
     setErrorMessage(null);
     setHydrating(false);
+    setHydrationProgress({ completed: 0, total: 0 });
     hydratedGuessesKeyRef.current = null;
+    if (puzzleChanged) {
+      evaluationCacheRef.current.clear();
+    }
     previousMediaIdRef.current = mediaId;
   }, [initialProgress, mediaId, payload.answer]);
 
@@ -335,6 +344,15 @@ export default function Anidle({
     [],
   );
 
+  const getCacheKey = useCallback(
+    (value: string, guessMediaId?: number | null) => {
+      return `${mediaId}:${value.trim().toLowerCase()}::${
+        guessMediaId ?? ""
+      }`;
+    },
+    [mediaId],
+  );
+
   useEffect(() => {
     const storedGuesses = initialProgress?.guesses ?? [];
     const hydrationKey = storedGuesses.join("||");
@@ -342,6 +360,7 @@ export default function Anidle({
       hydratedGuessesKeyRef.current = "";
       setEvaluations([]);
       setHydrating(false);
+      setHydrationProgress({ completed: 0, total: 0 });
       return;
     }
     if (hydratedGuessesKeyRef.current === hydrationKey) {
@@ -351,39 +370,69 @@ export default function Anidle({
     let cancelled = false;
     hydratedGuessesKeyRef.current = hydrationKey;
     setHydrating(true);
+    setHydrationProgress({ completed: 0, total: storedGuesses.length });
 
     async function hydrate() {
       try {
-        const results = await Promise.all(
-          storedGuesses.map(async (value): Promise<AnidleGuessEvaluation> => {
-            const guessValue = value.trim();
-            if (!guessValue) {
-              return createFallbackEvaluation(value);
-            }
-            try {
-              const evaluation = await evaluateAnidleGuess({
-                puzzleMediaId: mediaId,
-                guess: guessValue,
-              });
-              if (cancelled) {
-                return createFallbackEvaluation(value);
-              }
-              return evaluation;
-            } catch (error) {
-              if (!cancelled) {
-                console.warn("Failed to rebuild Anidle evaluation", error);
-              }
-              return createFallbackEvaluation(value);
-            }
-          }),
-        );
+        const results: AnidleGuessEvaluation[] = [];
+        for (const value of storedGuesses) {
+          if (cancelled) {
+            break;
+          }
 
-        if (!cancelled) {
-          setEvaluations(results);
+          const guessValue = value.trim();
+          let evaluation: AnidleGuessEvaluation;
+          let cacheKey: string | null = null;
+
+          if (!guessValue) {
+            evaluation = createFallbackEvaluation(value);
+          } else {
+            cacheKey = getCacheKey(guessValue);
+            const cached = evaluationCacheRef.current.get(cacheKey);
+
+            if (cached) {
+              evaluation = cached;
+            } else {
+              try {
+                const fetched = await evaluateAnidleGuess({
+                  puzzleMediaId: mediaId,
+                  guess: guessValue,
+                });
+                evaluation = fetched;
+                if (!cancelled) {
+                  evaluationCacheRef.current.set(cacheKey, fetched);
+                }
+              } catch (error) {
+                if (!cancelled) {
+                  console.warn("Failed to rebuild Anidle evaluation", error);
+                }
+                evaluation = createFallbackEvaluation(value);
+              }
+            }
+
+            if (!cancelled && cacheKey && !evaluationCacheRef.current.has(cacheKey)) {
+              evaluationCacheRef.current.set(cacheKey, evaluation);
+            }
+          }
+
+          if (cancelled) {
+            break;
+          }
+
+          results.push(evaluation);
+          setEvaluations([...results]);
+          setHydrationProgress({
+            completed: results.length,
+            total: storedGuesses.length,
+          });
         }
       } finally {
         if (!cancelled) {
           setHydrating(false);
+          setHydrationProgress((prev) => ({
+            completed: prev.total,
+            total: prev.total,
+          }));
         }
       }
     }
@@ -394,7 +443,12 @@ export default function Anidle({
       cancelled = true;
       setHydrating(false);
     };
-  }, [createFallbackEvaluation, initialProgress, mediaId]);
+  }, [
+    createFallbackEvaluation,
+    getCacheKey,
+    initialProgress,
+    mediaId,
+  ]);
 
   const advanceRound = useCallback(() => {
     setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
@@ -421,6 +475,10 @@ export default function Anidle({
         const evaluationRecord: AnidleGuessEvaluation = resolvedCorrect
           ? { ...evaluation, correct: true }
           : evaluation;
+        evaluationCacheRef.current.set(
+          getCacheKey(value, suggestionId ?? null),
+          evaluationRecord,
+        );
 
         setGuesses((prev) => {
           const next = [...prev, value];
@@ -445,7 +503,7 @@ export default function Anidle({
         setSubmitting(false);
       }
     },
-    [advanceRound, mediaId, normalizedAnswer, submitting],
+    [advanceRound, getCacheKey, mediaId, normalizedAnswer, submitting],
   );
 
   const handleFieldSubmit = useCallback(
@@ -717,7 +775,9 @@ export default function Anidle({
                     aria-hidden
                   />
                   <span className="text-sm font-medium text-white">
-                    Replaying your guesses…
+                    {hydrationProgress.total > 0
+                      ? `Replaying your guesses… (${hydrationProgress.completed}/${hydrationProgress.total})`
+                      : "Replaying your guesses…"}
                   </span>
                 </div>
               )}
