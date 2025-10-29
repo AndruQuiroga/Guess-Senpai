@@ -67,9 +67,9 @@ ANIDLE_ROUNDS = [
 ]
 
 POSTER_ROUNDS = [
-    RoundSpec(difficulty=1, hints=[]),
-    RoundSpec(difficulty=2, hints=["genres"]),
-    RoundSpec(difficulty=3, hints=["year", "format"]),
+    RoundSpec(difficulty=1, hints=["genres", "season", "format"]),
+    RoundSpec(difficulty=2, hints=["genres", "year"]),
+    RoundSpec(difficulty=3, hints=["genres"]),
 ]
 
 MAX_POSTER_HINTS = max(0, len(POSTER_ROUNDS) - 1)
@@ -305,23 +305,122 @@ def _build_poster_crop_stages(media: Media) -> List[PosterCropStage]:
     return stages
 
 
-def _build_poster(media: Media) -> PosterZoomGame:
+def _poster_release_year(media: Media) -> Optional[int]:
+    if media.seasonYear:
+        return media.seasonYear
+    start_date = media.startDate or {}
+    year = start_date.get("year") if isinstance(start_date, dict) else None
+    if isinstance(year, int):
+        return year
+    return None
+
+
+def _poster_release_season(media: Media) -> Optional[str]:
+    season = (media.season or "").replace("_", " ").strip()
+    if not season:
+        return None
+    normalized = season.title()
+    release_year = _poster_release_year(media)
+    if release_year:
+        return f"{normalized} {release_year}"
+    return normalized
+
+
+def _build_poster_round(*, media: Media, order: int, difficulty: int) -> PosterZoomRound:
+    crop_stages = _build_poster_crop_stages(media)
+    release_year = _poster_release_year(media)
     meta = PosterZoomMeta(
         genres=[g for g in media.genres if g],
-        year=media.seasonYear or (media.startDate or {}).get("year"),
+        year=release_year,
+        season=_poster_release_season(media),
         format=media.format,
     )
-    crop_stages = _build_poster_crop_stages(media)
-    answer = _choose_answer(media)
-    round_entry = PosterZoomRound(
-        order=1,
-        difficulty=POSTER_ROUNDS[-1].difficulty if POSTER_ROUNDS else 1,
+    return PosterZoomRound(
+        order=order,
+        difficulty=difficulty,
         mediaId=media.id,
-        answer=answer,
+        answer=_choose_answer(media),
         meta=meta,
         cropStages=crop_stages,
     )
-    return PosterZoomGame(spec=POSTER_ROUNDS, rounds=[round_entry])
+
+
+def _poster_difficulty_bucket(media: Media, reference_year: int) -> int:
+    year_bucket = 2
+    release_year = _poster_release_year(media)
+    if release_year is not None:
+        if release_year >= reference_year - 2:
+            year_bucket = 0
+        elif release_year >= reference_year - 6:
+            year_bucket = 1
+    popularity = media.popularity or 0
+    if popularity >= 150_000:
+        pop_bucket = 0
+    elif popularity >= 80_000:
+        pop_bucket = 1
+    else:
+        pop_bucket = 2
+    return min(year_bucket, pop_bucket)
+
+
+def _sort_poster_candidates(candidates: Sequence[Media], reference_year: int) -> List[Media]:
+    def sort_key(media: Media) -> Tuple[int, int, int, int]:
+        bucket = _poster_difficulty_bucket(media, reference_year)
+        popularity = media.popularity or 0
+        release_year = _poster_release_year(media) or 0
+        return (bucket, -popularity, -release_year, media.id)
+
+    return sorted(candidates, key=sort_key)
+
+
+def _select_poster_candidates(
+    *,
+    day: date,
+    pool: Sequence[Media],
+    required: int = 3,
+) -> List[Media]:
+    if not pool:
+        return []
+
+    reference_year = day.year
+    sorted_pool = _sort_poster_candidates(pool, reference_year)
+    buckets: dict[int, List[Media]] = {0: [], 1: [], 2: []}
+    for media in sorted_pool:
+        bucket = _poster_difficulty_bucket(media, reference_year)
+        buckets.setdefault(bucket, []).append(media)
+
+    selected: List[Media] = []
+    selected_ids: set[int] = set()
+
+    for bucket in (0, 1, 2):
+        for candidate in buckets.get(bucket, []):
+            if candidate.id in selected_ids:
+                continue
+            selected.append(candidate)
+            selected_ids.add(candidate.id)
+            break
+        if len(selected) >= required:
+            break
+
+    if len(selected) < required:
+        for candidate in sorted_pool:
+            if candidate.id in selected_ids:
+                continue
+            selected.append(candidate)
+            selected_ids.add(candidate.id)
+            if len(selected) >= required:
+                break
+
+    if len(selected) < required:
+        for candidate in pool:
+            if candidate.id in selected_ids:
+                continue
+            selected.append(candidate)
+            selected_ids.add(candidate.id)
+            if len(selected) >= required:
+                break
+
+    return selected[:required]
 
 
 def _tokenize_synopsis(text: str) -> tuple[List[str], List[int]]:
@@ -1003,17 +1102,57 @@ async def _assemble_daily_puzzle(
         solution=_build_solution(anidle_media),
     )
 
-    poster_candidate = _choose_media_from_pool(
-        base_seed, "poster_zoomed", pool, selected_ids
+    poster_candidates = _select_poster_candidates(
+        day=day,
+        pool=pool,
+        required=max(1, len(POSTER_ROUNDS))
+        if POSTER_ROUNDS
+        else 1,
     )
-    poster_media = await _load_media_details(poster_candidate.id, cache, settings)
-    selected_ids.add(poster_media.id)
-    if poster_media.id not in recorded_ids:
-        recorded_ids.append(poster_media.id)
+    poster_rounds: List[PosterZoomRound] = []
+    poster_primary: Optional[Media] = None
+    for index, candidate in enumerate(poster_candidates, start=1):
+        poster_media = await _load_media_details(candidate.id, cache, settings)
+        selected_ids.add(poster_media.id)
+        if poster_media.id not in recorded_ids:
+            recorded_ids.append(poster_media.id)
+        if poster_primary is None:
+            poster_primary = poster_media
+        spec_index = min(index - 1, len(POSTER_ROUNDS) - 1) if POSTER_ROUNDS else 0
+        difficulty = POSTER_ROUNDS[spec_index].difficulty if POSTER_ROUNDS else 1
+        poster_rounds.append(
+            _build_poster_round(
+                media=poster_media,
+                order=index,
+                difficulty=difficulty,
+            )
+        )
+
+    if not poster_rounds and pool:
+        fallback_media = await _load_media_details(pool[0].id, cache, settings)
+        selected_ids.add(fallback_media.id)
+        if fallback_media.id not in recorded_ids:
+            recorded_ids.append(fallback_media.id)
+        poster_primary = fallback_media
+        poster_rounds.append(
+            _build_poster_round(
+                media=fallback_media,
+                order=1,
+                difficulty=POSTER_ROUNDS[0].difficulty if POSTER_ROUNDS else 1,
+            )
+        )
+
+    if not poster_rounds:
+        raise ValueError("Unable to build poster zoom rounds")
+
+    poster_primary = poster_primary or await _load_media_details(
+        poster_rounds[0].mediaId, cache, settings
+    )
+
     poster_bundle = PosterZoomPuzzleBundle(
-        mediaId=poster_media.id,
-        puzzle=_build_poster(poster_media),
-        solution=_build_solution(poster_media),
+        mediaId=poster_rounds[0].mediaId,
+        puzzle=PosterZoomGame(spec=POSTER_ROUNDS, rounds=poster_rounds),
+        solution=_build_solution(poster_primary),
     )
 
     synopsis_candidate = _choose_media_from_pool(

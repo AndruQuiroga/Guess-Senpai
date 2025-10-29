@@ -38,6 +38,7 @@ class AnidleGame(BaseModel):
 class PosterZoomMeta(BaseModel):
     genres: List[str] = Field(default_factory=list)
     year: Optional[int] = None
+    season: Optional[str] = None
     format: Optional[str] = None
 
 

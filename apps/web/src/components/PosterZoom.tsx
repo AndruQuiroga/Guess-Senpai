@@ -158,6 +158,9 @@ export default function PosterZoom({
           if (hint === "year" && primaryRound.meta.year) {
             hints.push(`Year: ${primaryRound.meta.year}`);
           }
+          if (hint === "season" && primaryRound.meta.season) {
+            hints.push(`Season: ${primaryRound.meta.season}`);
+          }
           if (hint === "format" && primaryRound.meta.format) {
             const formattedLabel = formatMediaFormatLabel(primaryRound.meta.format);
             hints.push(`Format: ${formattedLabel}`);
