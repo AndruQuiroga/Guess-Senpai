@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import type { GameKey, GameProgress } from "../../types/progress";
 
 import { usePuzzleProgress } from "../../hooks/usePuzzleProgress";
+import { useAccount } from "../../hooks/useAccount";
 import { useUserPreferences } from "../../hooks/useUserPreferences";
 import { PlaceholderPuzzlePage } from "./PlaceholderPuzzlePage";
 import { AnidlePage } from "./AnidlePage";
@@ -30,6 +31,7 @@ interface Props {
 
 export function PuzzleSlugContent({ data, slug }: Props) {
   const gameKey = slug.gameKey;
+  const { account } = useAccount();
 
   const bundle = useMemo<GamesPayload[keyof GamesPayload] | null>(() => {
     if (!data || !gameKey) return null;
@@ -37,7 +39,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
   }, [data, gameKey]);
 
   const { progress, recordGame } = usePuzzleProgress(data?.date ?? "");
-  const { difficultyLevel } = useUserPreferences();
+  const { difficultyLevel } = useUserPreferences({
+    authenticated: account.authenticated,
+  });
 
   const availablePuzzles = useMemo(() => {
     if (!data) return [];
