@@ -154,9 +154,11 @@ export default function Anidle({
   );
 
   useEffect(() => {
+    const storedGuesses = initialProgress?.guesses ?? [];
+    const hydrationKey = storedGuesses.join("||");
     const puzzleChanged = previousMediaIdRef.current !== mediaId;
-    const noStoredGuesses =
-      !initialProgress?.guesses || initialProgress.guesses.length === 0;
+    const noStoredGuesses = storedGuesses.length === 0;
+    const guessListChanged = hydratedGuessesKeyRef.current !== hydrationKey;
 
     if (!initialProgress) {
       setRound(1);
@@ -164,7 +166,7 @@ export default function Anidle({
       setCompleted(false);
     } else {
       setRound(initialProgress.round ?? 1);
-      setGuesses(initialProgress.guesses ?? []);
+      setGuesses(storedGuesses);
       setCompleted(initialProgress.completed ?? false);
     }
     setGuess("");
@@ -173,7 +175,9 @@ export default function Anidle({
     }
     setErrorMessage(null);
     setHydrating(false);
-    hydratedGuessesKeyRef.current = null;
+    if (puzzleChanged || guessListChanged) {
+      hydratedGuessesKeyRef.current = null;
+    }
     previousMediaIdRef.current = mediaId;
   }, [initialProgress, mediaId, payload.answer]);
 
