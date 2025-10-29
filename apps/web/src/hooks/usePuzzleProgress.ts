@@ -17,6 +17,9 @@ export type {
 } from "../types/progress";
 
 const STORAGE_KEY = "guesssenpai-progress";
+const COOKIE_KEY = "guesssenpai-progress";
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 60; // 60 days
+const COOKIE_MAX_DAYS = 45;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 const FLUSH_DELAY_MS = 1000;
 const RETRY_DELAY_MS = 5000;
@@ -58,22 +61,22 @@ function normalizeProgress(value: unknown): DailyProgress {
   return { ...(value as DailyProgress) };
 }
 
-function readStoredState(date: string): PersistedDailyState {
+function readLocalStorageState(date: string): PersistedDailyState | null {
   if (typeof window === "undefined" || !date) {
-    return cloneState(EMPTY_STATE);
+    return null;
   }
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-      return cloneState(EMPTY_STATE);
+      return null;
     }
     const parsed: StorageShape = JSON.parse(stored);
     if (!parsed || typeof parsed !== "object") {
-      return cloneState(EMPTY_STATE);
+      return null;
     }
     const entry = parsed[date];
     if (!entry || typeof entry !== "object") {
-      return cloneState(EMPTY_STATE);
+      return null;
     }
     const record = entry as Record<string, unknown>;
     if ("progress" in record) {
@@ -85,23 +88,128 @@ function readStoredState(date: string): PersistedDailyState {
       progress: normalizeProgress(entry),
     };
   } catch (error) {
-    console.warn("Failed to read puzzle progress", error);
-    return cloneState(EMPTY_STATE);
+    console.warn("Failed to read puzzle progress from localStorage", error);
+    return null;
   }
 }
 
-function writeStoredState(date: string, value: PersistedDailyState) {
+function writeLocalStorageState(date: string, value: PersistedDailyState) {
   if (typeof window === "undefined" || !date) return;
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const parsed: StorageShape = stored ? JSON.parse(stored) : {};
-    parsed[date] = {
-      progress: { ...value.progress },
-    };
+    if (Object.keys(value.progress).length === 0) {
+      delete parsed[date];
+    } else {
+      parsed[date] = {
+        progress: { ...value.progress },
+      };
+    }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
   } catch (error) {
-    console.warn("Failed to persist puzzle progress", error);
+    console.warn("Failed to persist puzzle progress to localStorage", error);
   }
+}
+
+function readProgressCookie(): StorageShape {
+  if (typeof document === "undefined") {
+    return {};
+  }
+
+  const all = document.cookie ? document.cookie.split("; ") : [];
+  const target = all.find((entry) => entry.startsWith(`${COOKIE_KEY}=`));
+  if (!target) {
+    return {};
+  }
+
+  const [, rawValue] = target.split("=");
+  if (!rawValue) {
+    return {};
+  }
+
+  try {
+    const decoded = decodeURIComponent(rawValue);
+    const parsed = JSON.parse(decoded) as StorageShape;
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+  } catch (error) {
+    console.warn("Failed to parse puzzle progress cookie", error);
+  }
+  return {};
+}
+
+function writeProgressCookie(store: StorageShape) {
+  if (typeof document === "undefined") return;
+  try {
+    const serialized = encodeURIComponent(JSON.stringify(store));
+    document.cookie = `${COOKIE_KEY}=${serialized}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
+  } catch (error) {
+    console.warn("Failed to persist puzzle progress cookie", error);
+  }
+}
+
+function readCookieState(date: string): PersistedDailyState | null {
+  if (typeof document === "undefined" || !date) {
+    return null;
+  }
+  const store = readProgressCookie();
+  const entry = store[date];
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const record = entry as Record<string, unknown>;
+  if ("progress" in record) {
+    return {
+      progress: normalizeProgress(record.progress),
+    };
+  }
+  return {
+    progress: normalizeProgress(entry),
+  };
+}
+
+function writeCookieState(date: string, value: PersistedDailyState) {
+  if (typeof document === "undefined" || !date) return;
+  const store = readProgressCookie();
+  if (Object.keys(value.progress).length === 0) {
+    delete store[date];
+  } else {
+    store[date] = {
+      progress: { ...value.progress },
+    };
+  }
+  const keys = Object.keys(store)
+    .filter((key) => typeof key === "string" && key)
+    .sort((a, b) => (a > b ? -1 : 1));
+  if (keys.length > COOKIE_MAX_DAYS) {
+    for (const staleKey of keys.slice(COOKIE_MAX_DAYS)) {
+      delete store[staleKey];
+    }
+  }
+  writeProgressCookie(store);
+}
+
+function readStoredState(date: string): PersistedDailyState {
+  const localState = readLocalStorageState(date);
+  if (localState) {
+    return cloneState(localState);
+  }
+
+  const cookieState = readCookieState(date);
+  if (cookieState) {
+    // Keep localStorage in sync when available.
+    writeLocalStorageState(date, cookieState);
+    return cloneState(cookieState);
+  }
+
+  return cloneState(EMPTY_STATE);
+}
+
+function writeStoredState(date: string, value: PersistedDailyState) {
+  if (!date) return;
+  writeLocalStorageState(date, value);
+  writeCookieState(date, value);
 }
 
 export function usePuzzleProgress(date: string) {
