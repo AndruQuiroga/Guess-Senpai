@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 import httpx
 from pydantic import BaseModel, Field
@@ -507,6 +507,139 @@ async def _fetch_media_slice(query: str, variables: Dict[str, Any]) -> List[Medi
     payload = await gql_request(query, variables)
     media_payload = payload.get("Page", {}).get("media", [])
     return [Media.model_validate(item) for item in media_payload]
+
+
+_CHARACTER_ROLE_WEIGHTS: Dict[str, int] = {
+    "PROTAGONIST": 5,
+    "MAIN": 5,
+    "LEAD": 4,
+    "SUPPORTING": 3,
+    "SECONDARY": 3,
+    "ANTAGONIST": 3,
+    "BACKGROUND": 1,
+}
+
+_DIFFICULTY_THRESHOLDS: Dict[int, Sequence[int]] = {
+    1: (4, 3, 0),
+    2: (3, 2, 0),
+    3: (2, 1, 0),
+}
+
+
+def _character_role_weight(role: Optional[str]) -> int:
+    if not role:
+        return 0
+    normalized = role.replace("_", " ").strip().upper()
+    if not normalized:
+        return 0
+    return _CHARACTER_ROLE_WEIGHTS.get(normalized, 0)
+
+
+def _popularity_band(popularity: Optional[int]) -> str:
+    if popularity is None:
+        return "unknown"
+    if popularity >= 150_000:
+        return "blockbuster"
+    if popularity >= 75_000:
+        return "popular"
+    if popularity >= 25_000:
+        return "cult"
+    return "niche"
+
+
+def _count_edges_with_weight(edges: Sequence[MediaCharacterEdge], threshold: int) -> int:
+    total = 0
+    for edge in edges:
+        if _character_role_weight(edge.role) >= threshold:
+            total += 1
+    return total
+
+
+def available_character_edges(media: Media) -> List[MediaCharacterEdge]:
+    if not media.characters or not media.characters.edges:
+        return []
+    edges: List[MediaCharacterEdge] = []
+    seen: Set[int] = set()
+    for edge in media.characters.edges:
+        if not edge or not edge.node:
+            continue
+        character_id = edge.node.id
+        if character_id in seen:
+            continue
+        image = edge.node.image
+        if not image:
+            continue
+        if not (image.large or image.medium):
+            continue
+        seen.add(character_id)
+        edges.append(edge)
+    edges.sort(key=lambda item: item.node.id)
+    return edges
+
+
+def _effective_difficulty(
+    requested: int,
+    popularity_band: str,
+    edges: Sequence[MediaCharacterEdge],
+) -> int:
+    tier = max(1, min(requested, 3))
+    if popularity_band == "niche" and tier == 1:
+        return 2
+    if popularity_band in {"niche", "cult"} and tier == 2:
+        if _count_edges_with_weight(edges, 3) < 4:
+            return 3
+    if tier == 1 and _count_edges_with_weight(edges, 4) < 4:
+        return 2
+    return tier
+
+
+def character_edges_for_tier(
+    media: Media,
+    *,
+    difficulty: int,
+    max_candidates: int = 16,
+    exclude_ids: Optional[Set[int]] = None,
+) -> List[MediaCharacterEdge]:
+    edges = available_character_edges(media)
+    if exclude_ids:
+        edges = [edge for edge in edges if edge.node.id not in exclude_ids]
+    if not edges:
+        return []
+
+    band = _popularity_band(media.popularity)
+    tier = _effective_difficulty(difficulty, band, edges)
+    thresholds = _DIFFICULTY_THRESHOLDS.get(tier, (0,))
+
+    weighted = sorted(
+        edges,
+        key=lambda edge: (-_character_role_weight(edge.role), edge.node.id),
+    )
+
+    results: List[MediaCharacterEdge] = []
+    seen: Set[int] = set()
+    for threshold in thresholds:
+        for edge in weighted:
+            character_id = edge.node.id
+            if character_id in seen:
+                continue
+            if _character_role_weight(edge.role) < threshold:
+                continue
+            results.append(edge)
+            seen.add(character_id)
+            if len(results) >= max_candidates:
+                return results
+
+    if len(results) < max_candidates:
+        for edge in weighted:
+            character_id = edge.node.id
+            if character_id in seen:
+                continue
+            results.append(edge)
+            seen.add(character_id)
+            if len(results) >= max_candidates:
+                break
+
+    return results
 
 
 async def fetch_opening_pool(
