@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   DailyProgress,
@@ -18,6 +18,8 @@ export type {
 
 const STORAGE_KEY = "guesssenpai-progress";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const FLUSH_DELAY_MS = 1000;
+const RETRY_DELAY_MS = 5000;
 
 interface PersistedDailyState {
   progress: DailyProgress;
@@ -189,9 +191,15 @@ export function usePuzzleProgress(date: string) {
     };
   }, [date, fetchProgressFromServer]);
 
-  const pushUpdate = useCallback(
-    async (game: GameKey, progressState: GameProgress) => {
-      if (!date) return;
+  const pendingUpdatesRef = useRef<Record<GameKey, GameProgress>>({});
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushUpdatesToServer = useCallback(
+    async (updates: Record<GameKey, GameProgress>): Promise<boolean> => {
+      if (!date || Object.keys(updates).length === 0) {
+        return true;
+      }
+
       try {
         const response = await fetch(`${API_BASE}/puzzles/progress`, {
           method: "PUT",
@@ -199,32 +207,98 @@ export function usePuzzleProgress(date: string) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             date,
-            progress: {
-              [game]: progressState,
-            },
+            progress: updates,
           }),
         });
-        if (!response.ok && response.status !== 401) {
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            return true;
+          }
           console.warn(
             "Failed to update puzzle progress on server",
             response.statusText,
           );
+          return false;
         }
+
+        return true;
       } catch (error) {
         console.warn("Failed to update puzzle progress on server", error);
+        return false;
       }
     },
     [date],
   );
+
+  const flushPendingUpdates = useCallback(async () => {
+    if (!date) {
+      pendingUpdatesRef.current = {};
+      flushTimerRef.current = null;
+      return;
+    }
+
+    const updates = pendingUpdatesRef.current;
+    pendingUpdatesRef.current = {};
+    flushTimerRef.current = null;
+
+    if (Object.keys(updates).length === 0) {
+      return;
+    }
+
+    const wasSuccessful = await pushUpdatesToServer(updates);
+    if (!wasSuccessful) {
+      pendingUpdatesRef.current = {
+        ...updates,
+        ...pendingUpdatesRef.current,
+      };
+
+      if (!flushTimerRef.current) {
+        flushTimerRef.current = setTimeout(() => {
+          void flushPendingUpdates();
+        }, RETRY_DELAY_MS);
+      }
+    }
+  }, [date, pushUpdatesToServer]);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushTimerRef.current) {
+      return;
+    }
+
+    flushTimerRef.current = setTimeout(() => {
+      void flushPendingUpdates();
+    }, FLUSH_DELAY_MS);
+  }, [flushPendingUpdates]);
+
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+
+      const pending = pendingUpdatesRef.current;
+      pendingUpdatesRef.current = {};
+
+      if (date && Object.keys(pending).length > 0) {
+        void pushUpdatesToServer(pending);
+      }
+    };
+  }, [date, pushUpdatesToServer]);
 
   const recordGame = useCallback(
     (game: GameKey, progressState: GameProgress) => {
       persist((prev) => ({
         progress: { ...prev.progress, [game]: progressState },
       }));
-      void pushUpdate(game, progressState);
+      pendingUpdatesRef.current = {
+        ...pendingUpdatesRef.current,
+        [game]: progressState,
+      };
+      scheduleFlush();
     },
-    [persist, pushUpdate],
+    [persist, scheduleFlush],
   );
 
   const refresh = useCallback(async (): Promise<RefreshResult> => {
