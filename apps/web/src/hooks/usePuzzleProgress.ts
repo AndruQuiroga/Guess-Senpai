@@ -7,6 +7,7 @@ import type {
   GameKey,
   GameProgress,
   GameRoundProgress,
+  RoundFeedbackType,
 } from "../types/progress";
 
 export type {
@@ -14,6 +15,7 @@ export type {
   GameKey,
   GameProgress,
   GameRoundProgress,
+  RoundFeedbackType,
 } from "../types/progress";
 
 const STORAGE_KEY = "guesssenpai-progress";
@@ -161,6 +163,34 @@ function normalizeGameRoundProgress(value: unknown): GameRoundProgress | null {
   const resolvedYear =
     coerceInteger(record.resolvedYear) ??
     coerceInteger((record as Record<string, unknown>)["resolved_year"]);
+  const seasonGuessRaw =
+    record.seasonGuess ?? (record as Record<string, unknown>)["season_guess"];
+  const seasonYearGuess =
+    coerceInteger(record.seasonYearGuess) ??
+    coerceInteger((record as Record<string, unknown>)["season_year_guess"]);
+  const mediaId =
+    coerceInteger(record.mediaId) ??
+    coerceInteger((record as Record<string, unknown>)["media_id"]);
+  const posterImageBaseRaw =
+    typeof record.posterImageBase === "string"
+      ? record.posterImageBase
+      : typeof (record as Record<string, unknown>)["poster_image_base"] ===
+          "string"
+        ? String((record as Record<string, unknown>)["poster_image_base"])
+        : undefined;
+  const posterImageUrlRaw =
+    typeof record.posterImageUrl === "string"
+      ? record.posterImageUrl
+      : typeof (record as Record<string, unknown>)["poster_image_url"] ===
+          "string"
+        ? String((record as Record<string, unknown>)["poster_image_url"])
+        : undefined;
+  const feedbackTypeRaw =
+    record.feedbackType ??
+    (record as Record<string, unknown>)["feedback_type"];
+  const feedbackMessageRaw =
+    record.feedbackMessage ??
+    (record as Record<string, unknown>)["feedback_message"];
 
   const normalized: GameRoundProgress = {
     round,
@@ -199,6 +229,53 @@ function normalizeGameRoundProgress(value: unknown): GameRoundProgress | null {
 
   if (resolvedYear !== undefined) {
     normalized.resolvedYear = resolvedYear;
+  }
+
+  if (typeof seasonGuessRaw === "string") {
+    const trimmed = seasonGuessRaw.trim();
+    if (trimmed) {
+      normalized.seasonGuess = trimmed.toUpperCase();
+    }
+  }
+
+  if (seasonYearGuess !== undefined) {
+    normalized.seasonYearGuess = seasonYearGuess;
+  }
+
+  if (mediaId !== undefined) {
+    normalized.mediaId = mediaId;
+  }
+
+  if (typeof posterImageBaseRaw === "string") {
+    const trimmed = posterImageBaseRaw.trim();
+    if (trimmed) {
+      normalized.posterImageBase = trimmed;
+    }
+  }
+
+  if (typeof posterImageUrlRaw === "string") {
+    const trimmed = posterImageUrlRaw.trim();
+    if (trimmed) {
+      normalized.posterImageUrl = trimmed;
+    }
+  }
+
+  if (typeof feedbackTypeRaw === "string") {
+    const lowered = feedbackTypeRaw.trim().toLowerCase();
+    if (
+      lowered === "success" ||
+      lowered === "partial" ||
+      lowered === "error"
+    ) {
+      normalized.feedbackType = lowered as RoundFeedbackType;
+    }
+  }
+
+  if (typeof feedbackMessageRaw === "string") {
+    const trimmed = feedbackMessageRaw.trim();
+    if (trimmed) {
+      normalized.feedbackMessage = trimmed;
+    }
   }
 
   return normalized;
