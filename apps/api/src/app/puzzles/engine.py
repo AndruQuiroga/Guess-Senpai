@@ -18,7 +18,7 @@ from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
-from ..services import animethemes, anilist, character_index, title_index
+from ..services import animethemes, anilist, character_index, character_pool, title_index
 from ..services.anilist import CoverImage, Media, MediaCharacterEdge, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
 from ..services.history_repository import (
@@ -613,22 +613,6 @@ def _normalize_role(role: Optional[str]) -> Optional[str]:
     return normalized.title()
 
 
-def _available_character_edges(media: Media) -> List[MediaCharacterEdge]:
-    if not media.characters or not media.characters.edges:
-        return []
-    edges: List[MediaCharacterEdge] = []
-    for edge in media.characters.edges:
-        if not edge or not edge.node:
-            continue
-        image = edge.node.image
-        if not image:
-            continue
-        if not (image.large or image.medium):
-            continue
-        edges.append(edge)
-    return edges
-
-
 def _character_name_variants(edge: MediaCharacterEdge) -> List[str]:
     names = [
         edge.node.name.userPreferred if edge.node and edge.node.name else None,
@@ -651,40 +635,25 @@ def _character_name_variants(edge: MediaCharacterEdge) -> List[str]:
     return variants
 
 
-def _select_character_round_edges(media: Media, count: int) -> List[MediaCharacterEdge]:
-    edges = _available_character_edges(media)
-    if not edges:
-        return []
-    unique_edges: List[MediaCharacterEdge] = []
-    seen: set[int] = set()
-    for edge in edges:
-        if not edge.node:
-            continue
-        character_id = edge.node.id
-        if character_id in seen:
-            continue
-        seen.add(character_id)
-        unique_edges.append(edge)
-    if len(unique_edges) < count:
-        return []
-    ordered = sorted(unique_edges, key=lambda item: item.node.id)
-    digest = hashlib.sha256(f"character-rounds:{media.id}".encode("utf-8")).digest()
-    seed = int.from_bytes(digest[:8], "big")
-    rng = random.Random(seed)
-    rng.shuffle(ordered)
-    return ordered[:count]
-
-
 def _build_character_guess_game(media: Media) -> Optional[CharacterSilhouetteGame]:
     rounds_required = len(CHARACTER_GUESS_ROUND_CONFIG)
     if rounds_required <= 0:
         return None
     per_round = 4
-    total_required = rounds_required * per_round
-    selected_edges = _select_character_round_edges(media, total_required)
-    if len(selected_edges) < total_required:
+    round_difficulties = [config["difficulty"] for config in CHARACTER_GUESS_ROUND_CONFIG]
+    allocations = character_pool.build_round_pools(
+        media,
+        round_difficulties,
+        per_round=per_round,
+        max_candidates=per_round * 4,
+    )
+    if (
+        not allocations
+        or len(allocations) != rounds_required
+        or any(len(edges) < per_round for edges in allocations)
+    ):
         logger.debug(
-            "Not enough character edges to build multi-round game for media %s", media.id
+            "Unable to allocate character pools for media %s", media.id
         )
         return None
 
@@ -693,12 +662,7 @@ def _build_character_guess_game(media: Media) -> Optional[CharacterSilhouetteGam
     spec_rounds: List[CharacterSilhouetteRound] = []
     rounds: List[CharacterGuessRound] = []
 
-    for round_index, config in enumerate(CHARACTER_GUESS_ROUND_CONFIG):
-        start = round_index * per_round
-        end = start + per_round
-        edges = selected_edges[start:end]
-        if len(edges) < per_round:
-            return None
+    for config, edges in zip(CHARACTER_GUESS_ROUND_CONFIG, allocations):
         entries: List[CharacterGuessEntry] = []
         for edge in edges:
             image = edge.node.image if edge.node else None
