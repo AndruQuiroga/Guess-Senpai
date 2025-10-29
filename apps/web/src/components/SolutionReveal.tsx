@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { STREAK_MILESTONES, type StreakMilestone } from "../config/streak";
-import type { StreakSnapshot } from "../hooks/useStreak";
+import type { StreakSnapshot } from "../types/streak";
 import type { SolutionPayload } from "../types/puzzles";
 
 interface Props {

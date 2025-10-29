@@ -37,9 +37,8 @@ import {
   useDailyAvailability,
   useRuntimeGamesDirectory,
 } from "../hooks/useDailyAvailability";
-import { useAccount } from "../hooks/useAccount";
+import { useAccount, useAccountStreak } from "../hooks/useAccount";
 import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
-import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
 import {
   buildShareEvent,
@@ -48,6 +47,7 @@ import {
   type ShareEventData,
 } from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
+import { projectStreakSnapshot } from "../utils/streak";
 
 const BASE_GAME_KEYS: readonly GameKey[] = [
   "anidle",
@@ -382,7 +382,11 @@ export default function HomePage() {
     (key) => progress[key]?.completed,
   ).length;
   const allCompleted = keysToConsider.every((key) => progress[key]?.completed);
-  const streakInfo = useStreak(todayIso, allCompleted);
+  const { streak: accountStreak } = useAccountStreak();
+  const streakInfo = useMemo(
+    () => projectStreakSnapshot(accountStreak, todayIso, allCompleted),
+    [accountStreak, todayIso, allCompleted],
+  );
   const streakCount = streakInfo.count;
 
   const hasStartedAnyRounds = useMemo(() => {
