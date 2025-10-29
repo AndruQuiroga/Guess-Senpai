@@ -19,6 +19,7 @@ export type {
 } from "../types/progress";
 
 const STORAGE_KEY = "guesssenpai-progress";
+const STORAGE_KEY_PREFIX = `${STORAGE_KEY}:`;
 const COOKIE_KEY = "guesssenpai-progress";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 60; // 60 days
 const COOKIE_MAX_DAYS = 45;
@@ -360,32 +361,85 @@ function cloneState(
   };
 }
 
+function getDateStorageKey(date: string): string {
+  return `${STORAGE_KEY_PREFIX}${date}`;
+}
+
+function normalizePersistedState(
+  value: unknown,
+): PersistedDailyState | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if ("progress" in record) {
+    return {
+      progress: normalizeProgress(record.progress),
+    };
+  }
+
+  return {
+    progress: normalizeProgress(value),
+  };
+}
+
 function readLocalStorageState(date: string): PersistedDailyState | null {
   if (typeof window === "undefined" || !date) {
     return null;
   }
   try {
+    const directKey = getDateStorageKey(date);
+    const directValue = window.localStorage.getItem(directKey);
+    if (directValue) {
+      try {
+        const parsed = JSON.parse(directValue);
+        const normalized = normalizePersistedState(parsed);
+        if (normalized) {
+          return normalized;
+        }
+      } catch (error) {
+        console.warn("Failed to parse stored puzzle progress", error);
+        window.localStorage.removeItem(directKey);
+      }
+    }
+
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) {
       return null;
     }
-    const parsed: StorageShape = JSON.parse(stored);
+
+    const parsed = JSON.parse(stored) as StorageShape;
     if (!parsed || typeof parsed !== "object") {
       return null;
     }
+
     const entry = parsed[date];
-    if (!entry || typeof entry !== "object") {
+    const normalized = normalizePersistedState(entry);
+    if (!normalized) {
       return null;
     }
-    const record = entry as Record<string, unknown>;
-    if ("progress" in record) {
-      return {
-        progress: normalizeProgress(record.progress),
-      };
+
+    try {
+      const payload = JSON.stringify({ progress: { ...normalized.progress } });
+      window.localStorage.setItem(directKey, payload);
+    } catch (error) {
+      console.warn("Failed to migrate puzzle progress to optimized storage", error);
     }
-    return {
-      progress: normalizeProgress(entry),
-    };
+
+    try {
+      const clonedStore = { ...parsed };
+      delete clonedStore[date];
+      if (Object.keys(clonedStore).length === 0) {
+        window.localStorage.removeItem(STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clonedStore));
+      }
+    } catch (error) {
+      console.warn("Failed to clean up legacy puzzle progress storage", error);
+    }
+
+    return normalized;
   } catch (error) {
     console.warn("Failed to read puzzle progress from localStorage", error);
     return null;
@@ -395,16 +449,17 @@ function readLocalStorageState(date: string): PersistedDailyState | null {
 function writeLocalStorageState(date: string, value: PersistedDailyState) {
   if (typeof window === "undefined" || !date) return;
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const parsed: StorageShape = stored ? JSON.parse(stored) : {};
+    const directKey = getDateStorageKey(date);
     if (Object.keys(value.progress).length === 0) {
-      delete parsed[date];
-    } else {
-      parsed[date] = {
-        progress: { ...value.progress },
-      };
+      window.localStorage.removeItem(directKey);
+      return;
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+
+    const payload = {
+      progress: { ...value.progress },
+    } satisfies PersistedDailyState;
+
+    window.localStorage.setItem(directKey, JSON.stringify(payload));
   } catch (error) {
     console.warn("Failed to persist puzzle progress to localStorage", error);
   }
