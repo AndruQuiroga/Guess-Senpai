@@ -1,17 +1,15 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import type { GameProgress } from "../hooks/usePuzzleProgress";
 import type { CharacterSilhouetteGame } from "../types/puzzles";
-import { resolveHintRound } from "../utils/difficulty";
-import { verifyGuess } from "../utils/verifyGuess";
 import NextPuzzleButton from "./NextPuzzleButton";
-import {
-  TitleGuessField,
-  type TitleGuessFieldHandle,
-  type TitleGuessSelection,
-} from "./games/TitleGuessField";
+import { CharacterCard } from "./games/character-silhouette/CharacterCard";
+import { RoundSummaryModal } from "./games/character-silhouette/RoundSummaryModal";
+import { useCharacterSilhouetteGame } from "./games/character-silhouette/useCharacterSilhouetteGame";
+import type { FeedbackState } from "./games/character-silhouette/types";
+import { verifyGuess } from "../utils/verifyGuess";
 
 interface Props {
   mediaId: number;
@@ -20,18 +18,12 @@ interface Props {
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
-  accountDifficulty?: number;
 }
 
-type FeedbackState =
-  | { type: "success"; message: string }
-  | { type: "error"; message: string }
-  | null;
-
-function clampRound(value: number, totalRounds: number): number {
-  if (!Number.isFinite(value)) return 1;
-  if (totalRounds <= 1) return 1;
-  return Math.max(1, Math.min(totalRounds, Math.floor(value)));
+function clampRound(target: number, totalRounds: number): number {
+  if (!Number.isFinite(target)) return 0;
+  if (totalRounds <= 0) return 0;
+  return Math.max(0, Math.min(totalRounds - 1, Math.floor(target)));
 }
 
 export default function CharacterSilhouette({
@@ -41,366 +33,259 @@ export default function CharacterSilhouette({
   onProgressChange,
   registerRoundController,
   nextSlug,
-  accountDifficulty,
 }: Props) {
-  const sortedSpec = useMemo(
-    () => [...payload.spec].sort((a, b) => a.difficulty - b.difficulty),
-    [payload.spec],
+  const roundsData = Array.isArray(payload.rounds) ? payload.rounds : [];
+
+  const {
+    rounds,
+    activeRoundIndex,
+    setActiveRoundIndex,
+    totalEntries,
+    totalSolved,
+    completed,
+    progress,
+    summaryRoundIndex,
+    setSummaryRoundIndex,
+    updateEntryValue,
+    setEntrySubmitting,
+    setEntryFeedback,
+    applyGuessResult,
+  } = useCharacterSilhouetteGame({ rounds: roundsData, initialProgress });
+
+  const totalRounds = rounds.length > 0 ? rounds.length : 1;
+  const activeRoundState = rounds[activeRoundIndex] ?? rounds[0];
+  const activeRoundData = roundsData[activeRoundIndex] ?? roundsData[0] ?? null;
+
+  const highestCompletedIndex = useMemo(() => {
+    let index = -1;
+    rounds.forEach((round, idx) => {
+      if (round.completed) {
+        index = idx;
+      }
+    });
+    return index;
+  }, [rounds]);
+
+  const unlockedThreshold = useMemo(
+    () => Math.min(highestCompletedIndex + 1, totalRounds - 1),
+    [highestCompletedIndex, totalRounds],
   );
 
-  const totalRounds = Math.max(sortedSpec.length, 1);
-
-  const [round, setRound] = useState(() => {
-    const initialRound = initialProgress?.round ?? 1;
-    return clampRound(initialRound, totalRounds);
-  });
-  const [completed, setCompleted] = useState(initialProgress?.completed ?? false);
-  const [guess, setGuess] = useState("");
-  const [guesses, setGuesses] = useState<string[]>(initialProgress?.guesses ?? []);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [solvedAnswer, setSolvedAnswer] = useState(() => payload.answer);
-  const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
-
   useEffect(() => {
-    setRound((prev) => clampRound(prev, totalRounds));
-  }, [totalRounds]);
-
-  useEffect(() => {
-    if (!initialProgress) {
-      setRound(1);
-      setCompleted(false);
-      setGuesses([]);
-      setGuess("");
-      const resolvedAnswer = payload.answer;
-      setFeedback(null);
-      setSolvedAnswer(resolvedAnswer);
-      return;
-    }
-
-    setRound(clampRound(initialProgress.round ?? 1, totalRounds));
-    setCompleted(initialProgress.completed ?? false);
-    setGuesses(initialProgress.guesses ?? []);
-    setGuess("");
-    const resolvedAnswer = payload.answer;
-    setSolvedAnswer(resolvedAnswer);
-    if (initialProgress.completed) {
-      setFeedback({
-        type: "success",
-        message: `Silhouette solved! ${resolvedAnswer}`,
-      });
-    } else {
-      setFeedback(null);
-    }
-  }, [initialProgress, payload.answer, totalRounds]);
+    onProgressChange(progress);
+  }, [progress, onProgressChange]);
 
   useEffect(() => {
     if (!registerRoundController) return;
-    registerRoundController((targetRound) => {
-      setRound(clampRound(targetRound, totalRounds));
+    registerRoundController((round) => {
+      setActiveRoundIndex(clampRound(round - 1, totalRounds));
     });
-  }, [registerRoundController, totalRounds]);
+  }, [registerRoundController, setActiveRoundIndex, totalRounds]);
 
-  useEffect(() => {
-    onProgressChange({ completed, round, guesses });
-  }, [completed, round, guesses, onProgressChange]);
-
-  const hintRound = useMemo(
-    () =>
-      completed
-        ? totalRounds
-        : resolveHintRound(round, totalRounds, accountDifficulty),
-    [accountDifficulty, completed, round, totalRounds],
+  const handleAnimeChange = useCallback(
+    (roundIndex: number, entryIndex: number, value: string) => {
+      updateEntryValue(roundIndex, entryIndex, "anime", value);
+    },
+    [updateEntryValue],
   );
 
-  const currentStage = useMemo(() => {
-    if (sortedSpec.length === 0) {
-      return null;
-    }
-    if (completed) {
-      return sortedSpec[sortedSpec.length - 1];
-    }
-    return sortedSpec.reduce((acc, spec) => {
-      if (spec.difficulty <= hintRound) {
-        return spec;
-      }
-      return acc;
-    }, sortedSpec[0]);
-  }, [completed, hintRound, sortedSpec]);
-
-  const filterStyle = useMemo(() => {
-    if (!currentStage) {
-      return "none";
-    }
-    if (completed) {
-      return sortedSpec[sortedSpec.length - 1]?.filter ?? "none";
-    }
-    return currentStage.filter ?? "none";
-  }, [completed, currentStage, sortedSpec]);
-
-  const unlockedStages = useMemo(
-    () =>
-      sortedSpec.filter((stage) => {
-        if (completed) return true;
-        return stage.difficulty <= hintRound;
-      }),
-    [sortedSpec, completed, hintRound],
+  const handleCharacterChange = useCallback(
+    (roundIndex: number, entryIndex: number, value: string) => {
+      updateEntryValue(roundIndex, entryIndex, "character", value);
+    },
+    [updateEntryValue],
   );
 
-  const handleRevealMore = useCallback(() => {
-    setRound((prev) => clampRound(prev + 1, totalRounds));
-  }, [totalRounds]);
+  const handleValidationError = useCallback(
+    (roundIndex: number, entryIndex: number, feedback: FeedbackState) => {
+      setEntryFeedback(roundIndex, entryIndex, feedback);
+    },
+    [setEntryFeedback],
+  );
 
-  const normalizeText = useCallback((input: string) => {
-    const trimmed = input.trim().toLowerCase();
-    const withoutDiacritics = trimmed.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    return {
-      base: trimmed,
-      stripped: withoutDiacritics,
-    };
-  }, []);
+  const handleSubmitGuess = useCallback(
+    async (
+      roundIndex: number,
+      entryIndex: number,
+      selection: { value: string; suggestionId?: number },
+      characterValue: string,
+    ) => {
+      const roundState = rounds[roundIndex];
+      const roundDataSource = roundsData[roundIndex];
+      const entryState = roundState?.entries?.[entryIndex];
+      const entryData = roundDataSource?.entries?.[entryIndex];
+      if (!roundState || !entryState || !entryData) return;
+      if (entryState.completed || entryState.submitting) return;
 
-  const normalizedCharacterNames = useMemo(() => {
-    const variants = new Set<string>();
-    const { base, stripped } = normalizeText(payload.character.name);
-    if (base) {
-      variants.add(base);
-    }
-    if (stripped) {
-      variants.add(stripped);
-    }
-    return Array.from(variants);
-  }, [normalizeText, payload.character.name]);
-
-  const attemptGuess = useCallback(
-    async ({ value, suggestionId }: TitleGuessSelection) => {
-      if (completed || submitting) return;
-
-      const trimmed = value.trim();
-      if (!trimmed) {
-        setFeedback({
+      const animeGuess = selection.value.trim();
+      const characterGuess = characterValue.trim();
+      if (!animeGuess || !characterGuess) {
+        setEntryFeedback(roundIndex, entryIndex, {
           type: "error",
-          message: "Enter a guess before submitting.",
+          message: "Provide both the anime title and character name to continue.",
         });
         return;
       }
 
-      setSubmitting(true);
-      setFeedback(null);
+      setEntrySubmitting(roundIndex, entryIndex, true);
+      setEntryFeedback(roundIndex, entryIndex, null);
 
       try {
-        const normalizedGuess = normalizeText(trimmed);
-        const directMatch =
-          normalizedCharacterNames.includes(normalizedGuess.base) ||
-          normalizedCharacterNames.includes(normalizedGuess.stripped);
+        const result = await verifyGuess(mediaId, animeGuess, selection.suggestionId, {
+          characterGuess,
+          characterId: entryData.character.id,
+        });
 
-        if (directMatch) {
-          setGuesses((prev) => [...prev, trimmed]);
-          setCompleted(true);
-          setRound(totalRounds);
-          const resolvedAnswer = payload.answer;
-          setSolvedAnswer(resolvedAnswer);
-          setFeedback({
-            type: "success",
-            message: `Silhouette solved! ${resolvedAnswer}`,
-          });
-          setGuess("");
-          return;
-        }
-
-        const result = await verifyGuess(mediaId, trimmed, suggestionId);
-        setGuesses((prev) => [...prev, trimmed]);
-        if (result.correct) {
-          setCompleted(true);
-          setRound(totalRounds);
-          const resolvedAnswer = result.match?.trim() || payload.answer;
-          setSolvedAnswer(resolvedAnswer);
-          setFeedback({
-            type: "success",
-            message: `Silhouette solved! ${resolvedAnswer}`,
-          });
-        } else {
-          setFeedback({
-            type: "error",
-            message: "Not quite. The lights brighten a little more.",
-          });
-          setRound((prev) => clampRound(prev + 1, totalRounds));
-        }
-        setGuess("");
+        applyGuessResult(roundIndex, entryIndex, {
+          anime: animeGuess,
+          character: characterGuess,
+          animeMatch: result.animeMatch,
+          characterMatch:
+            typeof result.characterMatch === "boolean"
+              ? result.characterMatch
+              : result.characterMatch === null
+                ? null
+                : false,
+          resolvedAnime: result.animeMatch
+            ? result.match ?? entryData.animeAnswer ?? animeGuess
+            : undefined,
+          resolvedCharacter:
+            result.characterMatch === true
+              ? result.characterName ?? entryData.characterAnswer ?? characterGuess
+              : undefined,
+        });
       } catch (error) {
         const message =
           error instanceof Error
             ? error.message
             : "Unable to verify your guess. Please try again.";
-        setFeedback({ type: "error", message });
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [
-      completed,
-      submitting,
-      mediaId,
-      normalizedCharacterNames,
-      normalizeText,
-      payload.answer,
-      totalRounds,
-    ],
-  );
-
-  const handleFieldSubmit = useCallback(
-    (selection: TitleGuessSelection) => {
-      void attemptGuess(selection);
-    },
-    [attemptGuess],
-  );
-
-  const handleGuessSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (completed || submitting) return;
-
-      const selection = guessFieldRef.current?.submit();
-      if (!selection) {
-        setFeedback({
+        setEntryFeedback(roundIndex, entryIndex, {
           type: "error",
-          message: "Enter a guess before submitting.",
+          message,
         });
-        return;
+        setEntrySubmitting(roundIndex, entryIndex, false);
       }
-
-      void attemptGuess(selection);
     },
-    [attemptGuess, completed, submitting],
+    [applyGuessResult, mediaId, rounds, roundsData, setEntryFeedback, setEntrySubmitting],
   );
 
-  const revealLabel = completed
-    ? "Fully revealed"
-    : currentStage?.label ?? "Silhouette";
+  const handleRoundSummaryContinue = useCallback(() => {
+    if (summaryRoundIndex === null) return;
+    const nextIndex = Math.min(summaryRoundIndex + 1, totalRounds - 1);
+    setSummaryRoundIndex(null);
+    if (summaryRoundIndex < totalRounds - 1) {
+      setActiveRoundIndex(nextIndex);
+    }
+  }, [setActiveRoundIndex, setSummaryRoundIndex, summaryRoundIndex, totalRounds]);
+
+  const roundHeadline = activeRoundState?.label ?? `Round ${activeRoundIndex + 1}`;
+  const roundDescription = activeRoundState?.description ?? null;
 
   return (
-    <div className="space-y-5">
-      <div className="group relative flex h-80 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/4 via-white/6 to-white/10 shadow-ambient">
-        {payload.character.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={payload.character.image}
-            alt={`Silhouette of ${payload.character.name}`}
-            className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.03]"
-            style={{ filter: filterStyle }}
-          />
-        ) : (
-          <div className="text-neutral-600">Character artwork unavailable</div>
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-black/40 opacity-70 mix-blend-overlay" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-4 text-xs uppercase tracking-[0.3em] text-white/80">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-4 py-1 font-semibold backdrop-blur">
-            {revealLabel}
-          </span>
-          {payload.character.role ? (
-            <span className="hidden items-center gap-2 rounded-full border border-white/15 bg-black/30 px-4 py-1 font-semibold backdrop-blur sm:inline-flex">
-              Role: {payload.character.role}
-            </span>
-          ) : null}
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/6 p-5 shadow-[0_12px_40px_rgba(13,14,29,0.35)] backdrop-blur-xl">
+        <div className="flex flex-wrap items-center gap-3">
+          {rounds.map((round, index) => {
+            const isActive = index === activeRoundIndex;
+            const isCompleted = round.completed;
+            const isDisabled = index > unlockedThreshold + 0.0001;
+            const label = round.label || `Round ${index + 1}`;
+            return (
+              <button
+                key={round.order ?? index}
+                type="button"
+                onClick={() => !isDisabled && setActiveRoundIndex(index)}
+                disabled={isDisabled}
+                className={[
+                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                  isActive
+                    ? "border-brand-300 bg-brand-500/20 text-brand-100 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
+                    : isCompleted
+                      ? "border-emerald-300/60 bg-emerald-500/15 text-emerald-100"
+                      : "border-white/15 bg-white/10 text-white/80 hover:border-brand-300/60 hover:text-white",
+                  isDisabled ? "cursor-not-allowed opacity-50" : "",
+                ].join(" ")}
+              >
+                <span>{label}</span>
+                {isCompleted ? (
+                  <span aria-hidden className="text-[0.65rem]">✓</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-4 text-white sm:grid-cols-2">
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/60">Characters solved</p>
+            <p className="text-2xl font-display font-semibold">
+              {totalSolved} / {totalEntries}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-[0.24em] text-white/60">Current stage</p>
+            <p className="text-sm text-white/80">
+              Round {activeRoundIndex + 1} of {totalRounds}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
-        {unlockedStages.map((stage) => (
-          <span
-            key={stage.difficulty}
-            className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-semibold text-white/90"
-          >
-            {stage.description ?? stage.label}
-          </span>
-        ))}
-        {payload.character.role &&
-        (completed || hintRound >= Math.min(2, totalRounds)) ? (
-          <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-semibold text-white/90">
-            Role: {payload.character.role}
-          </span>
-        ) : null}
+      <div className="rounded-3xl border border-white/10 bg-white/4 p-6 shadow-ambient backdrop-blur-xl">
+        <div className="mb-6 space-y-2">
+          <h3 className="text-xl font-display font-semibold text-white">{roundHeadline}</h3>
+          {roundDescription ? (
+            <p className="text-sm text-white/75">{roundDescription}</p>
+          ) : (
+            <p className="text-sm text-white/70">
+              Match each silhouette to the correct character and anime to reveal the lineup.
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {activeRoundData?.entries?.map((entry, index) => {
+            const state = activeRoundState?.entries?.[index];
+            if (!state) return null;
+            return (
+              <CharacterCard
+                key={state.id}
+                index={index}
+                roundIndex={activeRoundIndex}
+                entry={entry}
+                state={state}
+                onAnimeChange={(value) => handleAnimeChange(activeRoundIndex, index, value)}
+                onCharacterChange={(value) => handleCharacterChange(activeRoundIndex, index, value)}
+                onSubmit={(selection, characterValue) =>
+                  handleSubmitGuess(activeRoundIndex, index, selection, characterValue)
+                }
+                onValidationError={(feedback) =>
+                  handleValidationError(activeRoundIndex, index, feedback)
+                }
+              />
+            );
+          })}
+        </div>
+
         {completed ? (
-          <span className="rounded-full border border-brand-400/60 bg-brand-500/15 px-3 py-1 font-semibold text-brand-100">
-            Answer: {solvedAnswer}
-          </span>
+          <div className="mt-8 flex justify-end">
+            <NextPuzzleButton nextSlug={nextSlug} />
+          </div>
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-brand-400/50 hover:text-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={handleRevealMore}
-          disabled={completed || round >= totalRounds}
-        >
-          Reveal More
-        </button>
-      </div>
-
-      <form onSubmit={handleGuessSubmit} className="flex flex-col gap-3 sm:flex-row">
-        <TitleGuessField
-          ref={guessFieldRef}
-          className="w-full"
-          value={guess}
-          onValueChange={setGuess}
-          onSubmit={handleFieldSubmit}
-          disabled={completed || submitting}
-          placeholder={completed ? "Silhouette solved!" : "Type your guess…"}
-          ariaLabel="Character silhouette guess"
-          suggestionsLabel="Character title suggestions"
+      {summaryRoundIndex !== null ? (
+        <RoundSummaryModal
+          roundIndex={summaryRoundIndex}
+          roundState={rounds[summaryRoundIndex]}
+          roundData={roundsData[summaryRoundIndex] ?? null}
+          totalRounds={totalRounds}
+          totalSolved={totalSolved}
+          totalEntries={totalEntries}
+          onContinue={handleRoundSummaryContinue}
         />
-        <button
-          type="submit"
-          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
-          disabled={completed || submitting}
-        >
-          Submit
-        </button>
-      </form>
-
-      {!completed ? (
-        <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
-          {guesses.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
-              Attempts
-              {guesses.map((value, index) => (
-                <span
-                  key={`${value}-${index}`}
-                  className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
-                >
-                  {value}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {feedback ? (
-        <div
-          role="status"
-          className={`rounded-2xl border px-4 py-3 text-sm ${
-            feedback.type === "success"
-              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
-              : "border-rose-400/40 bg-rose-500/10 text-rose-100"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      ) : null}
-
-      {completed ? (
-        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-neutral-100">
-          <p className="font-semibold text-white">
-            Character: {payload.character.name}
-          </p>
-          <p className="text-neutral-300">
-            You recognized the series as {solvedAnswer}. Nicely done!
-          </p>
-          <NextPuzzleButton nextSlug={nextSlug} className="w-full justify-center" />
-        </div>
       ) : null}
     </div>
   );
 }
+

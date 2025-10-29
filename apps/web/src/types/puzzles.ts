@@ -73,10 +73,32 @@ export interface CharacterSilhouetteCharacter {
   role?: string | null;
 }
 
+export interface CharacterGuessReveal {
+  label: string;
+  filter: string;
+  description?: string | null;
+}
+
+export interface CharacterGuessEntry {
+  character: CharacterSilhouetteCharacter;
+  characterAnswer: string;
+  characterAliases: string[];
+  animeAnswer: string;
+  animeAliases: string[];
+  reveal: CharacterGuessReveal;
+}
+
+export interface CharacterGuessRound {
+  order: number;
+  difficulty: number;
+  entries: CharacterGuessEntry[];
+}
+
 export interface CharacterSilhouetteGame {
   spec: CharacterSilhouetteRound[];
   answer: string;
   character: CharacterSilhouetteCharacter;
+  rounds: CharacterGuessRound[];
 }
 
 export interface OpeningClip {
