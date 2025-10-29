@@ -289,8 +289,15 @@ export default function Anidle({
         target: null,
         status: "unknown" as ScalarStatus,
       },
+      popularity: {
+        guess: null,
+        target: null,
+        status: "unknown" as ScalarStatus,
+      },
       genres: [],
       tags: [],
+      studios: [],
+      source: [],
     }),
     [],
   );
