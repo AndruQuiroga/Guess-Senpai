@@ -48,6 +48,7 @@ from .models import (
     PosterZoomGame,
     PosterZoomMeta,
     PosterZoomPuzzleBundle,
+    PosterZoomRound,
     RedactedSynopsisGame,
     RedactedSynopsisSegment,
     RedactedSynopsisPuzzleBundle,
@@ -305,24 +306,22 @@ def _build_poster_crop_stages(media: Media) -> List[PosterCropStage]:
 
 
 def _build_poster(media: Media) -> PosterZoomGame:
-    cover = media.coverImage or CoverImage()
-    image = (
-        getattr(cover, "extraLarge", None)
-        or getattr(cover, "large", None)
-        or getattr(cover, "medium", None)
-    )
     meta = PosterZoomMeta(
         genres=[g for g in media.genres if g],
         year=media.seasonYear or (media.startDate or {}).get("year"),
         format=media.format,
     )
-    return PosterZoomGame(
-        spec=POSTER_ROUNDS,
-        answer=_choose_answer(media),
-        image=image,
+    crop_stages = _build_poster_crop_stages(media)
+    answer = _choose_answer(media)
+    round_entry = PosterZoomRound(
+        order=1,
+        difficulty=POSTER_ROUNDS[-1].difficulty if POSTER_ROUNDS else 1,
+        mediaId=media.id,
+        answer=answer,
         meta=meta,
-        cropStages=_build_poster_crop_stages(media),
+        cropStages=crop_stages,
     )
+    return PosterZoomGame(spec=POSTER_ROUNDS, rounds=[round_entry])
 
 
 def _tokenize_synopsis(text: str) -> tuple[List[str], List[int]]:

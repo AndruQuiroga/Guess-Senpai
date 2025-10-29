@@ -24,7 +24,6 @@ import {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 interface Props {
-  mediaId: number;
   payload: PosterPayload;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
@@ -39,7 +38,6 @@ type FeedbackState =
   | null;
 
 export default function PosterZoom({
-  mediaId,
   payload,
   initialProgress,
   onProgressChange,
@@ -59,15 +57,18 @@ export default function PosterZoom({
   const [submitting, setSubmitting] = useState(false);
   const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
+  const primaryRound = useMemo(() => payload.rounds[0] ?? null, [payload.rounds]);
+  const mediaId = primaryRound?.mediaId ?? null;
+
   const totalRounds = useMemo(() => {
     if (payload.spec.length > 0) {
       return payload.spec.length;
     }
-    if (payload.cropStages && payload.cropStages.length > 0) {
-      return payload.cropStages.length;
+    if (primaryRound?.cropStages && primaryRound.cropStages.length > 0) {
+      return primaryRound.cropStages.length;
     }
     return 3;
-  }, [payload.cropStages, payload.spec.length]);
+  }, [payload.spec.length, primaryRound]);
 
   useEffect(() => {
     if (!initialProgress) {
@@ -82,15 +83,15 @@ export default function PosterZoom({
     setCompleted(initialProgress.completed ?? false);
     setGuesses(initialProgress.guesses ?? []);
     setGuess("");
-    if (initialProgress.completed) {
+    if (initialProgress.completed && primaryRound) {
       setFeedback({
         type: "success",
-        message: `Poster solved! ${payload.answer}`,
+        message: `Poster solved! ${primaryRound.answer}`,
       });
     } else {
       setFeedback(null);
     }
-  }, [initialProgress, payload.answer]);
+  }, [initialProgress, primaryRound]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -111,10 +112,12 @@ export default function PosterZoom({
     [accountDifficulty, completed, round, totalRounds],
   );
 
-  const posterImageBase = useMemo(
-    () => `${API_BASE}/puzzles/poster/${mediaId}/image`,
-    [mediaId],
-  );
+  const posterImageBase = useMemo(() => {
+    if (typeof mediaId !== "number") {
+      return null;
+    }
+    return `${API_BASE}/puzzles/poster/${mediaId}/image`;
+  }, [mediaId]);
 
   const activeHintCount = useMemo(() => {
     if (totalRounds <= 1) {
@@ -128,38 +131,44 @@ export default function PosterZoom({
   }, [completed, hintRound, totalRounds]);
 
   const imageSrc = useMemo(() => {
+    if (!posterImageBase) {
+      return null;
+    }
     return `${posterImageBase}?hints=${activeHintCount}`;
   }, [activeHintCount, posterImageBase]);
 
   const activeHints = useMemo(() => {
     const hints: string[] = [];
+    if (!primaryRound) {
+      return hints;
+    }
     payload.spec
       .filter((spec) => spec.difficulty <= hintRound)
       .forEach((spec) => {
         spec.hints.forEach((hint) => {
-          if (hint === "genres" && payload.meta.genres.length) {
-            const cappedGenres = payload.meta.genres.slice(0, 3);
+          if (hint === "genres" && primaryRound.meta.genres.length) {
+            const cappedGenres = primaryRound.meta.genres.slice(0, 3);
             cappedGenres.forEach((genre) => {
               hints.push(`Genre: ${genre}`);
             });
-            if (payload.meta.genres.length > cappedGenres.length) {
-              hints.push(`Genres: +${payload.meta.genres.length - cappedGenres.length} more`);
+            if (primaryRound.meta.genres.length > cappedGenres.length) {
+              hints.push(`Genres: +${primaryRound.meta.genres.length - cappedGenres.length} more`);
             }
           }
-          if (hint === "year" && payload.meta.year) {
-            hints.push(`Year: ${payload.meta.year}`);
+          if (hint === "year" && primaryRound.meta.year) {
+            hints.push(`Year: ${primaryRound.meta.year}`);
           }
-          if (hint === "format" && payload.meta.format) {
-            const formattedLabel = formatMediaFormatLabel(payload.meta.format);
+          if (hint === "format" && primaryRound.meta.format) {
+            const formattedLabel = formatMediaFormatLabel(primaryRound.meta.format);
             hints.push(`Format: ${formattedLabel}`);
           }
         });
       });
     if (completed) {
-      hints.push(`Answer: ${payload.answer}`);
+      hints.push(`Answer: ${primaryRound.answer}`);
     }
     return Array.from(new Set(hints));
-  }, [completed, hintRound, payload]);
+  }, [completed, hintRound, payload, primaryRound]);
 
   const attemptGuess = useCallback(
     async ({ value, suggestionId }: TitleGuessSelection) => {
@@ -173,6 +182,14 @@ export default function PosterZoom({
         return;
       }
 
+      if (typeof mediaId !== "number" || !primaryRound) {
+        setFeedback({
+          type: "error",
+          message: "Poster data unavailable. Please refresh and try again.",
+        });
+        return;
+      }
+
       setSubmitting(true);
       setFeedback(null);
       try {
@@ -180,7 +197,7 @@ export default function PosterZoom({
         setGuesses((prev) => [...prev, trimmed]);
         if (result.correct) {
           setCompleted(true);
-          const acceptedTitle = result.match ?? payload.answer;
+          const acceptedTitle = result.match ?? primaryRound.answer;
           setFeedback({
             type: "success",
             message: `Poster solved! ${acceptedTitle}`,
@@ -200,7 +217,7 @@ export default function PosterZoom({
         setSubmitting(false);
       }
     },
-    [completed, mediaId, payload.answer, submitting, totalRounds],
+    [completed, mediaId, primaryRound, submitting, totalRounds],
   );
 
   const handleFieldSubmit = useCallback(
@@ -261,7 +278,7 @@ export default function PosterZoom({
           onClick={() =>
             setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1))
           }
-          disabled={completed || round === totalRounds}
+          disabled={completed || round === totalRounds || !primaryRound}
         >
           Reveal More
         </button>
@@ -276,15 +293,21 @@ export default function PosterZoom({
           value={guess}
           onValueChange={setGuess}
           onSubmit={handleFieldSubmit}
-          disabled={completed || submitting}
-          placeholder={completed ? "Poster solved!" : "Type your guess…"}
+          disabled={completed || submitting || !primaryRound}
+          placeholder={
+            completed
+              ? "Poster solved!"
+              : primaryRound
+                ? "Type your guess…"
+                : "Poster unavailable"
+          }
           ariaLabel="Poster Zoom guess"
           suggestionsLabel="Poster title suggestions"
         />
         <button
           type="submit"
           className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={completed || submitting}
+          disabled={completed || submitting || !primaryRound}
         >
           {submitting ? "Checking…" : "Submit Guess"}
         </button>
@@ -312,7 +335,11 @@ export default function PosterZoom({
           <div
             className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
             role="status"
-            aria-label={`Poster solved! ${payload.answer}`}
+            aria-label={
+              primaryRound
+                ? `Poster solved! ${primaryRound.answer}`
+                : "Poster solved!"
+            }
           >
             {feedback.message}
           </div>

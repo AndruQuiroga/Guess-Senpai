@@ -38,20 +38,25 @@ describe("PosterZoom autocomplete", () => {
   it("opens suggestions and submits the selected canonical title", async () => {
     const payload: PosterZoomGame = {
       spec: [{ difficulty: 1, hints: [] }],
-      answer: "Naruto",
-      image: null,
-      cropStages: [],
-      meta: { genres: [], year: 2002, format: "TV" },
+      rounds: [
+        {
+          order: 1,
+          difficulty: 1,
+          mediaId: 42,
+          answer: "Naruto",
+          meta: { genres: [], year: 2002, format: "TV" },
+          cropStages: [],
+        },
+      ],
     };
 
     const user = userEvent.setup();
 
     render(
       <PosterZoom
-        mediaId={42}
         payload={payload}
         onProgressChange={() => {}}
-      />,
+      />, 
     );
 
     const input = screen.getByLabelText("Poster Zoom guess");

@@ -252,7 +252,10 @@ def test_build_poster_bundle_without_cover_image() -> None:
         solution=engine._build_solution(media),
     )
 
-    assert bundle.puzzle.image is None
+    assert bundle.mediaId == media.id
+    assert bundle.puzzle.rounds
+    primary_round = bundle.puzzle.rounds[0]
+    assert primary_round.mediaId == media.id
 
 
 def test_redacted_synopsis_masks_majority_of_words() -> None:

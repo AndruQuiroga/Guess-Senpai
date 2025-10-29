@@ -10,7 +10,6 @@ import { PosterZoomGame } from "../../types/puzzles";
 
 interface Props {
   slug: string;
-  mediaId: number;
   payload: PosterZoomGame;
   progress?: GameProgress;
   dailyProgress?: DailyProgress;
@@ -22,7 +21,6 @@ interface Props {
 
 export function PosterZoomedPage({
   slug,
-  mediaId,
   payload,
   progress,
   dailyProgress,
@@ -34,15 +32,18 @@ export function PosterZoomedPage({
   const controller = useRef<((round: number) => void) | null>(null);
   const [controllerReady, setControllerReady] = useState(false);
 
+  const primaryRound = useMemo(() => payload.rounds[0] ?? null, [payload.rounds]);
+  const mediaId = primaryRound?.mediaId ?? null;
+
   const totalRounds = useMemo(() => {
     if (payload.spec.length > 0) {
       return payload.spec.length;
     }
-    if (payload.cropStages && payload.cropStages.length > 0) {
-      return payload.cropStages.length;
+    if (primaryRound?.cropStages && primaryRound.cropStages.length > 0) {
+      return primaryRound.cropStages.length;
     }
     return 3;
-  }, [payload.cropStages, payload.spec.length]);
+  }, [payload.spec.length, primaryRound]);
 
   const clampDifficulty = useCallback(
     (value: number | undefined | null) => {
@@ -92,7 +93,6 @@ export function PosterZoomedPage({
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <PosterZoom
-          mediaId={mediaId}
           payload={payload}
           initialProgress={progress}
           onProgressChange={handleProgressChange}
