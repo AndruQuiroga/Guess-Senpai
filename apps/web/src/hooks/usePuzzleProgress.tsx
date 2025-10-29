@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import type { AnidleGuessHistoryEntry } from "../types/anidle";
 import { normalizeAnidleEvaluation } from "../utils/normalizeAnidleEvaluation";
@@ -33,6 +42,29 @@ interface PersistedDailyState {
   progress: DailyProgress;
 }
 
+type UsePuzzleProgressValue = {
+  progress: DailyProgress;
+  recordGame: (game: GameKey, progressState: GameProgress) => void;
+  refresh: () => Promise<RefreshResult>;
+  isRefreshing: boolean;
+  refreshError: ProgressFetchError | null;
+};
+
+interface PuzzleProgressContextValue {
+  date: string;
+  value: UsePuzzleProgressValue;
+}
+
+interface PuzzleProgressProviderProps {
+  date: string;
+  initialProgress?: DailyProgress | null;
+  children: ReactNode;
+}
+
+const PuzzleProgressContext = createContext<PuzzleProgressContextValue | null>(
+  null,
+);
+
 type StorageShape = Record<string, unknown>;
 
 interface ProgressResponse {
@@ -49,6 +81,35 @@ export interface RefreshResult {
 }
 
 const EMPTY_STATE: PersistedDailyState = { progress: {} };
+
+function stableStringify(value: unknown): string {
+  if (value === undefined) {
+    return "undefined";
+  }
+  if (value === null) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`);
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function areGameProgressEntriesEqual(
+  a: GameProgress | undefined,
+  b: GameProgress,
+): boolean {
+  if (!a) {
+    return false;
+  }
+  return stableStringify(a) === stableStringify(b);
+}
 
 function coerceInteger(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -693,18 +754,65 @@ function writeStoredState(date: string, value: PersistedDailyState) {
   writeCookieState(date, value);
 }
 
-export function usePuzzleProgress(date: string) {
-  const [state, setState] = useState<PersistedDailyState>(() =>
-    readStoredState(date),
-  );
+function usePuzzleProgressController(
+  date: string,
+  initialProgress?: DailyProgress | null,
+): UsePuzzleProgressValue {
+  const normalizedInitialProgress = useMemo<DailyProgress | null>(() => {
+    if (initialProgress && Object.keys(initialProgress).length > 0) {
+      return normalizeProgress(initialProgress);
+    }
+    return null;
+  }, [initialProgress]);
+
+  const [state, setState] = useState<PersistedDailyState>(() => {
+    const baseState = readStoredState(date);
+    if (normalizedInitialProgress) {
+      const merged: PersistedDailyState = {
+        progress: { ...baseState.progress, ...normalizedInitialProgress },
+      };
+      if (
+        stableStringify(merged.progress) !==
+        stableStringify(baseState.progress)
+      ) {
+        writeStoredState(date, merged);
+        return merged;
+      }
+    }
+    return baseState;
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<ProgressFetchError | null>(
     null,
   );
 
   useEffect(() => {
-    setState(readStoredState(date));
-  }, [date]);
+    const nextState = readStoredState(date);
+    let targetState = nextState;
+
+    if (normalizedInitialProgress) {
+      const merged: PersistedDailyState = {
+        progress: { ...nextState.progress, ...normalizedInitialProgress },
+      };
+      if (
+        stableStringify(merged.progress) !==
+        stableStringify(nextState.progress)
+      ) {
+        targetState = merged;
+        writeStoredState(date, merged);
+      }
+    }
+
+    setState((previous) => {
+      if (
+        stableStringify(previous.progress) ===
+        stableStringify(targetState.progress)
+      ) {
+        return previous;
+      }
+      return targetState;
+    });
+  }, [date, normalizedInitialProgress]);
 
   const persist = useCallback(
     (updater: (previous: PersistedDailyState) => PersistedDailyState) => {
@@ -889,6 +997,11 @@ export function usePuzzleProgress(date: string) {
         return;
       }
 
+      const current = state.progress[game];
+      if (areGameProgressEntriesEqual(current, normalized)) {
+        return;
+      }
+
       persist((prev) => ({
         progress: { ...prev.progress, [game]: normalized },
       }));
@@ -898,7 +1011,7 @@ export function usePuzzleProgress(date: string) {
       };
       scheduleFlush();
     },
-    [persist, scheduleFlush],
+    [persist, scheduleFlush, state.progress],
   );
 
   const refresh = useCallback(async (): Promise<RefreshResult> => {
@@ -935,11 +1048,46 @@ export function usePuzzleProgress(date: string) {
     }
   }, [date, fetchProgressFromServer]);
 
-  return {
-    progress: state.progress,
-    recordGame,
-    refresh,
-    isRefreshing,
-    refreshError,
-  };
+  const value = useMemo<UsePuzzleProgressValue>(
+    () => ({
+      progress: state.progress,
+      recordGame,
+      refresh,
+      isRefreshing,
+      refreshError,
+    }),
+    [state.progress, recordGame, refresh, isRefreshing, refreshError],
+  );
+
+  return value;
+}
+
+export function PuzzleProgressProvider({
+  date,
+  initialProgress,
+  children,
+}: PuzzleProgressProviderProps) {
+  const value = usePuzzleProgressController(date, initialProgress);
+  const contextValue = useMemo<PuzzleProgressContextValue>(
+    () => ({ date, value }),
+    [date, value],
+  );
+
+  return (
+    <PuzzleProgressContext.Provider value={contextValue}>
+      {children}
+    </PuzzleProgressContext.Provider>
+  );
+}
+
+export function usePuzzleProgress(
+  date: string,
+  initialProgress?: DailyProgress | null,
+) {
+  const context = useContext(PuzzleProgressContext);
+  if (context && context.date === date) {
+    return context.value;
+  }
+
+  return usePuzzleProgressController(date, initialProgress);
 }
