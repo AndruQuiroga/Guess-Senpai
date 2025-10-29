@@ -89,6 +89,39 @@ const LIST_TONES: Record<ListStatus, string> = {
   miss: "border-white/10 bg-white/5 text-neutral-200",
 } as const;
 
+type ScalarColumnKey = "year" | "averageScore" | "popularity";
+type ListColumnKey = "genres" | "tags" | "studios" | "source";
+
+type ScalarColumn = {
+  key: ScalarColumnKey;
+  label: string;
+  type: "scalar";
+  options?: { suffix?: string; showSeason?: boolean };
+};
+
+type ListColumn = {
+  key: ListColumnKey;
+  label: string;
+  type: "list";
+};
+
+type FeedbackColumn = ScalarColumn | ListColumn;
+
+const FEEDBACK_COLUMNS: readonly FeedbackColumn[] = [
+  { key: "year", label: "Year", type: "scalar", options: { showSeason: true } },
+  {
+    key: "averageScore",
+    label: "Score",
+    type: "scalar",
+    options: { suffix: "%" },
+  },
+  { key: "popularity", label: "Popularity", type: "scalar" },
+  { key: "genres", label: "Genres", type: "list" },
+  { key: "tags", label: "Tags", type: "list" },
+  { key: "studios", label: "Studios", type: "list" },
+  { key: "source", label: "Source", type: "list" },
+] as const;
+
 export default function Anidle({
   mediaId,
   payload,
@@ -445,9 +478,8 @@ export default function Anidle({
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const renderScalar = useCallback(
+  const renderScalarValue = useCallback(
     (
-      label: string,
       value: ScalarFeedback,
       options?: { suffix?: string; showSeason?: boolean },
     ) => {
@@ -461,53 +493,53 @@ export default function Anidle({
           ? value.guessSeason.toUpperCase()
           : null;
       return (
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-            {label}
-          </span>
-          <div
-            className={`mt-1 inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-medium ${tone.className}`}
-          >
-            <span>{guessDisplay}</span>
-            {seasonDisplay ? (
-              <span className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white/70">
-                [{seasonDisplay}]
-              </span>
-            ) : null}
-            <span aria-hidden className="text-xs">
-              {tone.icon}
+        <div
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-medium ${tone.className}`}
+        >
+          <span>{guessDisplay}</span>
+          {seasonDisplay ? (
+            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white/70">
+              [{seasonDisplay}]
             </span>
-            <span className="sr-only">{tone.description}</span>
-          </div>
+          ) : null}
+          <span aria-hidden className="text-xs">
+            {tone.icon}
+          </span>
+          <span className="sr-only">{tone.description}</span>
         </div>
       );
     },
     [],
   );
 
-  const renderList = useCallback(
-    (label: string, items: ListFeedbackItem[]) => (
-      <div>
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-          {label}
-        </span>
-        <div className="mt-1 flex flex-wrap gap-2">
-          {items.length > 0 ? (
-            items.map((item) => (
-              <span
-                key={`${label}-${item.value}`}
-                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${LIST_TONES[item.status]}`}
-              >
-                {item.value}
-              </span>
-            ))
-          ) : (
-            <span className="text-xs text-neutral-500">—</span>
-          )}
-        </div>
+  const renderListValue = useCallback(
+    (items: ListFeedbackItem[]) => (
+      <div className="flex flex-wrap gap-2">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <span
+              key={item.value}
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${LIST_TONES[item.status]}`}
+            >
+              {item.value}
+            </span>
+          ))
+        ) : (
+          <span className="text-xs text-neutral-500">—</span>
+        )}
       </div>
     ),
     [],
+  );
+
+  const renderFeedbackCell = useCallback(
+    (column: FeedbackColumn, entry: AnidleGuessEvaluation) => {
+      if (column.type === "scalar") {
+        return renderScalarValue(entry[column.key], column.options);
+      }
+      return renderListValue(entry[column.key]);
+    },
+    [renderListValue, renderScalarValue],
   );
 
   return (
@@ -607,46 +639,72 @@ export default function Anidle({
             </div>
             <div className="relative min-h-[5rem]">
               <div className="space-y-3">
-                {evaluations.map((entry, index) => {
-                  const solved = entry.correct;
-                  return (
-                    <div
-                      key={`${entry.title}-${index}`}
-                      className={`rounded-2xl border px-4 py-4 transition ${
-                        solved
-                          ? "border-emerald-400/40 bg-emerald-500/10"
-                          : "border-white/10 bg-white/5"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold text-white">
-                            {entry.title}
-                          </p>
-                          <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
-                            Guess {index + 1}
-                          </p>
-                        </div>
-                        {solved ? (
-                          <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-50">
-                            Correct
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {renderScalar("Year", entry.year, { showSeason: true })}
-                        {renderScalar("Score", entry.averageScore, {
-                          suffix: "%",
-                        })}
-                        {renderScalar("Popularity", entry.popularity)}
-                        {renderList("Genres", entry.genres)}
-                        {renderList("Tags", entry.tags)}
-                        {renderList("Studios", entry.studios)}
-                        {renderList("Source", entry.source)}
-                      </div>
+                {evaluations.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[56rem] rounded-2xl border border-white/10 bg-white/5">
+                      <table className="w-full border-collapse text-sm text-white">
+                        <thead>
+                          <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                            <th className="px-4 py-3 font-semibold">Guess</th>
+                            {FEEDBACK_COLUMNS.map((column) => (
+                              <th
+                                key={column.key}
+                                className="px-4 py-3 font-semibold"
+                              >
+                                {column.label}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/10">
+                          {evaluations.map((entry, index) => {
+                            const solved = entry.correct;
+                            return (
+                              <tr
+                                key={`${entry.title}-${index}`}
+                                className={`transition ${
+                                  solved
+                                    ? "bg-emerald-500/10"
+                                    : "bg-transparent"
+                                }`}
+                              >
+                                <td className="px-4 py-4 align-top">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold text-white">
+                                        {entry.title}
+                                      </p>
+                                      <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+                                        Guess {index + 1}
+                                      </p>
+                                    </div>
+                                    {solved ? (
+                                      <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-emerald-50">
+                                        Correct
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </td>
+                                {FEEDBACK_COLUMNS.map((column) => (
+                                  <td
+                                    key={column.key}
+                                    className="px-4 py-4 align-top"
+                                  >
+                                    {renderFeedbackCell(column, entry)}
+                                  </td>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  );
-                })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-neutral-300">
+                    Previous guesses will appear here.
+                  </div>
+                )}
               </div>
               {hydrating && (
                 <div
