@@ -67,7 +67,6 @@ export function RedactedSynopsisPage({
         title="Redacted Synopsis"
         round={progress?.round ?? highlightDifficulty}
         totalRounds={totalRounds}
-        onJumpRound={(target) => controller.current?.(target)}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <SynopsisRedacted

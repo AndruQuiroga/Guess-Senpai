@@ -1,12 +1,11 @@
 "use client";
 
-import { PropsWithChildren, useEffect } from "react";
+import { PropsWithChildren } from "react";
 
 interface GameShellProps {
   title: string;
   round: number;
   totalRounds: number;
-  onJumpRound?: (round: number) => void;
   actions?: React.ReactNode;
   roundLabel?: string;
 }
@@ -15,29 +14,10 @@ export function GameShell({
   title,
   round,
   totalRounds,
-  onJumpRound,
   actions,
   roundLabel,
   children,
 }: PropsWithChildren<GameShellProps>) {
-  useEffect(() => {
-    if (!onJumpRound) return;
-    const allowedKeys = new Set(Array.from({ length: totalRounds }, (_, idx) => String(idx + 1)));
-    const handler = (event: KeyboardEvent) => {
-      if (!allowedKeys.has(event.key)) return;
-      const target = event.target as HTMLElement | null;
-      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) {
-        return;
-      }
-      const value = Number.parseInt(event.key, 10);
-      if (Number.isNaN(value)) return;
-      if (value >= 1 && value <= totalRounds) {
-        onJumpRound(value);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onJumpRound, totalRounds]);
 
   return (
     <section className="relative flex min-h-[60vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl transition hover:border-brand-400/30 hover:shadow-glow">
@@ -51,7 +31,6 @@ export function GameShell({
             <span className="rounded-full border border-brand-400/60 bg-brand-500/10 px-3 py-1 text-[0.65rem] font-semibold text-brand-200">
               {roundLabel ?? "Round"} {round} / {totalRounds}
             </span>
-            <span className="hidden text-[0.65rem] text-neutral-500 sm:inline">Press 1 • 2 • 3 to jump rounds</span>
           </div>
         </div>
         {actions ? <div className="flex items-center gap-2 text-sm text-neutral-300">{actions}</div> : null}

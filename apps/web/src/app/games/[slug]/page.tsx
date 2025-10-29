@@ -2,7 +2,6 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { GameSwitcher } from "../../../components/GameSwitcher";
 import { PuzzleSlugContent } from "../../../components/puzzle-pages";
 import type { DailyPuzzleResponse } from "../../../types/puzzles";
 import { findPuzzleSlug, PUZZLE_SLUGS } from "./slugs";
@@ -78,15 +77,12 @@ export default async function PuzzleGamePage({
               {formattedDate ? ` — ${formattedDate}` : ""}
             </p>
           </div>
-          <div className="flex flex-col items-start gap-3 sm:items-end">
-            <GameSwitcher currentSlug={slugDefinition.slug} />
-            <Link
-              href="/games/daily"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm transition hover:bg-white/20"
-            >
-              ← Back to Daily
-            </Link>
-          </div>
+          <Link
+            href="/games/daily"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm transition hover:bg-white/20"
+          >
+            ← Back to Daily
+          </Link>
         </div>
       </header>
 

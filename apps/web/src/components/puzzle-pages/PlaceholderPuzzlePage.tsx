@@ -24,7 +24,6 @@ export function PlaceholderPuzzlePage({
       title={title}
       round={1}
       totalRounds={1}
-      onJumpRound={() => undefined}
       actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
     >
       <div className="flex flex-col items-center justify-center gap-4 py-10 text-center text-neutral-200">
