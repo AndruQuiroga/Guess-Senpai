@@ -9,7 +9,9 @@ export function PosterZoomPreview({ bundle }: PosterZoomPreviewProps) {
   if (!bundle) return null;
 
   const roundHints = bundle.puzzle.spec?.[0]?.hints ?? [];
-  const { meta } = bundle.puzzle;
+  const primaryRound = bundle.puzzle.rounds?.[0];
+  if (!primaryRound) return null;
+  const { meta } = primaryRound;
 
   return (
     <div className="space-y-3">

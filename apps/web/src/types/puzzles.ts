@@ -37,12 +37,18 @@ export interface PosterCropStage {
   offset_y: number;
 }
 
+export interface PosterZoomRound {
+  order: number;
+  difficulty: number;
+  mediaId: number;
+  answer: string;
+  meta: PosterZoomMeta;
+  cropStages: PosterCropStage[];
+}
+
 export interface PosterZoomGame {
   spec: RoundSpec[];
-  answer: string;
-  image?: string | null;
-  meta: PosterZoomMeta;
-  cropStages?: PosterCropStage[];
+  rounds: PosterZoomRound[];
 }
 
 export interface RedactedSynopsisSegment {

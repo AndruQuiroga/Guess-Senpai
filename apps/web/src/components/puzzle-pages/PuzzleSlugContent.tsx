@@ -149,7 +149,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         return (
           <PosterZoomedPage
             slug={slug.slug}
-            mediaId={posterBundle.mediaId}
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
             dailyProgress={progress}

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ..services.anilist import Title
 
@@ -47,12 +47,18 @@ class PosterCropStage(BaseModel):
     offset_y: float = 50.0
 
 
-class PosterZoomGame(BaseModel):
-    spec: List[RoundSpec]
+class PosterZoomRound(BaseModel):
+    order: int
+    difficulty: int
+    mediaId: int
     answer: str
-    image: Optional[str] = None
     meta: PosterZoomMeta
     cropStages: List[PosterCropStage] = Field(default_factory=list)
+
+
+class PosterZoomGame(BaseModel):
+    spec: List[RoundSpec]
+    rounds: List[PosterZoomRound] = Field(default_factory=list)
 
 
 class RedactedSynopsisSegment(BaseModel):
@@ -151,6 +157,37 @@ class PosterZoomPuzzleBundle(BaseModel):
     mediaId: int
     puzzle: PosterZoomGame
     solution: SolutionPayload
+
+    @model_validator(mode="before")
+    @classmethod
+    def _populate_media_id(cls, values: Dict[str, object]) -> Dict[str, object]:
+        media_id = values.get("mediaId")
+        if media_id is not None:
+            return values
+
+        puzzle = values.get("puzzle")
+        rounds: Optional[List[PosterZoomRound]] = None
+        if isinstance(puzzle, PosterZoomGame):
+            rounds = puzzle.rounds
+        elif isinstance(puzzle, dict):
+            raw_rounds = puzzle.get("rounds")
+            if isinstance(raw_rounds, list):
+                rounds = []
+                for entry in raw_rounds:
+                    if isinstance(entry, PosterZoomRound):
+                        rounds.append(entry)
+                    elif isinstance(entry, dict) and "mediaId" in entry:
+                        rounds.append(PosterZoomRound.model_validate(entry))
+
+        if rounds:
+            values["mediaId"] = rounds[0].mediaId
+        return values
+
+    @model_validator(mode="after")
+    def _align_media_id(self) -> PosterZoomPuzzleBundle:
+        if self.puzzle.rounds:
+            self.mediaId = self.puzzle.rounds[0].mediaId
+        return self
 
 
 class RedactedSynopsisPuzzleBundle(BaseModel):
