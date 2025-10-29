@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
-from typing import Any, List, Literal, Optional
+from time import perf_counter
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
@@ -9,12 +11,7 @@ from pydantic import BaseModel
 from ..core.config import settings
 from ..core.database import get_session_factory
 from ..puzzles import engine as puzzle_engine
-from ..puzzles.engine import (
-    UserContext,
-    _choose_answer,
-    _title_variants,
-    get_daily_puzzle,
-)
+from ..puzzles.engine import UserContext, _choose_answer, _title_variants, get_daily_puzzle
 from ..puzzles.models import (
     DailyProgressPayload,
     DailyPuzzleResponse,
@@ -34,8 +31,16 @@ from ..services.progress import (
 )
 from ..services.session import SessionData, get_session_manager
 from ..services.anilist import Media, search_media
+from ..services.anidle_evaluator import (
+    AnidleEvaluationService,
+    AnidleGuessEvaluationPayload,
+    AnidleGuessEvaluationResponse,
+    AnidleListFeedbackItem,
+    AnidleScalarFeedback,
+)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _parse_date(value: Optional[str]) -> date:
@@ -102,37 +107,6 @@ class ArchiveIndexResponse(BaseModel):
     dates: list[str]
 
 
-class AnidleScalarFeedback(BaseModel):
-    guess: Optional[int] = None
-    target: Optional[int] = None
-    status: Literal["match", "higher", "lower", "unknown"]
-    guess_season: Optional[str] = None
-    target_season: Optional[str] = None
-
-
-class AnidleListFeedbackItem(BaseModel):
-    value: str
-    status: Literal["match", "miss"]
-
-
-class AnidleGuessEvaluationPayload(BaseModel):
-    puzzle_media_id: int
-    guess: str
-    guess_media_id: Optional[int] = None
-
-
-class AnidleGuessEvaluationResponse(BaseModel):
-    title: str
-    correct: bool
-    year: AnidleScalarFeedback
-    average_score: AnidleScalarFeedback
-    popularity: AnidleScalarFeedback
-    genres: List[AnidleListFeedbackItem]
-    tags: List[AnidleListFeedbackItem]
-    studios: List[AnidleListFeedbackItem]
-    source: List[AnidleListFeedbackItem]
-
-
 class GuessVerificationPayload(BaseModel):
     media_id: int
     guess: str
@@ -161,38 +135,6 @@ def _generate_archive_dates(history_days: int) -> list[str]:
         (today - timedelta(days=offset)).isoformat()
         for offset in range(total_days)
     ]
-
-
-def _normalize_text(value: str) -> str:
-    return " ".join(value.split()).casefold()
-
-
-def _dedupe_preserve_order(values: List[str]) -> List[str]:
-    seen: set[str] = set()
-    result: List[str] = []
-    for value in values:
-        if not value:
-            continue
-        normalized = value.strip()
-        if not normalized:
-            continue
-        lowered = normalized.casefold()
-        if lowered in seen:
-            continue
-        seen.add(lowered)
-        result.append(normalized)
-    return result
-
-
-def _format_enum_label(value: Optional[str]) -> Optional[str]:
-    if not value:
-        return None
-    normalized = value.replace("_", " ").replace("-", " ").strip()
-    if not normalized:
-        return None
-    return normalized.title()
-
-
 def _normalize_season_label(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -212,66 +154,6 @@ def _normalize_season_label(value: Optional[str]) -> Optional[str]:
         return resolved
     upper = token.upper()
     return upper if upper in {"WINTER", "SPRING", "SUMMER", "FALL"} else None
-
-
-def _extract_studio_names(media: Media) -> List[str]:
-    studios = getattr(media, "studios", None)
-    if not studios or not getattr(studios, "edges", None):
-        return []
-    primary: List[str] = []
-    secondary: List[str] = []
-    for edge in studios.edges:
-        if not edge:
-            continue
-        node: Any = getattr(edge, "node", None)
-        if not node:
-            continue
-        name = getattr(node, "name", None)
-        if not name:
-            continue
-        bucket = primary if getattr(edge, "isMain", False) else secondary
-        bucket.append(name)
-    return _dedupe_preserve_order(primary + secondary)
-
-
-def _build_scalar_feedback(
-    guess_value: Optional[int],
-    target_value: Optional[int],
-    *,
-    guess_season: Optional[str] = None,
-    target_season: Optional[str] = None,
-) -> AnidleScalarFeedback:
-    if guess_value is None or target_value is None:
-        status: Literal["match", "higher", "lower", "unknown"] = "unknown"
-    elif guess_value == target_value:
-        status = "match"
-    elif guess_value > target_value:
-        status = "higher"
-    else:
-        status = "lower"
-    return AnidleScalarFeedback(
-        guess=guess_value,
-        target=target_value,
-        status=status,
-        guess_season=guess_season,
-        target_season=target_season,
-    )
-
-
-def _build_list_feedback(
-    guess_values: List[str],
-    target_values: List[str],
-) -> List[AnidleListFeedbackItem]:
-    normalized_targets = {value.casefold() for value in target_values if value}
-    feedback: List[AnidleListFeedbackItem] = []
-    for value in _dedupe_preserve_order(guess_values):
-        status: Literal["match", "miss"] = (
-            "match" if value.casefold() in normalized_targets else "miss"
-        )
-        feedback.append(AnidleListFeedbackItem(value=value, status=status))
-    return feedback
-
-
 @router.get("/poster/{media_id}/image")
 async def get_poster_image(
     media_id: int,
@@ -527,138 +409,57 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
 async def evaluate_anidle_guess(
     request: Request, payload: AnidleGuessEvaluationPayload
 ) -> AnidleGuessEvaluationResponse:
-    guess_value = payload.guess.strip()
-    if not guess_value:
-        raise HTTPException(status_code=400, detail="Guess cannot be empty")
-
     cache = await get_cache(settings.redis_url)
     session_factory = get_session_factory()
-    try:
-        target_media = await puzzle_engine._load_media_details(
-            payload.puzzle_media_id, cache, settings
-        )
-    except Exception as exc:  # pragma: no cover - upstream failures
-        raise HTTPException(status_code=404, detail="Puzzle media not found") from exc
-
-    guess_media = None
-    if payload.guess_media_id:
-        try:
-            guess_media = await puzzle_engine._load_media_details(
-                payload.guess_media_id, cache, settings
-            )
-        except Exception:
-            guess_media = None
-
-    normalized_guess = _normalize_text(guess_value)
-
-    index_matches: list[title_index.TitleMatch] = []
-    if guess_media is None:
-        async with session_factory() as session:
-            index_matches = await title_index.search_titles(session, guess_value, limit=5)
-        best_candidate = None
-        for match in index_matches:
-            try:
-                candidate = await puzzle_engine._load_media_details(
-                    match.media_id, cache, settings
-                )
-            except Exception:
-                continue
-            if best_candidate is None:
-                best_candidate = candidate
-            variants = puzzle_engine._title_variants(candidate)
-            if any(
-                variant and _normalize_text(variant) == normalized_guess
-                for variant in variants
-            ):
-                guess_media = candidate
-                break
-        if guess_media is None and best_candidate is not None:
-            guess_media = best_candidate
-
-    if guess_media is None and not index_matches:
-        user_ctx = await _resolve_user_context(request)
-        token = user_ctx.access_token if user_ctx else None
-        search_results = await search_media(guess_value, limit=5, token=token)
-        best_candidate = None
-        for pair in search_results:
-            try:
-                candidate = await puzzle_engine._load_media_details(
-                    pair.id, cache, settings
-                )
-            except Exception:
-                continue
-            if best_candidate is None:
-                best_candidate = candidate
-            variants = puzzle_engine._title_variants(candidate)
-            if any(
-                variant and _normalize_text(variant) == normalized_guess
-                for variant in variants
-            ):
-                guess_media = candidate
-                break
-        if guess_media is None and best_candidate is not None:
-            guess_media = best_candidate
-
-    target_year = target_media.seasonYear or (target_media.startDate or {}).get("year")
-    target_season = _format_enum_label(target_media.season)
-    target_score = target_media.averageScore
-    target_popularity = target_media.popularity
-    target_genres = [genre for genre in target_media.genres if genre]
-    target_tags = puzzle_engine._extract_top_tags(target_media)
-    target_studios = _extract_studio_names(target_media)
-    target_source = _format_enum_label(getattr(target_media, "source", None))
-
-    if guess_media is not None:
-        resolved_title = (
-            guess_media.title.userPreferred
-            or guess_media.title.english
-            or guess_media.title.romaji
-            or guess_media.title.native
-            or guess_value
-        )
-        guess_year = guess_media.seasonYear or (guess_media.startDate or {}).get("year")
-        guess_season = _format_enum_label(guess_media.season)
-        guess_score = guess_media.averageScore
-        guess_popularity = guess_media.popularity
-        guess_genres = [genre for genre in guess_media.genres if genre]
-        guess_tags = puzzle_engine._extract_top_tags(guess_media)
-        guess_studios = _extract_studio_names(guess_media)
-        guess_source = _format_enum_label(getattr(guess_media, "source", None))
-        correct = guess_media.id == target_media.id
-    else:
-        resolved_title = guess_value
-        guess_year = None
-        guess_season = None
-        guess_score = None
-        guess_popularity = None
-        guess_genres = []
-        guess_tags = []
-        guess_studios = []
-        guess_source = None
-        correct = any(
-            variant and _normalize_text(variant) == normalized_guess
-            for variant in puzzle_engine._title_variants(target_media)
-        )
-
-    return AnidleGuessEvaluationResponse(
-        title=resolved_title,
-        correct=correct,
-        year=_build_scalar_feedback(
-            guess_year,
-            target_year,
-            guess_season=guess_season,
-            target_season=target_season,
-        ),
-        average_score=_build_scalar_feedback(guess_score, target_score),
-        popularity=_build_scalar_feedback(guess_popularity, target_popularity),
-        genres=_build_list_feedback(guess_genres, target_genres),
-        tags=_build_list_feedback(guess_tags, target_tags),
-        studios=_build_list_feedback(guess_studios, target_studios),
-        source=_build_list_feedback(
-            [guess_source] if guess_source else [],
-            [target_source] if target_source else [],
-        ),
+    user_ctx = await _resolve_user_context(request)
+    service = AnidleEvaluationService(
+        cache=cache, session_factory=session_factory, user=user_ctx
     )
+
+    start = perf_counter()
+    try:
+        return await service.evaluate_guess(payload)
+    finally:
+        duration_ms = (perf_counter() - start) * 1000
+        metrics = service.metrics
+        logger.info(
+            "anidle.evaluate.single",
+            extra={
+                "duration_ms": round(duration_ms, 3),
+                "count": 1,
+                **metrics,
+            },
+        )
+
+
+@router.post(
+    "/anidle/evaluate/batch",
+    response_model=list[AnidleGuessEvaluationResponse],
+)
+async def evaluate_anidle_guess_batch(
+    request: Request, payloads: list[AnidleGuessEvaluationPayload]
+) -> list[AnidleGuessEvaluationResponse]:
+    cache = await get_cache(settings.redis_url)
+    session_factory = get_session_factory()
+    user_ctx = await _resolve_user_context(request)
+    service = AnidleEvaluationService(
+        cache=cache, session_factory=session_factory, user=user_ctx
+    )
+
+    start = perf_counter()
+    try:
+        return [await service.evaluate_guess(payload) for payload in payloads]
+    finally:
+        duration_ms = (perf_counter() - start) * 1000
+        metrics = service.metrics
+        logger.info(
+            "anidle.evaluate.batch",
+            extra={
+                "duration_ms": round(duration_ms, 3),
+                "count": len(payloads),
+                **metrics,
+            },
+        )
 
 
 @router.get("/search-titles", response_model=TitleSuggestionResponse)
@@ -730,3 +531,11 @@ async def search_characters(
 async def get_archive_dates() -> ArchiveIndexResponse:
     dates = _generate_archive_dates(settings.puzzle_history_days)
     return ArchiveIndexResponse(dates=dates)
+
+
+__all__ = [
+    "AnidleGuessEvaluationPayload",
+    "AnidleGuessEvaluationResponse",
+    "AnidleScalarFeedback",
+    "AnidleListFeedbackItem",
+]
