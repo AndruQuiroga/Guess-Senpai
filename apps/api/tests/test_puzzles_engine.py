@@ -376,6 +376,62 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.asyncio
+async def test_daily_puzzle_poster_rounds_scale_difficulty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = date(2024, 1, 7)
+    poster_media = [
+        make_media(601, "Poster One"),
+        make_media(602, "Poster Two"),
+        make_media(603, "Poster Three"),
+    ]
+    additional_media = [
+        make_media(701, "Anidle Pick"),
+        make_media(702, "Synopsis Pick"),
+        make_media(703, "Character Pick"),
+    ]
+    pool = poster_media + additional_media
+    media_by_id = {media.id: media for media in pool}
+
+    async def fake_load_popular_pool(day_value, cache, settings):
+        assert day_value == day
+        return list(pool)
+
+    async def fake_load_media_details(media_id: int, cache, settings):
+        return media_by_id[media_id]
+
+    async def fake_build_guess_opening_round(media: Media, cache, **kwargs):
+        return make_guess_opening(media, **kwargs)
+
+    def fake_select_poster_candidates(*, day: date, pool, required: int = 3):
+        assert required == len(engine.POSTER_ROUNDS)
+        return list(poster_media)
+
+    monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
+    monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
+    monkeypatch.setattr(engine, "_build_guess_opening_round", fake_build_guess_opening_round)
+    monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
+    monkeypatch.setattr(engine, "_select_poster_candidates", fake_select_poster_candidates)
+
+    cache = DummyCache()
+    result = await engine._assemble_daily_puzzle(
+        day,
+        user=None,
+        include_guess_opening=True,
+        cache=cache,
+    )
+
+    poster_rounds = result.games.poster_zoomed.puzzle.rounds
+    assert len(poster_rounds) == 3
+    assert [round.order for round in poster_rounds] == [1, 2, 3]
+    assert [round.difficulty for round in poster_rounds] == [
+        spec.difficulty for spec in engine.POSTER_ROUNDS
+    ]
+    poster_media_ids = [round.mediaId for round in poster_rounds]
+    assert len(poster_media_ids) == len(set(poster_media_ids))
+
+
+@pytest.mark.asyncio
 async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch) -> None:
     day = date(2024, 1, 6)
     popular = [
