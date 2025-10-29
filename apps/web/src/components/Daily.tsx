@@ -63,10 +63,11 @@ interface TimelineEntry {
 export default function Daily({ data }: Props) {
   if (!data) {
     return (
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 text-neutral-100 shadow-ambient backdrop-blur-xl">
+      <div className="relative flex min-h-[50vh] flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 text-center text-neutral-100 shadow-ambient backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-        Couldn&apos;t load today&apos;s puzzles. Please refresh or try again
-        later.
+        <p className="max-w-md text-sm text-neutral-200">
+          Couldn&apos;t load today&apos;s puzzles. Please refresh or try again later.
+        </p>
       </div>
     );
   }

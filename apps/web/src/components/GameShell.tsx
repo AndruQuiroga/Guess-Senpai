@@ -40,7 +40,7 @@ export function GameShell({
   }, [onJumpRound, totalRounds]);
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl transition hover:border-brand-400/30 hover:shadow-glow">
+    <section className="relative flex min-h-[60vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl transition hover:border-brand-400/30 hover:shadow-glow">
       <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/70 to-transparent" />
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -56,7 +56,7 @@ export function GameShell({
         </div>
         {actions ? <div className="flex items-center gap-2 text-sm text-neutral-300">{actions}</div> : null}
       </header>
-      <div className="space-y-5">{children}</div>
+      <div className="flex-1 space-y-5">{children}</div>
       <div className="mt-6 h-1 w-full overflow-hidden rounded-full bg-white/5">
         <div
           className="h-full rounded-full bg-gradient-to-r from-brand-400 via-brand-500 to-brand-300 transition-all duration-500"
