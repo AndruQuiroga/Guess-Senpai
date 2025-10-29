@@ -139,6 +139,8 @@ class GuessVerificationPayload(BaseModel):
     guess_media_id: Optional[int] = None
     character_guess: Optional[str] = None
     guess_character_id: Optional[int] = None
+    season: Optional[str] = None
+    season_year: Optional[int] = None
 
 
 class GuessVerificationResponse(BaseModel):
@@ -148,6 +150,8 @@ class GuessVerificationResponse(BaseModel):
     match: Optional[str] = None
     character: Optional[str] = None
     character_id: Optional[int] = None
+    season_match: Optional[bool] = None
+    season_year_match: Optional[bool] = None
 
 
 def _generate_archive_dates(history_days: int) -> list[str]:
@@ -187,6 +191,27 @@ def _format_enum_label(value: Optional[str]) -> Optional[str]:
     if not normalized:
         return None
     return normalized.title()
+
+
+def _normalize_season_label(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    normalized = value.replace("_", " ").replace("-", " ").strip().casefold()
+    if not normalized:
+        return None
+    token = normalized.split()[0]
+    aliases = {
+        "winter": "WINTER",
+        "spring": "SPRING",
+        "summer": "SUMMER",
+        "fall": "FALL",
+        "autumn": "FALL",
+    }
+    resolved = aliases.get(token)
+    if resolved:
+        return resolved
+    upper = token.upper()
+    return upper if upper in {"WINTER", "SPRING", "SUMMER", "FALL"} else None
 
 
 def _extract_studio_names(media: Media) -> List[str]:
@@ -367,6 +392,27 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
     def _normalize(value: str) -> str:
         return " ".join(value.split()).casefold()
 
+    normalized_target_season = _normalize_season_label(getattr(media, "season", None))
+    target_season_year = getattr(media, "seasonYear", None)
+    if target_season_year is None:
+        target_season_year = (getattr(media, "startDate", None) or {}).get("year")
+
+    request_season = _normalize_season_label(payload.season)
+    season_match: Optional[bool] = None
+    if request_season is not None:
+        season_match = (
+            request_season == normalized_target_season
+            if normalized_target_season is not None
+            else None
+        )
+
+    season_year_match: Optional[bool] = None
+    if payload.season_year is not None:
+        if target_season_year is not None:
+            season_year_match = int(payload.season_year) == int(target_season_year)
+        else:
+            season_year_match = None
+
     variants = _title_variants(media)
     normalized_guess = _normalize(guess)
     normalized_variants = {_normalize(variant) for variant in variants if variant}
@@ -472,6 +518,8 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
         match=match,
         character=resolved_character,
         character_id=resolved_character_id,
+        season_match=season_match,
+        season_year_match=season_year_match,
     )
 
 

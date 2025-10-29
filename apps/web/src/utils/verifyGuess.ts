@@ -7,11 +7,15 @@ export interface GuessVerificationResult {
   characterMatch?: boolean | null;
   characterName?: string | null;
   characterId?: number | null;
+  seasonMatch?: boolean | null;
+  seasonYearMatch?: boolean | null;
 }
 
 interface VerifyGuessOptions {
   characterGuess?: string | null;
   characterId?: number | null;
+  season?: string | null;
+  seasonYear?: number | null;
 }
 
 export async function verifyGuess(
@@ -30,6 +34,8 @@ export async function verifyGuess(
       guess_media_id: guessMediaId ?? null,
       character_guess: options.characterGuess ?? null,
       guess_character_id: options.characterId ?? null,
+      season: options.season ?? null,
+      season_year: options.seasonYear ?? null,
     }),
   });
 
@@ -50,6 +56,8 @@ export async function verifyGuess(
         character_match?: boolean | null;
         character?: string | null;
         character_id?: number | null;
+        season_match?: boolean | null;
+        season_year_match?: boolean | null;
       })
     | null;
   if (!payload || typeof payload !== "object") {
@@ -69,6 +77,23 @@ export async function verifyGuess(
         ? null
         : null;
 
+  const seasonMatchSource = payload.seasonMatch ?? payload.season_match;
+  const seasonMatch =
+    typeof seasonMatchSource === "boolean"
+      ? seasonMatchSource
+      : seasonMatchSource === null
+        ? null
+        : null;
+
+  const seasonYearMatchSource =
+    payload.seasonYearMatch ?? payload.season_year_match;
+  const seasonYearMatch =
+    typeof seasonYearMatchSource === "boolean"
+      ? seasonYearMatchSource
+      : seasonYearMatchSource === null
+        ? null
+        : null;
+
   return {
     correct: Boolean(payload.correct),
     match: payload.match ?? null,
@@ -82,5 +107,7 @@ export async function verifyGuess(
         : typeof payload.character_id === "number"
           ? payload.character_id
           : null,
+    seasonMatch,
+    seasonYearMatch,
   };
 }
