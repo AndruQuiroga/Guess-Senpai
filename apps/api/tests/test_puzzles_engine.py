@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import Any, List
 
 import base64
 
@@ -23,7 +23,17 @@ from app.puzzles.models import (
     RoundSpec,
     SolutionPayload,
 )
-from app.services.anilist import Media, Title
+from app.services.anilist import (
+    Character,
+    CharacterImage,
+    CharacterName,
+    Media,
+    MediaCharacterEdge,
+    MediaList,
+    MediaListCollection,
+    MediaListEntry,
+    Title,
+)
 
 
 class DummyCache:
@@ -115,6 +125,87 @@ def make_character_silhouette(media: Media) -> CharacterSilhouetteGame:
         ),
     )
 
+
+def make_character_edge(index: int) -> MediaCharacterEdge:
+    character = Character(
+        id=10_000 + index,
+        name=CharacterName(
+            full=f"Character {index}",
+            userPreferred=f"Character {index}",
+            native=None,
+        ),
+        image=CharacterImage(large=f"https://cdn.example.com/character-{index}.jpg"),
+    )
+    return MediaCharacterEdge(role="MAIN", node=character)
+
+
+def test_build_candidate_pool_prefers_novel_media() -> None:
+    popular = [make_media(1, "Watched"), make_media(2, "Watching"), make_media(3, "Fresh")]
+    user_lists = MediaListCollection(
+        lists=[
+            MediaList(
+                status="COMPLETED",
+                entries=[MediaListEntry(media=popular[0])],
+            ),
+            MediaList(
+                status="CURRENT",
+                entries=[MediaListEntry(media=popular[1])],
+            ),
+        ]
+    )
+
+    pool = engine._build_candidate_pool(popular, user_lists)
+
+    assert [media.id for media in pool] == [3]
+
+
+def test_build_candidate_pool_falls_back_excluding_recent() -> None:
+    popular = [make_media(10, "Classic"), make_media(11, "Returnee")]
+    user_lists = MediaListCollection(
+        lists=[
+            MediaList(
+                status="COMPLETED",
+                entries=[MediaListEntry(media=popular[0])],
+            ),
+            MediaList(
+                status="COMPLETED",
+                entries=[MediaListEntry(media=popular[1])],
+            ),
+        ]
+    )
+
+    pool = engine._build_candidate_pool(popular, user_lists, recent_ids=[10])
+
+    assert [media.id for media in pool] == [11]
+
+
+def test_character_guess_rounds_preserve_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
+    media = make_media(99, "Spotlight Saga")
+
+    allocations: List[List[MediaCharacterEdge]] = [
+        [make_character_edge(round_index * 4 + entry) for entry in range(4)]
+        for round_index in range(len(engine.CHARACTER_GUESS_ROUND_CONFIG))
+    ]
+
+    monkeypatch.setattr(
+        engine.character_pool,
+        "build_round_pools",
+        lambda *_args, **_kwargs: allocations,
+    )
+
+    game = engine._build_character_guess_game(media)
+
+    assert game is not None
+    assert [round_payload.difficulty for round_payload in game.rounds] == [
+        config["difficulty"] for config in engine.CHARACTER_GUESS_ROUND_CONFIG
+    ]
+    assert [round_spec.difficulty for round_spec in game.spec] == [
+        config["difficulty"] for config in engine.CHARACTER_GUESS_ROUND_CONFIG
+    ]
+
+    for config, round_payload in zip(engine.CHARACTER_GUESS_ROUND_CONFIG, game.rounds):
+        assert len(round_payload.entries) == 4
+        assert all(entry.reveal.label == config["label"] for entry in round_payload.entries)
 
 def test_generate_character_silhouette_cuts_background(monkeypatch: pytest.MonkeyPatch) -> None:
     image = np.full((200, 200, 3), 255, dtype=np.uint8)
