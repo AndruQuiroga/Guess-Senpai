@@ -250,16 +250,18 @@ def _choose_answer(media: Media) -> str:
     return "Unknown"
 
 
-def _extract_top_tags(media: Media, limit: int = 6) -> List[str]:
+def _extract_top_tags(media: Media, limit: int = 5, min_rank: int = 70) -> List[str]:
     tags: List[tuple[int, str]] = []
     for tag in media.tags or []:
         if not tag or not tag.name:
             continue
         if getattr(tag, "isGeneralSpoiler", False):
             continue
-        rank = tag.rank if tag.rank is not None else 10_000
+        rank = tag.rank if tag.rank is not None else 0
+        if rank < min_rank:
+            continue
         tags.append((rank, tag.name))
-    tags.sort(key=lambda item: item[0])
+    tags.sort(key=lambda item: item[0], reverse=True)
     return [name for _, name in tags[:limit]]
 
 

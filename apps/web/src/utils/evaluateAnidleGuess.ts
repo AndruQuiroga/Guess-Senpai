@@ -7,6 +7,8 @@ export interface ScalarFeedback {
   guess: number | null;
   target: number | null;
   status: ScalarStatus;
+  guessSeason?: string | null;
+  targetSeason?: string | null;
 }
 
 export interface ListFeedbackItem {
@@ -19,8 +21,11 @@ export interface AnidleGuessEvaluation {
   correct: boolean;
   year: ScalarFeedback;
   averageScore: ScalarFeedback;
+  popularity: ScalarFeedback;
   genres: ListFeedbackItem[];
   tags: ListFeedbackItem[];
+  studios: ListFeedbackItem[];
+  source: ListFeedbackItem[];
 }
 
 interface EvaluateAnidleGuessPayload {
@@ -37,6 +42,8 @@ function normalizeScalar(value: unknown): ScalarFeedback {
     guess?: unknown;
     target?: unknown;
     status?: unknown;
+    guess_season?: unknown;
+    target_season?: unknown;
   };
   const guess = typeof record.guess === "number" ? record.guess : null;
   const target = typeof record.target === "number" ? record.target : null;
@@ -47,7 +54,11 @@ function normalizeScalar(value: unknown): ScalarFeedback {
     record.status === "unknown"
       ? record.status
       : "unknown";
-  return { guess, target, status };
+  const guessSeason =
+    typeof record.guess_season === "string" ? record.guess_season : null;
+  const targetSeason =
+    typeof record.target_season === "string" ? record.target_season : null;
+  return { guess, target, status, guessSeason, targetSeason };
 }
 
 function normalizeList(value: unknown): ListFeedbackItem[] {
@@ -61,7 +72,10 @@ function normalizeList(value: unknown): ListFeedbackItem[] {
       }
       const record = item as { value?: unknown; status?: unknown };
       const label = typeof record.value === "string" ? record.value : null;
-      const status = record.status === "match" || record.status === "miss" ? record.status : "miss";
+      const status =
+        record.status === "match" || record.status === "miss"
+          ? record.status
+          : "miss";
       if (!label) {
         return null;
       }
@@ -107,7 +121,10 @@ export async function evaluateAnidleGuess({
     correct: Boolean(payload.correct),
     year: normalizeScalar(payload.year),
     averageScore: normalizeScalar(payload.average_score),
+    popularity: normalizeScalar(payload.popularity),
     genres: normalizeList(payload.genres),
     tags: normalizeList(payload.tags),
+    studios: normalizeList(payload.studios),
+    source: normalizeList(payload.source),
   };
 }

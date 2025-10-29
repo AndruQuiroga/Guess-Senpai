@@ -58,7 +58,10 @@ type AggregatedHint =
       text: string;
     };
 
-const SCALAR_TONES: Record<ScalarStatus, { className: string; icon: string; description: string }> = {
+const SCALAR_TONES: Record<
+  ScalarStatus,
+  { className: string; icon: string; description: string }
+> = {
   match: {
     className: "border-emerald-400/40 bg-emerald-500/10 text-emerald-100",
     icon: "✓",
@@ -164,9 +167,8 @@ export default function Anidle({
         (incorrectGuessCount - MIN_INCORRECT_GUESSES_FOR_HINT) /
           INCORRECT_GUESS_INTERVAL,
       );
-      const entry = synopsisEntries[
-        Math.min(stage, synopsisEntries.length - 1)
-      ];
+      const entry =
+        synopsisEntries[Math.min(stage, synopsisEntries.length - 1)];
       if (entry && entry.text.trim().length > 0) {
         return [
           {
@@ -437,18 +439,20 @@ export default function Anidle({
   }, []);
 
   const renderScalar = useCallback(
-    (label: string, value: ScalarFeedback, suffix = "") => {
+    (
+      label: string,
+      value: ScalarFeedback,
+      options?: { suffix?: string; showSeason?: boolean },
+    ) => {
+      const suffix = options?.suffix ?? "";
+      const showSeason = options?.showSeason ?? false;
       const tone = SCALAR_TONES[value.status];
       const guessDisplay =
-        typeof value.guess === "number"
-          ? `${value.guess}${suffix}`
-          : "—";
-      const targetDisplay =
-        typeof value.target === "number" ? `${value.target}${suffix}` : null;
-      const display =
-        targetDisplay != null
-          ? `${guessDisplay} → ${targetDisplay}`
-          : guessDisplay;
+        typeof value.guess === "number" ? `${value.guess}${suffix}` : "—";
+      const seasonDisplay =
+        showSeason && value.guessSeason
+          ? value.guessSeason.toUpperCase()
+          : null;
       return (
         <div>
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
@@ -457,7 +461,12 @@ export default function Anidle({
           <div
             className={`mt-1 inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-medium ${tone.className}`}
           >
-            <span>{display}</span>
+            <span>{guessDisplay}</span>
+            {seasonDisplay ? (
+              <span className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white/70">
+                [{seasonDisplay}]
+              </span>
+            ) : null}
             <span aria-hidden className="text-xs">
               {tone.icon}
             </span>
@@ -565,9 +574,7 @@ export default function Anidle({
             onValueChange={setGuess}
             onSubmit={handleFieldSubmit}
             disabled={completed || submitting}
-            placeholder={
-              completed ? "You solved Anidle!" : "Type your guess…"
-            }
+            placeholder={completed ? "You solved Anidle!" : "Type your guess…"}
             ariaLabel="Anidle guess"
             suggestionsLabel="Anidle title suggestions"
           />
@@ -606,7 +613,9 @@ export default function Anidle({
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="text-sm font-semibold text-white">{entry.title}</p>
+                          <p className="text-sm font-semibold text-white">
+                            {entry.title}
+                          </p>
                           <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
                             Guess {index + 1}
                           </p>
@@ -617,11 +626,16 @@ export default function Anidle({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        {renderScalar("Year", entry.year)}
-                        {renderScalar("Score", entry.averageScore, "%")}
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {renderScalar("Year", entry.year, { showSeason: true })}
+                        {renderScalar("Score", entry.averageScore, {
+                          suffix: "%",
+                        })}
+                        {renderScalar("Popularity", entry.popularity)}
                         {renderList("Genres", entry.genres)}
                         {renderList("Tags", entry.tags)}
+                        {renderList("Studios", entry.studios)}
+                        {renderList("Source", entry.source)}
                       </div>
                     </div>
                   );

@@ -42,6 +42,20 @@ class Tag(BaseModel):
     isGeneralSpoiler: Optional[bool] = None
 
 
+class StudioNode(BaseModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+
+
+class MediaStudioEdge(BaseModel):
+    isMain: Optional[bool] = None
+    node: Optional[StudioNode] = None
+
+
+class MediaStudios(BaseModel):
+    edges: List[MediaStudioEdge] = Field(default_factory=list)
+
+
 class CharacterName(BaseModel):
     full: Optional[str] = None
     native: Optional[str] = None
@@ -81,6 +95,8 @@ class Media(BaseModel):
     tags: List[Tag] = Field(default_factory=list)
     popularity: Optional[int] = None
     averageScore: Optional[int] = None
+    source: Optional[str] = None
+    studios: Optional[MediaStudios] = None
     description: Optional[str] = None
     status: Optional[str] = None
     format: Optional[str] = None
@@ -335,12 +351,19 @@ query MediaDetails($id: Int!) {
     tags { name rank isGeneralSpoiler }
     popularity
     averageScore
+    source
     description(asHtml: false)
     status
     format
     coverImage { extraLarge large medium color }
     bannerImage
     isAdult
+    studios {
+      edges {
+        isMain
+        node { id name }
+      }
+    }
     relations {
       edges {
         relationType
