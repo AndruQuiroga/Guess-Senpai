@@ -80,4 +80,48 @@ describe("PosterZoom autocomplete", () => {
       });
     });
   });
+
+  it("emits enriched progress metadata for each round", async () => {
+    const payload: PosterZoomGame = {
+      spec: [{ difficulty: 1, hints: [] }],
+      rounds: [
+        {
+          order: 1,
+          difficulty: 1,
+          mediaId: 88,
+          answer: "Bleach",
+          meta: { genres: [], year: 2004, format: "TV" },
+          cropStages: [],
+        },
+      ],
+    };
+
+    const onProgressChange = vi.fn();
+
+    render(
+      <PosterZoom
+        payload={payload}
+        onProgressChange={onProgressChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onProgressChange).toHaveBeenCalled();
+    });
+
+    const progressArg = onProgressChange.mock.calls.at(-1)?.[0];
+    expect(progressArg).toBeTruthy();
+    expect(progressArg.rounds).toBeTruthy();
+    const [firstRound] = progressArg.rounds;
+    expect(firstRound).toMatchObject({
+      round: 1,
+      mediaId: 88,
+      posterImageBase: "http://localhost:8000/puzzles/poster/88/image",
+      posterImageUrl: "http://localhost:8000/puzzles/poster/88/image?hints=0",
+      stage: 1,
+      completed: false,
+    });
+    expect(firstRound.feedbackType).toBeUndefined();
+    expect(firstRound.seasonGuess).toBeUndefined();
+  });
 });

@@ -35,6 +35,19 @@ type FeedbackState =
   | { type: "error"; message: string }
   | null;
 
+interface RoundController {
+  roundNumber: number;
+  mediaId: number | null;
+  posterImageBase: string | null;
+  cropImageUrl: string | null;
+  totalStages: number;
+  stage: number;
+  completed: boolean;
+  unlocked: boolean;
+  hintRound: number;
+  activeHintCount: number;
+}
+
 interface RoundState {
   guesses: string[];
   yearGuesses: number[];
@@ -44,12 +57,24 @@ interface RoundState {
   feedback: FeedbackState;
   hintUsed: boolean;
   resolvedYear?: number;
+  lastSeasonGuess?: string;
+  lastSeasonYearGuess?: number;
 }
 
 interface RoundDraft {
   guess: string;
   season: SeasonValue;
   year: string;
+}
+
+function normalizeSeasonValue(value?: string | null): SeasonValue {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const match = SEASON_OPTIONS.find(
+    (option) => option && option.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return (match ?? "") as SeasonValue;
 }
 
 interface Props {
@@ -119,6 +144,8 @@ export default function PosterZoom({
       feedback: null,
       hintUsed: false,
       resolvedYear: undefined,
+      lastSeasonGuess: undefined,
+      lastSeasonYearGuess: undefined,
     })),
   );
   const [roundDrafts, setRoundDrafts] = useState<RoundDraft[]>(() =>
@@ -129,6 +156,7 @@ export default function PosterZoom({
   const [seasonYear, setSeasonYear] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
+  const roundControllersRef = useRef<RoundController[]>([]);
 
   const storedRoundMap = useMemo(() => {
     const map = new Map<number, GameRoundProgress>();
@@ -174,10 +202,71 @@ export default function PosterZoom({
         resolvedAnswer: entry.resolvedTitle ?? entry.resolvedAnswer,
         resolvedTitle: entry.resolvedTitle ?? entry.resolvedAnswer,
         resolvedYear: entry.resolvedYear,
+        seasonGuess:
+          typeof entry.seasonGuess === "string" && entry.seasonGuess.trim().length > 0
+            ? entry.seasonGuess.trim().toUpperCase()
+            : undefined,
+        seasonYearGuess: entry.seasonYearGuess,
+        mediaId:
+          typeof entry.mediaId === "number" && Number.isFinite(entry.mediaId)
+            ? Math.trunc(entry.mediaId)
+            : undefined,
+        posterImageBase: entry.posterImageBase,
+        posterImageUrl: entry.posterImageUrl,
+        feedbackType: entry.feedbackType,
+        feedbackMessage: entry.feedbackMessage,
       });
     });
     return map;
   }, [initialProgress?.rounds]);
+
+  const roundControllers = useMemo<RoundController[]>(() => {
+    return payload.rounds.map((round, index) => {
+      const state = roundStates[index];
+      const totalStages = resolveTotalStages(round, payload.spec);
+      const stage = state?.stage ?? 1;
+      const completed = Boolean(state?.completed);
+      const hintRound = completed
+        ? totalStages
+        : resolveHintRound(stage, totalStages, accountDifficulty);
+
+      let activeHintCount = 0;
+      if (totalStages > 1) {
+        if (completed) {
+          activeHintCount = totalStages - 1;
+        } else {
+          const clampedRound = Math.max(1, Math.min(totalStages, hintRound));
+          activeHintCount = Math.max(0, Math.min(totalStages - 1, clampedRound - 1));
+        }
+      }
+
+      const posterImageBase =
+        typeof round.mediaId === "number"
+          ? `${API_BASE}/puzzles/poster/${round.mediaId}/image`
+          : null;
+      const cropImageUrl =
+        posterImageBase !== null ? `${posterImageBase}?hints=${activeHintCount}` : null;
+      const unlocked =
+        index <= 0 || roundStates.slice(0, index).every((entry) => entry.completed);
+
+      return {
+        roundNumber: index + 1,
+        mediaId: typeof round.mediaId === "number" ? round.mediaId : null,
+        posterImageBase,
+        cropImageUrl,
+        totalStages,
+        stage,
+        completed,
+        unlocked,
+        hintRound,
+        activeHintCount,
+      };
+    });
+  }, [accountDifficulty, payload.rounds, payload.spec, roundStates]);
+
+  useEffect(() => {
+    roundControllersRef.current = roundControllers;
+  }, [roundControllers]);
 
   const updateRoundDraft = useCallback((index: number, patch: Partial<RoundDraft>) => {
     setRoundDrafts((prev) =>
@@ -219,6 +308,17 @@ export default function PosterZoom({
               typeof value === "number" && Number.isFinite(value),
           )
         : [];
+
+      const storedSeason =
+        typeof stored?.seasonGuess === "string" && stored.seasonGuess.trim().length > 0
+          ? stored.seasonGuess.trim().toUpperCase()
+          : undefined;
+      const storedSeasonYear =
+        typeof stored?.seasonYearGuess === "number" && Number.isFinite(stored.seasonYearGuess)
+          ? Math.trunc(stored.seasonYearGuess)
+          : undefined;
+      const storedFeedbackType = stored?.feedbackType;
+      const storedFeedbackMessage = stored?.feedbackMessage;
 
       let completed = false;
       if (stored?.completed !== undefined) {
@@ -266,12 +366,29 @@ export default function PosterZoom({
       const normalizedGuesses =
         guesses.length > 0 ? guesses : fallbackGuessList;
 
-      const feedback: FeedbackState = completed
-        ? {
-            type: "success",
-            message: `Poster solved! ${canonicalTitle}`,
-          }
-        : null;
+      let feedback: FeedbackState = null;
+      if (completed) {
+        const successMessage =
+          storedFeedbackType === "success" && storedFeedbackMessage
+            ? storedFeedbackMessage
+            : `Poster solved! ${canonicalTitle}`;
+        feedback = {
+          type: "success",
+          message: successMessage,
+        };
+      } else if (storedFeedbackType === "partial") {
+        feedback = {
+          type: "partial",
+          message:
+            storedFeedbackMessage ?? "Title correct! Almost there!",
+        };
+      } else if (storedFeedbackType === "error") {
+        feedback = {
+          type: "error",
+          message:
+            storedFeedbackMessage ?? "Not quite. Keep trying!",
+        };
+      }
 
       return {
         guesses: normalizedGuesses,
@@ -282,14 +399,39 @@ export default function PosterZoom({
         feedback,
         hintUsed,
         resolvedYear,
+        lastSeasonGuess: storedSeason,
+        lastSeasonYearGuess: storedSeasonYear,
       };
     });
 
-    const nextDrafts: RoundDraft[] = payload.rounds.map(() => ({
-      guess: "",
-      season: "",
-      year: "",
-    }));
+    const nextDrafts: RoundDraft[] = payload.rounds.map((_, index) => {
+      const state = nextStates[index];
+      const stored = storedRoundMap.get(index + 1);
+      const season = normalizeSeasonValue(state.lastSeasonGuess);
+      const year =
+        state.lastSeasonYearGuess !== undefined &&
+        Number.isFinite(state.lastSeasonYearGuess)
+          ? String(Math.trunc(state.lastSeasonYearGuess)).slice(0, 4)
+          : "";
+
+      let guessDraft = "";
+      if (!state.completed) {
+        if (state.feedback?.type === "partial") {
+          guessDraft = state.canonicalTitle;
+        } else if (!stored?.feedbackType && state.guesses.length > 0) {
+          const lastGuess = state.guesses[state.guesses.length - 1];
+          if (lastGuess) {
+            guessDraft = lastGuess;
+          }
+        }
+      }
+
+      return {
+        guess: guessDraft,
+        season,
+        year,
+      };
+    });
 
     const firstIncomplete = nextStates.findIndex((state) => !state.completed);
     const fallbackUnlocked =
@@ -328,17 +470,17 @@ export default function PosterZoom({
         if (clamped === prev) {
           return prev;
         }
-        const unlocked =
-          clamped <= 0 ||
-          roundStates.slice(0, clamped).every((state) => state.completed);
+        const controller = roundControllersRef.current[clamped];
+        const unlocked = controller?.unlocked ?? clamped <= 0;
         return unlocked ? clamped : prev;
       });
     });
-  }, [clampRoundIndex, registerRoundController, roundStates]);
+  }, [clampRoundIndex, registerRoundController]);
 
   const currentRound = payload.rounds[activeRoundIndex];
   const currentState = roundStates[activeRoundIndex];
   const currentDraft = roundDrafts[activeRoundIndex];
+  const currentController = roundControllers[activeRoundIndex];
 
   useEffect(() => {
     setGuess(currentDraft?.guess ?? "");
@@ -380,51 +522,23 @@ export default function PosterZoom({
     [roundStates],
   );
 
-  const isRoundUnlocked = useCallback(
-    (index: number) => {
-      if (index <= 0) return true;
-      return roundStates.slice(0, index).every((state) => state.completed);
-    },
-    [roundStates],
-  );
+  const totalStagesForRound = currentController
+    ? currentController.totalStages
+    : currentRound
+      ? resolveTotalStages(currentRound, payload.spec)
+      : 1;
 
-  const totalStagesForRound = useMemo(() => {
-    if (!currentRound) return 1;
-    return resolveTotalStages(currentRound, payload.spec);
-  }, [currentRound, payload.spec]);
+  const hintRound = currentController
+    ? currentController.hintRound
+    : currentState && currentRound
+      ? resolveHintRound(currentState.stage, totalStagesForRound, accountDifficulty)
+      : 1;
 
-  const hintRound = useMemo(() => {
-    if (!currentRound || !currentState) return 1;
-    return currentState.completed
-      ? totalStagesForRound
-      : resolveHintRound(currentState.stage, totalStagesForRound, accountDifficulty);
-  }, [accountDifficulty, currentRound, currentState, totalStagesForRound]);
+  const activeHintCount = currentController?.activeHintCount ?? 0;
 
-  const activeHintCount = useMemo(() => {
-    if (!currentRound || !currentState) return 0;
-    if (totalStagesForRound <= 1) {
-      return 0;
-    }
-    if (currentState.completed) {
-      return totalStagesForRound - 1;
-    }
-    const clampedRound = Math.max(1, Math.min(totalStagesForRound, hintRound));
-    return Math.max(0, Math.min(totalStagesForRound - 1, clampedRound - 1));
-  }, [currentRound, currentState, hintRound, totalStagesForRound]);
+  const posterImageBase = currentController?.posterImageBase ?? null;
 
-  const posterImageBase = useMemo(() => {
-    if (!currentRound || typeof currentRound.mediaId !== "number") {
-      return null;
-    }
-    return `${API_BASE}/puzzles/poster/${currentRound.mediaId}/image`;
-  }, [currentRound]);
-
-  const imageSrc = useMemo(() => {
-    if (!posterImageBase) {
-      return null;
-    }
-    return `${posterImageBase}?hints=${activeHintCount}`;
-  }, [activeHintCount, posterImageBase]);
+  const imageSrc = currentController?.cropImageUrl ?? null;
 
   const activeHints = useMemo(() => {
     if (!currentRound || !currentState) return [];
@@ -491,6 +605,7 @@ export default function PosterZoom({
           ? seasonSelection.trim().toUpperCase()
           : undefined;
       const parsedYear = parseYearInput(seasonYear);
+      const seasonGuessValue = normalizedSeason ?? undefined;
 
       setSubmitting(true);
       setRoundStates((prev) =>
@@ -534,6 +649,9 @@ export default function PosterZoom({
                 hintUsed: true,
                 resolvedYear:
                   round.meta.year ?? parsedYear ?? entry.resolvedYear,
+                lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
+                lastSeasonYearGuess:
+                  parsedYear ?? entry.lastSeasonYearGuess,
               };
             }
 
@@ -554,6 +672,9 @@ export default function PosterZoom({
                 yearGuesses,
                 canonicalTitle: matchTitle,
                 feedback: { type: "partial", message: partialMessage },
+                lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
+                lastSeasonYearGuess:
+                  parsedYear ?? entry.lastSeasonYearGuess,
               };
             }
 
@@ -568,6 +689,9 @@ export default function PosterZoom({
               },
               stage: nextStage,
               hintUsed: nextStage > entry.stage ? true : entry.hintUsed,
+              lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
+              lastSeasonYearGuess:
+                parsedYear ?? entry.lastSeasonYearGuess,
             };
           });
 
@@ -660,21 +784,49 @@ export default function PosterZoom({
 
   useEffect(() => {
     const aggregatedGuesses = roundStates.flatMap((state) => state.guesses);
-    const roundsProgress: GameRoundProgress[] = roundStates.map((state, index) => ({
-      round: index + 1,
-      guesses: [...state.guesses],
-      titleGuesses: [...state.guesses],
-      yearGuesses: state.yearGuesses.length ? [...state.yearGuesses] : undefined,
-      stage: state.stage,
-      completed: state.completed,
-      hintUsed: state.hintUsed,
-      resolvedAnswer: state.completed ? state.canonicalTitle : undefined,
-      resolvedTitle: state.completed ? state.canonicalTitle : undefined,
-      resolvedYear:
-        state.completed && state.resolvedYear !== undefined
-          ? state.resolvedYear
-          : undefined,
-    }));
+    const roundsProgress: GameRoundProgress[] = roundStates.map((state, index) => {
+      const controller = roundControllers[index];
+      const guesses = [...state.guesses];
+      const titleGuesses = guesses.length ? [...guesses] : undefined;
+      const yearGuesses = state.yearGuesses.length ? [...state.yearGuesses] : undefined;
+      const feedbackType = state.feedback?.type;
+      const feedbackMessage = state.feedback?.message;
+      const seasonGuess = state.lastSeasonGuess
+        ? state.lastSeasonGuess.trim().toUpperCase()
+        : undefined;
+      const seasonYearGuess =
+        state.lastSeasonYearGuess !== undefined &&
+        Number.isFinite(state.lastSeasonYearGuess)
+          ? Math.trunc(state.lastSeasonYearGuess)
+          : undefined;
+      const resolvedTitleCandidate = state.canonicalTitle?.trim();
+      const includeResolvedTitle =
+        resolvedTitleCandidate && (state.completed || feedbackType === "partial");
+
+      return {
+        round: index + 1,
+        guesses,
+        titleGuesses,
+        yearGuesses,
+        seasonGuess,
+        seasonYearGuess,
+        stage: state.stage,
+        completed: state.completed,
+        hintUsed: state.hintUsed,
+        resolvedAnswer:
+          state.completed && resolvedTitleCandidate ? resolvedTitleCandidate : undefined,
+        resolvedTitle: includeResolvedTitle ? resolvedTitleCandidate : undefined,
+        resolvedYear:
+          state.completed && state.resolvedYear !== undefined
+            ? state.resolvedYear
+            : undefined,
+        mediaId: controller?.mediaId ?? undefined,
+        posterImageBase: controller?.posterImageBase ?? undefined,
+        posterImageUrl: controller?.cropImageUrl ?? undefined,
+        feedbackType,
+        feedbackMessage: feedbackType ? feedbackMessage : undefined,
+      };
+    });
     const activeRoundNumber = roundStates.length
       ? Math.max(1, Math.min(roundStates.length, activeRoundIndex + 1))
       : 1;
@@ -684,7 +836,13 @@ export default function PosterZoom({
       guesses: aggregatedGuesses,
       rounds: roundsProgress,
     });
-  }, [activeRoundIndex, onProgressChange, puzzleCompleted, roundStates]);
+  }, [
+    activeRoundIndex,
+    onProgressChange,
+    puzzleCompleted,
+    roundControllers,
+    roundStates,
+  ]);
 
   const revealMore = useCallback(() => {
     const round = currentRound;
@@ -719,8 +877,9 @@ export default function PosterZoom({
       {totalRounds > 1 && (
         <div className="flex flex-wrap gap-2">
           {payload.rounds.map((round, index) => {
-            const unlocked = isRoundUnlocked(index);
-            const completed = roundStates[index]?.completed;
+            const controller = roundControllers[index];
+            const unlocked = controller?.unlocked ?? index === 0;
+            const completed = controller?.completed ?? roundStates[index]?.completed;
             const isActive = index === activeRoundIndex;
             return (
               <button
