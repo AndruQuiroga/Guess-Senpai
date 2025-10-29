@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PuzzleSlugContent } from "../../../components/puzzle-pages";
 import type { DailyPuzzleResponse } from "../../../types/puzzles";
 import { findPuzzleSlug, PUZZLE_SLUGS } from "./slugs";
+import { PuzzleProgressProvider } from "../../../hooks/usePuzzleProgress";
 
 const API_BASE =
   process.env.API_BASE_URL ||
@@ -63,7 +64,7 @@ export default async function PuzzleGamePage({
   const data = await fetchDailyPuzzles();
   const formattedDate = data ? formatDate(data.date) : null;
 
-  return (
+  const pageContent = (
     <div className="space-y-8">
       <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl">
         <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
@@ -91,5 +92,15 @@ export default async function PuzzleGamePage({
 
       <PuzzleSlugContent data={data} slug={slugDefinition} />
     </div>
+  );
+
+  if (!data?.date) {
+    return pageContent;
+  }
+
+  return (
+    <PuzzleProgressProvider date={data.date}>
+      {pageContent}
+    </PuzzleProgressProvider>
   );
 }

@@ -9,8 +9,12 @@ import {
 } from "react";
 
 import { GAMES_DIRECTORY } from "../config/games";
+import {
+  GameKey,
+  PuzzleProgressProvider,
+  usePuzzleProgress,
+} from "../hooks/usePuzzleProgress";
 import { useAccountStreak } from "../hooks/useAccount";
-import { GameKey, usePuzzleProgress } from "../hooks/usePuzzleProgress";
 import {
   DailyPuzzleResponse,
   GamesPayload,
@@ -73,6 +77,14 @@ export default function Daily({ data }: Props) {
     );
   }
 
+  return (
+    <PuzzleProgressProvider date={data.date}>
+      <DailyContent data={data} />
+    </PuzzleProgressProvider>
+  );
+}
+
+function DailyContent({ data }: { data: DailyPuzzleResponse }) {
   const { progress, refresh, isRefreshing } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
   const nextResetIso = useMemo(() => getNextResetIso(data.date), [data.date]);

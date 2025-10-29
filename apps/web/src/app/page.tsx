@@ -38,7 +38,8 @@ import {
   useRuntimeGamesDirectory,
 } from "../hooks/useDailyAvailability";
 import { useAccount, useAccountStreak } from "../hooks/useAccount";
-import { usePuzzleProgress } from "../hooks/usePuzzleProgress";
+import { PuzzleProgressProvider, usePuzzleProgress } from "../hooks/usePuzzleProgress";
+import { useStreak } from "../hooks/useStreak";
 import { GameKey } from "../types/progress";
 import {
   buildShareEvent,
@@ -101,6 +102,16 @@ function classNames(
   ...classes: Array<string | false | null | undefined>
 ): string {
   return classes.filter(Boolean).join(" ");
+}
+
+export default function HomePage() {
+  const todayIso = useMemo(() => todayIsoDate(), []);
+
+  return (
+    <PuzzleProgressProvider date={todayIso}>
+      <HomePageView todayIso={todayIso} />
+    </PuzzleProgressProvider>
+  );
 }
 
 function createProgressSummaryChunks({
@@ -320,8 +331,7 @@ function todayIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
-export default function HomePage() {
-  const todayIso = useMemo(() => todayIsoDate(), []);
+function HomePageView({ todayIso }: { todayIso: string }) {
   const formattedDate = useMemo(() => formatShareDate(todayIso), [todayIso]);
   const nextResetIso = useMemo(() => getNextResetIso(todayIso), [todayIso]);
   const { account, loading: accountLoading } = useAccount();
