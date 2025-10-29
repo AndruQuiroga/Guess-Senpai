@@ -14,8 +14,6 @@ from datetime import date
 from typing import Any, List, Optional, Sequence, Tuple
 
 import httpx
-import cv2
-import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 
 from ..core.config import Settings, settings
@@ -32,6 +30,9 @@ from .models import (
     AnidleGame,
     AnidleHints,
     AnidlePuzzleBundle,
+    CharacterGuessEntry,
+    CharacterGuessReveal,
+    CharacterGuessRound,
     CharacterSilhouetteCharacter,
     CharacterSilhouetteGame,
     CharacterSilhouettePuzzleBundle,
@@ -89,25 +90,28 @@ OPENING_ROUNDS = [
     RoundSpec(difficulty=3, hints=["song", "sequence"]),
 ]
 
-CHARACTER_SILHOUETTE_ROUNDS = [
-    CharacterSilhouetteRound(
-        difficulty=1,
-        label="Silhouette",
-        filter="brightness(0) saturate(0) contrast(180%) blur(12px)",
-        description="Shadow outline only",
-    ),
-    CharacterSilhouetteRound(
-        difficulty=2,
-        label="Spotlight",
-        filter="brightness(0.45) saturate(120%) blur(6px)",
-        description="Soft lighting begins to reveal features",
-    ),
-    CharacterSilhouetteRound(
-        difficulty=3,
-        label="Full reveal",
-        filter="none",
-        description="Complete character artwork",
-    ),
+CHARACTER_GUESS_ROUND_CONFIG = [
+    {
+        "order": 1,
+        "difficulty": 1,
+        "label": "Silhouette",
+        "filter": "brightness(0) saturate(0) contrast(180%) blur(12px)",
+        "description": "Shadow outline only",
+    },
+    {
+        "order": 2,
+        "difficulty": 2,
+        "label": "Spotlight",
+        "filter": "brightness(0.45) saturate(120%) blur(6px)",
+        "description": "Soft lighting begins to reveal features",
+    },
+    {
+        "order": 3,
+        "difficulty": 3,
+        "label": "Full reveal",
+        "filter": "none",
+        "description": "Complete character artwork",
+    },
 ]
 
 STREAMING_SITES = {
@@ -126,76 +130,6 @@ PUZZLE_CACHE_PREFIX = "guesssenpai:puzzle"
 USER_HISTORY_KEY_TEMPLATE = "guesssenpai:user-history:{user_id}"
 
 logger = logging.getLogger(__name__)
-
-
-def _generate_character_silhouette(image_url: str) -> Optional[str]:
-    try:
-        response = httpx.get(image_url, timeout=10.0)
-        response.raise_for_status()
-    except httpx.HTTPError as exc:
-        logger.warning("Failed to download character artwork for silhouette", exc_info=exc)
-        return None
-
-    image_data = np.frombuffer(response.content, dtype=np.uint8)
-    if image_data.size == 0:
-        logger.warning("Character artwork response was empty when building silhouette")
-        return None
-
-    image = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
-    if image is None:
-        logger.warning("Unable to decode character artwork for silhouette generation")
-        return None
-
-    try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-
-        _, otsu_mask = cv2.threshold(
-            blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-        )
-        otsu_mask = cv2.bitwise_not(otsu_mask)
-
-        edges = cv2.Canny(blurred, 50, 140)
-        edge_kernel = np.ones((5, 5), np.uint8)
-        expanded_edges = cv2.dilate(edges, edge_kernel, iterations=1)
-
-        combined = cv2.bitwise_or(otsu_mask, expanded_edges)
-        smooth_kernel = np.ones((7, 7), np.uint8)
-        combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, smooth_kernel, iterations=2)
-
-        contours, _ = cv2.findContours(
-            combined, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        mask = np.zeros(gray.shape, dtype=np.uint8)
-        if contours:
-            contours = sorted(contours, key=cv2.contourArea, reverse=True)
-            primary_area = cv2.contourArea(contours[0])
-            if primary_area > 0:
-                cv2.drawContours(mask, [contours[0]], -1, 255, thickness=-1)
-                for contour in contours[1:]:
-                    if cv2.contourArea(contour) >= primary_area * 0.15:
-                        cv2.drawContours(mask, [contour], -1, 255, thickness=-1)
-        else:
-            mask = combined
-
-        mask = cv2.GaussianBlur(mask, (9, 9), 0)
-        mask = cv2.normalize(mask, None, 0, 255, cv2.NORM_MINMAX)
-
-        silhouette = cv2.bitwise_and(image, image, mask=mask)
-        background = np.zeros_like(image)
-        silhouette = cv2.addWeighted(silhouette, 1.0, background, 0.0, 0.0)
-
-        success, buffer = cv2.imencode(".png", silhouette)
-        if not success:
-            logger.warning("Failed to encode character silhouette image")
-            return None
-
-        base64_image = base64.b64encode(buffer.tobytes()).decode("ascii")
-        return f"data:image/png;base64,{base64_image}"
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Error while generating character silhouette", exc_info=exc)
-        return None
 
 
 TOKEN_PATTERN = re.compile(r"\s+|[^\w\s]+|\w+(?:'\w+)?", re.UNICODE)
@@ -695,47 +629,139 @@ def _available_character_edges(media: Media) -> List[MediaCharacterEdge]:
     return edges
 
 
-def _select_character_edge(media: Media) -> Optional[MediaCharacterEdge]:
+def _character_name_variants(edge: MediaCharacterEdge) -> List[str]:
+    names = [
+        edge.node.name.userPreferred if edge.node and edge.node.name else None,
+        edge.node.name.full if edge.node and edge.node.name else None,
+        edge.node.name.native if edge.node and edge.node.name else None,
+    ]
+    variants: List[str] = []
+    seen: set[str] = set()
+    for value in names:
+        if not value:
+            continue
+        normalized = value.strip()
+        if not normalized:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        variants.append(normalized)
+    return variants
+
+
+def _select_character_round_edges(media: Media, count: int) -> List[MediaCharacterEdge]:
     edges = _available_character_edges(media)
     if not edges:
-        return None
-    main_edges = [edge for edge in edges if (edge.role or "").upper() == "MAIN"]
-    pool = main_edges or edges
-    pool = sorted(pool, key=lambda edge: edge.node.id)
-    digest = hashlib.sha256(f"character:{media.id}".encode("utf-8")).hexdigest()
-    index = int(digest[:8], 16) % max(1, len(pool))
-    return pool[index]
+        return []
+    unique_edges: List[MediaCharacterEdge] = []
+    seen: set[int] = set()
+    for edge in edges:
+        if not edge.node:
+            continue
+        character_id = edge.node.id
+        if character_id in seen:
+            continue
+        seen.add(character_id)
+        unique_edges.append(edge)
+    if len(unique_edges) < count:
+        return []
+    ordered = sorted(unique_edges, key=lambda item: item.node.id)
+    digest = hashlib.sha256(f"character-rounds:{media.id}".encode("utf-8")).digest()
+    seed = int.from_bytes(digest[:8], "big")
+    rng = random.Random(seed)
+    rng.shuffle(ordered)
+    return ordered[:count]
 
 
-def _build_character_silhouette(media: Media) -> Optional[CharacterSilhouetteGame]:
-    edge = _select_character_edge(media)
-    if not edge:
+def _build_character_guess_game(media: Media) -> Optional[CharacterSilhouetteGame]:
+    rounds_required = len(CHARACTER_GUESS_ROUND_CONFIG)
+    if rounds_required <= 0:
         return None
-    image = edge.node.image
-    if not image:
-        return None
-    image_url = image.large or image.medium
-    if not image_url:
+    per_round = 4
+    total_required = rounds_required * per_round
+    selected_edges = _select_character_round_edges(media, total_required)
+    if len(selected_edges) < total_required:
+        logger.debug(
+            "Not enough character edges to build multi-round game for media %s", media.id
+        )
         return None
 
-    silhouette_image = _generate_character_silhouette(image_url)
+    answer = _choose_answer(media)
+    anime_aliases = _title_variants(media)
+    spec_rounds: List[CharacterSilhouetteRound] = []
+    rounds: List[CharacterGuessRound] = []
 
-    name = (
-        edge.node.name.full
-        or edge.node.name.userPreferred
-        or edge.node.name.native
-        or "Unknown"
-    )
+    for round_index, config in enumerate(CHARACTER_GUESS_ROUND_CONFIG):
+        start = round_index * per_round
+        end = start + per_round
+        edges = selected_edges[start:end]
+        if len(edges) < per_round:
+            return None
+        entries: List[CharacterGuessEntry] = []
+        for edge in edges:
+            image = edge.node.image if edge.node else None
+            image_url = None
+            if image:
+                image_url = image.large or image.medium
+            if not image_url:
+                return None
+            name = (
+                edge.node.name.full
+                or edge.node.name.userPreferred
+                or edge.node.name.native
+                or "Unknown"
+            )
+            character_payload = CharacterSilhouetteCharacter(
+                id=edge.node.id,
+                name=name,
+                image=image_url,
+                role=_normalize_role(edge.role),
+            )
+            reveal = CharacterGuessReveal(
+                label=config["label"],
+                filter=config["filter"],
+                description=config.get("description"),
+            )
+            entry = CharacterGuessEntry(
+                character=character_payload,
+                characterAnswer=name,
+                characterAliases=_character_name_variants(edge),
+                animeAnswer=answer,
+                animeAliases=anime_aliases,
+                reveal=reveal,
+            )
+            entries.append(entry)
+        rounds.append(
+            CharacterGuessRound(
+                order=config["order"],
+                difficulty=config["difficulty"],
+                entries=entries,
+            )
+        )
+        spec_rounds.append(
+            CharacterSilhouetteRound(
+                difficulty=config["difficulty"],
+                label=config["label"],
+                filter=config["filter"],
+                description=config.get("description"),
+            )
+        )
+
+    primary_character: Optional[CharacterSilhouetteCharacter] = None
+    if rounds and rounds[-1].entries:
+        primary_character = rounds[-1].entries[0].character
+    elif rounds and rounds[0].entries:
+        primary_character = rounds[0].entries[0].character
+    if primary_character is None:
+        return None
 
     return CharacterSilhouetteGame(
-        spec=[round_spec.model_copy(deep=True) for round_spec in CHARACTER_SILHOUETTE_ROUNDS],
-        answer=_choose_answer(media),
-        character=CharacterSilhouetteCharacter(
-            id=edge.node.id,
-            name=name,
-            image=silhouette_image or image_url,
-            role=_normalize_role(edge.role),
-        ),
+        spec=spec_rounds,
+        answer=answer,
+        character=primary_character,
+        rounds=rounds,
     )
 
 
@@ -1054,7 +1080,7 @@ async def _assemble_daily_puzzle(
         )
         character_media = await _load_media_details(candidate.id, cache, settings)
         attempted_character_ids.add(character_media.id)
-        game = _build_character_silhouette(character_media)
+        game = _build_character_guess_game(character_media)
         if not game:
             continue
         selected_ids.add(character_media.id)
@@ -1069,7 +1095,7 @@ async def _assemble_daily_puzzle(
 
     if not character_bundle:
         for fallback_media in (anidle_media, poster_media, synopsis_media):
-            game = _build_character_silhouette(fallback_media)
+            game = _build_character_guess_game(fallback_media)
             if not game:
                 continue
             selected_ids.add(fallback_media.id)
