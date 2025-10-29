@@ -74,7 +74,10 @@ describe("PosterZoom autocomplete", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledWith(42, "Naruto", 101);
+      expect(verifyGuessMock).toHaveBeenCalledWith(42, "Naruto", 101, {
+        season: undefined,
+        seasonYear: undefined,
+      });
     });
   });
 });
