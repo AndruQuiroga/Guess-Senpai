@@ -104,19 +104,20 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
   {
     slug: "character-silhouette",
     title: "Character Silhouette",
-    tagline: "Unmask the protagonist from a dramatic silhouette.",
+    tagline: "Spot every member of the lineup as the lights turn up.",
     accentColor: "from-purple-400 via-indigo-400 to-sky-500",
     playable: true,
     comingSoon: false,
     gameKey: "character_silhouette",
-    description: "Identify the anime using a lead character as the lighting slowly reveals them.",
+    description:
+      "Identify the anime and every featured character as the silhouettes sharpen across multiple reveal rounds.",
     preview: {
       summary:
-        "Study the shadowy outline of a main character as the lights brighten across three rounds of reveals.",
+        "Tackle three escalating rounds of silhouettes—four cards per round—locking in both the character and anime before the lights come up.",
       rules: [
-        "Start with a stark silhouette of a featured character.",
-        "Each miss turns up the lights with softer filters and richer detail.",
-        "Name the originating series before the portrait is fully revealed.",
+        "Each round features four characters from the same anime—submit both the series and character name to clear a card.",
+        "Incorrect guesses keep the round alive but you’ll need both answers to remove the filter.",
+        "Clear all three rounds (twelve cards total) to complete the daily silhouette lineup.",
       ],
       media: {
         type: "image",

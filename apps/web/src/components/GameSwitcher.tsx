@@ -85,6 +85,7 @@ export function GameSwitcher({ currentSlug, progress }: GameSwitcherProps) {
                 .filter(Boolean)
                 .join(" ")}
               aria-current={isActive ? "page" : undefined}
+              title={game.description ?? undefined}
             >
               <span className="inline-flex items-center gap-1">
                 <span>{game.title}</span>

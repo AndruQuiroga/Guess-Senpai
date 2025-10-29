@@ -76,6 +76,9 @@ export default async function PuzzleGamePage({
               Part of GuessSenpai Daily
               {formattedDate ? ` — ${formattedDate}` : ""}
             </p>
+            {slugDefinition.description ? (
+              <p className="text-sm text-neutral-200/90">{slugDefinition.description}</p>
+            ) : null}
           </div>
           <Link
             href="/games/daily"

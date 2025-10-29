@@ -28,24 +28,64 @@ describe("CharacterSilhouette autocomplete", () => {
       loading: false,
       error: null,
     });
-    verifyGuessMock.mockResolvedValue({ correct: true, match: "Fullmetal Alchemist" });
+    verifyGuessMock.mockResolvedValue({
+      correct: true,
+      match: "Fullmetal Alchemist",
+      animeMatch: true,
+      characterMatch: true,
+      characterName: "Edward Elric",
+    });
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it("lets players navigate suggestions before submitting a guess", async () => {
+  it("requires both anime and character guesses to clear a card", async () => {
     const payload: CharacterSilhouetteGame = {
       spec: [
         { difficulty: 1, label: "Outline", filter: "grayscale(1)" },
-        { difficulty: 2, label: "Shaded", filter: "grayscale(0.5)" },
+        { difficulty: 2, label: "Midlight", filter: "grayscale(0.6)" },
+        { difficulty: 3, label: "Full reveal", filter: "none" },
+      ],
+      rounds: [
+        {
+          order: 1,
+          difficulty: 1,
+          entries: Array.from({ length: 4 }).map((_, index) => ({
+            character: {
+              id: 100 + index,
+              name: index === 0 ? "Edward Elric" : `Supporting ${index}`,
+              image: "https://example.com/edward.jpg",
+              role: index === 0 ? "Protagonist" : null,
+            },
+            characterAnswer: index === 0 ? "Edward Elric" : `Supporting ${index}`,
+            characterAliases: [],
+            animeAnswer: "Fullmetal Alchemist",
+            animeAliases: ["FMA"],
+            reveal: {
+              label: index === 0 ? "Outline" : `Outline ${index}`,
+              filter: "grayscale(1)",
+              description: "High contrast silhouette",
+            },
+          })),
+        },
+        {
+          order: 2,
+          difficulty: 2,
+          entries: [],
+        },
+        {
+          order: 3,
+          difficulty: 3,
+          entries: [],
+        },
       ],
       answer: "Fullmetal Alchemist",
       character: {
         id: 1,
         name: "Edward Elric",
-        image: "",
+        image: "https://example.com/edward.jpg",
         role: "Protagonist",
       },
     };
@@ -60,26 +100,25 @@ describe("CharacterSilhouette autocomplete", () => {
       />,
     );
 
-    const input = screen.getByLabelText("Character silhouette guess");
-    await user.type(input, "fu");
+    const animeField = screen.getByLabelText("Anime guess for card 1");
+    const characterField = screen.getAllByLabelText(/Character/)[0];
 
-    const listbox = await screen.findByRole("listbox", {
-      name: /character title suggestions/i,
-    });
-    expect(listbox).toBeInTheDocument();
+    await user.clear(animeField);
+    await user.type(animeField, "Fullmetal Alchemist");
+    await user.type(characterField, "Edward Elric");
 
-    await user.keyboard("{ArrowDown}");
-    const option = screen.getByRole("option", { name: "Fullmetal Alchemist" });
-    expect(option).toHaveAttribute("aria-selected", "true");
-
-    await user.keyboard("{Enter}");
+    const submitButton = screen.getAllByRole("button", { name: /submit guess/i })[0];
+    await user.click(submitButton);
 
     await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledWith(
-        512,
-        "Fullmetal Alchemist",
-        300,
-      );
+      expect(verifyGuessMock).toHaveBeenCalledWith(512, "Fullmetal Alchemist", 300, {
+        characterGuess: "Edward Elric",
+        characterId: 100,
+      });
     });
+
+    expect(
+      await screen.findByText(/Edward Elric from Fullmetal Alchemist/i),
+    ).toBeInTheDocument();
   });
 });
