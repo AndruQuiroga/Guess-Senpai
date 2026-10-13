@@ -70,6 +70,8 @@ export const TitleGuessField = forwardRef<
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  /** The suggestion last picked, so its id survives a re-search of its title. */
+  const pickedRef = useRef<TitleGuessSelection | null>(null);
 
   const listboxId = `${useId()}-title-suggestions`;
   const trimmedValue = useMemo(() => value.trim(), [value]);
@@ -93,6 +95,10 @@ export const TitleGuessField = forwardRef<
       return null;
     }
     const normalized = trimmedValue.toLowerCase();
+    const picked = pickedRef.current;
+    if (picked && picked.value.trim().toLowerCase() === normalized) {
+      return { value: trimmedValue, suggestionId: picked.suggestionId };
+    }
     const canonical = suggestions.find(
       (item) => item.title.trim().toLowerCase() === normalized,
     );
@@ -153,8 +159,10 @@ export const TitleGuessField = forwardRef<
 
   const handleSubmitSelection = useCallback(
     (selection: TitleGuessSelection) => {
+      pickedRef.current = selection;
       onValueChange(selection.value);
       closeMenu();
+      inputRef.current?.focus();
     },
     [closeMenu, onValueChange],
   );
@@ -263,6 +271,9 @@ export const TitleGuessField = forwardRef<
                       id={`${listboxId}-option-${index}`}
                       role="option"
                       aria-selected={isActive}
+                      // Keep focus in the input: a blur here would close the
+                      // menu before the click lands and drop the selection.
+                      onMouseDown={(event) => event.preventDefault()}
                       onClick={() => {
                         if (disabled) return;
                         handleSubmitSelection({

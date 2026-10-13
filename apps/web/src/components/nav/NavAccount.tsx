@@ -54,6 +54,7 @@ export function NavAccount({ compact = false }: { compact?: boolean }) {
   }
 
   const name = account.user?.username ?? "AniList user";
+  const avatar = account.user?.avatar ?? null;
   const active = pathname === "/account" || pathname.startsWith("/account/");
   return (
     <div className={compact ? "flex items-center gap-1" : "space-y-1"}>
@@ -65,7 +66,18 @@ export function NavAccount({ compact = false }: { compact?: boolean }) {
           active ? "bg-panel-raised text-paper" : "text-paper hover:bg-hover"
         }`}
       >
-        <NavIcon name="account" />
+        {avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatar}
+            alt=""
+            width={24}
+            height={24}
+            className="h-6 w-6 shrink-0 rounded-full border border-line-strong object-cover"
+          />
+        ) : (
+          <NavIcon name="account" />
+        )}
         {compact ? null : <span className="min-w-0 truncate">{name}</span>}
       </Link>
       <button

@@ -42,8 +42,10 @@ class AnidleHints(BaseModel):
 
 class AnidleRules(BaseModel):
     version: str = "2"
-    max_attempts: int = 8
-    hint_after_incorrect: List[int] = Field(default_factory=lambda: [2, 4, 6])
+    max_attempts: int = 20
+    # Wrong-guess counts at which another hint becomes available. Players
+    # choose whether to reveal it; nothing is shown automatically.
+    hint_after_incorrect: List[int] = Field(default_factory=lambda: [10, 13, 16])
 
 
 class AnidleGame(BaseModel):
@@ -449,6 +451,12 @@ class GameProgressPayload(BaseModel):
         ge=1,
         validation_alias=AliasChoices("attempt_limit", "attemptLimit"),
         serialization_alias="attemptLimit",
+    )
+    hints_revealed: Optional[int] = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices("hints_revealed", "hintsRevealed"),
+        serialization_alias="hintsRevealed",
     )
 
     @model_validator(mode="after")

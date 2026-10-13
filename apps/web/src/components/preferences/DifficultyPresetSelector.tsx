@@ -14,6 +14,10 @@ interface DifficultyPresetSelectorProps {
   presets: DifficultyPresetOption[];
   selected?: number;
   recommended?: number;
+  /** Preset used when nothing is saved; shown as active with a "Default" tag. */
+  defaultValue?: number;
+  /** Hides the active state while the saved value is still loading. */
+  loading?: boolean;
   onSelect(value: number): void;
 }
 
@@ -23,17 +27,27 @@ export function DifficultyPresetSelector({
   presets,
   selected,
   recommended,
+  defaultValue,
+  loading = false,
   onSelect,
 }: DifficultyPresetSelectorProps) {
+  const hasSelection =
+    typeof selected === "number" && Number.isFinite(selected);
   const highlightValue = useMemo(() => {
+    if (loading) {
+      return null;
+    }
     if (typeof selected === "number" && Number.isFinite(selected)) {
       return selected;
+    }
+    if (typeof defaultValue === "number" && Number.isFinite(defaultValue)) {
+      return defaultValue;
     }
     if (typeof recommended === "number" && Number.isFinite(recommended)) {
       return recommended;
     }
-    return presets[0]?.value ?? null;
-  }, [presets, recommended, selected]);
+    return null;
+  }, [defaultValue, loading, recommended, selected]);
 
   const recommendedLabel = useMemo(() => {
     if (typeof recommended !== "number" || !Number.isFinite(recommended)) {
@@ -63,7 +77,9 @@ export function DifficultyPresetSelector({
       <div className="grid gap-3 sm:grid-cols-3">
         {presets.map((preset) => {
           const isActive = highlightValue === preset.value;
-          const isSelected = selected === preset.value;
+          const isSelected = !loading && selected === preset.value;
+          const isDefault =
+            !loading && !hasSelection && defaultValue === preset.value;
           const isSuggested = recommended === preset.value;
           return (
             <button
@@ -73,7 +89,7 @@ export function DifficultyPresetSelector({
               className={`group relative overflow-hidden rounded-lg border border-line-strong bg-panel p-4 text-left transition hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${
                 isActive ? "border-signal bg-signal-soft" : ""
               }`}
-              aria-pressed={isSelected}
+              aria-pressed={isSelected || isDefault}
             >
               <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-20" />
               <div className="flex items-center justify-between gap-2">
@@ -82,6 +98,8 @@ export function DifficultyPresetSelector({
                 </h4>
                 {isSelected ? (
                   <span className="text-sm text-paper">Selected</span>
+                ) : isDefault ? (
+                  <span className="text-sm text-paper">Default</span>
                 ) : isSuggested ? (
                   <span className="text-xs uppercase tracking-[0.28em] text-signal-text">
                     Suggested

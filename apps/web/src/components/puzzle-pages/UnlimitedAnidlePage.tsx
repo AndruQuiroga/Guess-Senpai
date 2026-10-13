@@ -8,6 +8,7 @@ import { AttemptMeter } from "../anidle/AttemptMeter";
 import { GameShell } from "../GameShell";
 import type { GameProgress } from "../../types/progress";
 import { isProgressExhausted } from "../../utils/gameAction";
+import { describeAnidleRules } from "../anidle/hints";
 import {
   EMPTY_TALLY,
   RECENT_LIMIT,
@@ -22,9 +23,9 @@ import {
   type PracticeTally,
 } from "../../utils/practiceAnidle";
 
-const RULES = [
-  "Practice mode: a fresh random anime each time, with the same rules as the daily Anidle.",
-  "Find one exact anime title in 8 accepted guesses. Hints unlock after 2, 4 and 6 wrong guesses.",
+const PRACTICE_INTRO =
+  "Practice mode: a fresh random anime each time, with the same rules as the daily Anidle.";
+const PRACTICE_RULES = [
   "Invalid titles, repeated anime and failed requests cost no guess.",
   "Nothing here counts toward your streak, your daily score or your account. Your practice tally stays in this browser.",
 ];
@@ -109,7 +110,7 @@ export function UnlimitedAnidlePage() {
   const handleProgressChange = useCallback((progress: GameProgress) => {
     const current = sessionRef.current;
     if (!current) return;
-    const limit = current.puzzle.rules?.max_attempts ?? 8;
+    const limit = current.puzzle.rules?.max_attempts ?? 20;
     let updated: PracticeSession = { ...current, progress };
     if (isFinished(progress, limit) && !current.tallied) {
       const next = recordPracticeResult(tallyRef.current, {
@@ -136,7 +137,11 @@ export function UnlimitedAnidlePage() {
     <GameShell
       title="Unlimited Anidle"
       slug="unlimited-anidle"
-      rules={RULES}
+      rules={[
+        PRACTICE_INTRO,
+        ...(rules ? describeAnidleRules(rules) : []),
+        ...PRACTICE_RULES,
+      ]}
       status={
         rules && state === "ready" ? (
           <AttemptMeter

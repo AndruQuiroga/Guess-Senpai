@@ -15,7 +15,7 @@ import type { AnidleGame } from "../../../types/puzzles";
 export type FixtureState = "empty" | "progress" | "solved" | "exhausted";
 
 const puzzle: AnidleGame = {
-  rules: { version: "2", max_attempts: 8, hint_after_incorrect: [2, 4, 6] },
+  rules: { version: "2", max_attempts: 20, hint_after_incorrect: [2, 4, 6] },
   spec: [{ difficulty: 1, hints: ["year", "genres"] }],
   answer: "Mob Psycho 100",
   hints: {
@@ -130,13 +130,13 @@ function progressFor(state: FixtureState): GameProgress | undefined {
       ? [entry(0, 2104), entry(1, 5114), entry(2, 101921)]
       : state === "solved"
         ? [entry(0, 2104), entry(1, 5114), entry(3, 21507)]
-        : Array.from({ length: 8 }, (_, i) => entry(i % 3, 3000 + i));
+        : Array.from({ length: 20 }, (_, i) => entry(i % 3, 3000 + i));
   return {
     completed: state === "solved",
     round: 1,
     guesses: history.map((item) => item.guess),
     anidleHistory: history,
-    attemptLimit: 8,
+    attemptLimit: 20,
   };
 }
 
@@ -159,7 +159,12 @@ export default function AnidleFixtureClient({
         mediaId={1}
         payload={puzzle}
         progress={progress}
-        onProgressChange={setProgress}
+        onProgressChange={(next) =>
+          // Mirror usePuzzleProgress: identical progress keeps its identity.
+          setProgress((prev) =>
+            JSON.stringify(prev) === JSON.stringify(next) ? prev : next,
+          )
+        }
         nextSlug="poster-zoomed"
       />
     </div>

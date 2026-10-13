@@ -9,7 +9,7 @@ interface AttemptMeterProps {
   finished?: boolean;
 }
 
-/** "Guess n / 8" plus one pip per attempt, ringed where a hint unlocks. */
+/** "Guess n / 20" plus one pip per attempt, ringed where a hint becomes available. */
 export function AttemptMeter({
   used,
   max,
@@ -20,14 +20,18 @@ export function AttemptMeter({
   const shown = Math.min(position ?? (finished ? used : used + 1), max);
   const pips = Array.from({ length: max }, (_, index) => index + 1);
   return (
-    <span className="inline-flex items-center gap-3">
-      <span>
+    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="whitespace-nowrap">
         Guess {shown} / {max}
       </span>
       <span
-        className="inline-flex items-center gap-1"
+        className="inline-flex flex-wrap items-center gap-[3px]"
         role="img"
-        aria-label={`${used} of ${max} guesses used. Hints unlock after ${hintAfter.join(", ")} wrong guesses.`}
+        aria-label={`${used} of ${max} guesses used.${
+          hintAfter.length
+            ? ` Optional hints become available after ${hintAfter.join(", ")} wrong guesses.`
+            : ""
+        }`}
       >
         {pips.map((n) => {
           const hint = hintAfter.includes(n);
@@ -37,7 +41,7 @@ export function AttemptMeter({
               key={n}
               data-pip={state}
               data-hint={hint ? "true" : undefined}
-              className={`relative h-2.5 w-2.5 rounded-full border ${
+              className={`relative h-2 w-2 rounded-full border ${
                 state === "used"
                   ? "border-signal bg-signal"
                   : "border-line-strong bg-ink"

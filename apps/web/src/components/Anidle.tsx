@@ -5,6 +5,7 @@ import type { AnidleGame as AnidlePayload } from "../types/puzzles";
 import { GuessGrid } from "./anidle/GuessGrid";
 import { GuessInput } from "./anidle/GuessInput";
 import { HintStrip } from "./anidle/HintStrip";
+import { KnowledgeSummary } from "./anidle/KnowledgeSummary";
 import { ResultCard } from "./anidle/ResultCard";
 import type { AnidleEvaluationView } from "./anidle/tiles";
 import { useAnidleGame } from "./anidle/useAnidleGame";
@@ -63,7 +64,23 @@ export default function Anidle({
           error={game.errorMessage}
         />
       ) : null}
-      <HintStrip hints={game.hints} />
+      <HintStrip
+        hints={game.hints}
+        offer={
+          game.rules &&
+          game.hintsTotal > 0 &&
+          game.attemptsUsed > 0 &&
+          !game.finished
+            ? {
+                pending: game.hintsPending,
+                used: game.hintsUsed,
+                total: game.hintsTotal,
+                nextHintIn: game.nextHintIn,
+                onReveal: game.revealHint,
+              }
+            : null
+        }
+      />
       {game.finished ? (
         <ResultCard
           solved={game.completed}
@@ -77,12 +94,19 @@ export default function Anidle({
           newPuzzleBusy={newPuzzleBusy}
         />
       ) : null}
-      <GuessGrid
-        evaluations={views}
-        animateIndex={game.lastAddedIndex}
-        hydrating={game.hydrating}
-        hydrationProgress={game.hydrationProgress}
-      />
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
+        <GuessGrid
+          evaluations={views}
+          animateIndex={game.lastAddedIndex}
+          hydrating={game.hydrating}
+          hydrationProgress={game.hydrationProgress}
+        />
+        {game.hydrating ? null : (
+          <div className="order-first lg:order-none lg:sticky lg:top-6">
+            <KnowledgeSummary evaluations={views} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

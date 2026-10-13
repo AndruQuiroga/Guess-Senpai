@@ -24,7 +24,9 @@ import type {
 } from "../games/TitleGuessField";
 import {
   LEGACY_TOTAL_ROUNDS,
+  availableHintCount,
   computeAnidleHints,
+  missesUntilNextHint,
   type AggregatedHint,
 } from "./hints";
 import { getHistoryKey, useAnidleHydration } from "./useAnidleHydration";
@@ -73,6 +75,9 @@ export function useAnidleGame({
   const [completed, setCompleted] = useState(
     initialProgress?.completed ?? false,
   );
+  const [hintsRevealed, setHintsRevealed] = useState(
+    initialProgress?.hintsRevealed ?? 0,
+  );
   const [hydrating, setHydrating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -100,6 +105,12 @@ export function useAnidleGame({
     const normalizedHistory = historyFromProgress(initialProgress);
 
     setHistoryEntries(normalizedHistory);
+    // Reveals only ever grow within a puzzle, so a stale echo of older
+    // progress cannot hide a hint the player already asked for.
+    const savedHints = initialProgress?.hintsRevealed ?? 0;
+    setHintsRevealed((prev) =>
+      puzzleChanged ? savedHints : Math.max(prev, savedHints),
+    );
 
     if (!initialProgress) {
       setRound(1);
@@ -151,10 +162,24 @@ export function useAnidleGame({
     [historyEntries],
   );
 
+  const hintsAvailable = rules
+    ? availableHintCount(rules, incorrectGuessCount)
+    : 0;
+  const hintsUsed = Math.min(hintsRevealed, hintsAvailable);
+  const hintsTotal = rules?.hint_after_incorrect.length ?? 0;
+  const nextHintIn = rules
+    ? missesUntilNextHint(rules, incorrectGuessCount)
+    : null;
+
   const hints = useMemo<AggregatedHint[]>(
-    () => computeAnidleHints(payload, rules, incorrectGuessCount),
-    [incorrectGuessCount, payload, rules],
+    () => computeAnidleHints(payload, rules, incorrectGuessCount, hintsUsed),
+    [hintsUsed, incorrectGuessCount, payload, rules],
   );
+
+  const revealHint = useCallback(() => {
+    if (!rules || finished) return;
+    setHintsRevealed((prev) => Math.min(prev + 1, hintsAvailable));
+  }, [finished, hintsAvailable, rules]);
 
   useEffect(() => {
     const historySnapshot = historyEntries.map((entry) => ({
@@ -171,8 +196,17 @@ export function useAnidleGame({
       guesses: guessValues,
       anidleHistory: historySnapshot,
       ...(rules ? { attemptLimit: rules.max_attempts } : {}),
+      ...(hintsRevealed > 0 ? { hintsRevealed } : {}),
     });
-  }, [completed, round, guessValues, historyEntries, onProgressChange, rules]);
+  }, [
+    completed,
+    round,
+    guessValues,
+    hintsRevealed,
+    historyEntries,
+    onProgressChange,
+    rules,
+  ]);
 
   const { getCacheKey } = useAnidleHydration({
     mediaId,
@@ -329,6 +363,12 @@ export function useAnidleGame({
     exhausted,
     finished,
     hints,
+    /** Rules v2: hints earned but not yet revealed. */
+    hintsPending: Math.max(0, hintsAvailable - hintsUsed),
+    hintsUsed,
+    hintsTotal,
+    nextHintIn,
+    revealHint,
     hydrating,
     hydrationProgress,
     submitting,

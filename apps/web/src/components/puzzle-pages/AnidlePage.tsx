@@ -8,6 +8,7 @@ import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { AnidleGame } from "../../types/puzzles";
 import { isProgressExhausted } from "../../utils/gameAction";
+import { describeAnidleRules } from "../anidle/hints";
 
 interface Props {
   slug: string;
@@ -29,8 +30,7 @@ const COMPARE_RULE =
 function rulesCopy(rules: AnidleGame["rules"]): string[] {
   if (rules?.version === "2") {
     return [
-      `Find one exact anime title in ${rules.max_attempts} accepted guesses.`,
-      `Hints unlock after ${rules.hint_after_incorrect.join(", ")} wrong guesses: a partly redacted synopsis, or genres, then year, then tags when no synopsis exists.`,
+      ...describeAnidleRules(rules),
       "Invalid titles, repeated anime and failed requests cost no guess.",
       COMPARE_RULE,
       "The final guess can still win.",

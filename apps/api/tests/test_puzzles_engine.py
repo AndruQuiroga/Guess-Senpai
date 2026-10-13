@@ -293,8 +293,8 @@ def test_anidle_new_rules_and_legacy_payload_are_distinct() -> None:
     generated = engine._build_anidle(make_media(889, "Finite Daily"))
     assert generated.rules is not None
     assert generated.rules.version == "2"
-    assert generated.rules.max_attempts == 8
-    assert generated.rules.hint_after_incorrect == [2, 4, 6]
+    assert generated.rules.max_attempts == 20
+    assert generated.rules.hint_after_incorrect == [10, 13, 16]
     assert len(generated.spec) == 1
     legacy_json = generated.model_dump(mode="json", exclude={"rules"})
     legacy_json["spec"] = [spec.model_dump() for spec in engine.ANIDLE_ROUNDS]
