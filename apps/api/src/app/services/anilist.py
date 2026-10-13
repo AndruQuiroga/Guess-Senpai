@@ -133,7 +133,17 @@ class TokenResponse(BaseModel):
     access_token: str
     expires_in: int
     refresh_token: Optional[str] = None
-    user: Optional[Dict[str, Any]] = None
+
+
+VIEWER_QUERY = """
+query AuthenticatedViewer {
+  Viewer {
+    id
+    name
+    avatar { large medium }
+  }
+}
+"""
 
 
 POPULAR_POOL_QUERY = """
@@ -707,6 +717,15 @@ async def fetch_media_bulk(media_ids: Sequence[int]) -> List[Media]:
 async def fetch_user_media_lists(user_id: int, token: str) -> MediaListCollection:
     data = await gql_request(USER_LISTS_QUERY, {"userId": user_id}, token=token)
     return MediaListCollection.model_validate(data["MediaListCollection"])
+
+
+async def fetch_viewer(token: str) -> Dict[str, Any]:
+    """Resolve identity through AniList GraphQL, not the OAuth token response."""
+    data = await gql_request(VIEWER_QUERY, {}, token=token)
+    viewer = data.get("Viewer")
+    if not isinstance(viewer, dict) or not viewer.get("id"):
+        raise AniListError("Authenticated viewer is unavailable")
+    return viewer
 
 
 async def exchange_code_for_token(
