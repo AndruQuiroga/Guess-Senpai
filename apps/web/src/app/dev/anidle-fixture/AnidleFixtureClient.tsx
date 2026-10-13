@@ -1,17 +1,21 @@
 "use client";
 
-import Anidle from "../../../components/Anidle";
-import { GameShell } from "../../../components/GameShell";
-import GameSwitcher from "../../../components/GameSwitcher";
-import type { DailyProgress, GameProgress } from "../../../types/progress";
+import { useState } from "react";
+
+import { AnidlePage } from "../../../components/puzzle-pages/AnidlePage";
+import type {
+  AnidleGuessEvaluation,
+  AnidleGuessHistoryEntry,
+  ScalarFeedback,
+} from "../../../types/anidle";
+import type { GameProgress } from "../../../types/progress";
 import type { AnidleGame } from "../../../types/puzzles";
 
+export type FixtureState = "empty" | "progress" | "solved" | "exhausted";
+
 const puzzle: AnidleGame = {
-  spec: [
-    { difficulty: 1, hints: ["year", "genres"] },
-    { difficulty: 2, hints: ["episodes", "tags"] },
-    { difficulty: 3, hints: ["average_score", "popularity"] },
-  ],
+  rules: { version: "2", max_attempts: 8, hint_after_incorrect: [2, 4, 6] },
+  spec: [{ difficulty: 1, hints: ["year", "genres"] }],
   answer: "Mob Psycho 100",
   hints: {
     genres: ["Action", "Comedy"],
@@ -24,86 +28,131 @@ const puzzle: AnidleGame = {
     synopsis: [
       {
         ratio: 0.2,
-        text: "A student with extraordinary psychic power tries to live an ordinary life.",
+        text: "A [REDACTED] with extraordinary [REDACTED] power tries to live an [REDACTED] life while [REDACTED] his emotions.",
+      },
+      {
+        ratio: 0.5,
+        text: "A student with extraordinary [REDACTED] power tries to live an ordinary life while [REDACTED] his emotions.",
       },
     ],
   },
 };
 
-function evaluation(
-  title: string,
-  correct: boolean,
-  year: number,
-  yearStatus: "higher" | "lower" | "match",
-) {
+function scalar(
+  guess: number,
+  target: number,
+  season?: string,
+): ScalarFeedback {
   return {
-    title,
-    correct,
-    year: { guess: year, target: 2016, status: yearStatus },
-    averageScore: { guess: 79, target: 84, status: "lower" as const },
-    popularity: { guess: 180000, target: 214000, status: "lower" as const },
-    genres: [
-      { value: "Action", status: "match" as const },
-      { value: "Drama", status: "miss" as const },
-    ],
-    tags: [{ value: "Psychic", status: "match" as const }],
-    studios: [{ value: "Bones", status: "match" as const }],
-    source: [{ value: "Manga", status: "match" as const }],
+    guess,
+    target,
+    status: guess === target ? "match" : guess > target ? "higher" : "lower",
+    guessSeason: season ?? null,
   };
 }
 
-export default function AnidleFixtureClient({ solved }: { solved: boolean }) {
-  const initialProgress: GameProgress | undefined = solved
-    ? {
-        completed: true,
-        round: 2,
-        guesses: ["One Punch Man", "Mob Psycho 100"],
-        anidleHistory: [
-          {
-            guess: "One Punch Man",
-            guessMediaId: 2104,
-            evaluation: evaluation("One-Punch Man", false, 2015, "lower"),
-            evaluationVersion: 1,
-          },
-          {
-            guess: "Mob Psycho 100",
-            guessMediaId: 21507,
-            evaluation: evaluation("Mob Psycho 100", true, 2016, "match"),
-            evaluationVersion: 1,
-          },
-        ],
-      }
-    : undefined;
+function list(matched: string[], missed: string[]) {
+  return [
+    ...matched.map((value) => ({ value, status: "match" as const })),
+    ...missed.map((value) => ({ value, status: "miss" as const })),
+  ];
+}
 
+const EVALUATIONS: AnidleGuessEvaluation[] = [
+  {
+    title: "One-Punch Man",
+    correct: false,
+    year: scalar(2015, 2016, "fall"),
+    averageScore: scalar(79, 84),
+    popularity: scalar(480000, 214000),
+    genres: list(["Action", "Comedy"], ["Sci-Fi"]),
+    tags: list(["Psychic"], ["Super Power", "Parody", "Seinen", "Gag Humor"]),
+    studios: list([], ["Madhouse"]),
+    source: list([], ["Web Manga"]),
+  },
+  {
+    title: "Fullmetal Alchemist: Brotherhood",
+    correct: false,
+    year: scalar(2009, 2016, "spring"),
+    averageScore: scalar(91, 84),
+    popularity: scalar(300000, 214000),
+    genres: list([], ["Adventure", "Drama", "Fantasy"]),
+    tags: list([], ["Military", "Alchemy", "War"]),
+    studios: list([], ["Bones"]),
+    source: list(["Manga"], []),
+  },
+  {
+    title: "Kaguya-sama: Love is War",
+    correct: false,
+    year: scalar(2019, 2016, "spring"),
+    averageScore: scalar(86, 84),
+    popularity: scalar(190000, 214000),
+    genres: list(["Comedy"], ["Romance"]),
+    tags: list([], ["Love Triangle", "School"]),
+    studios: list([], ["A-1 Pictures"]),
+    source: list(["Manga"], []),
+  },
+  {
+    title: "Mob Psycho 100",
+    correct: true,
+    year: scalar(2016, 2016, "summer"),
+    averageScore: scalar(84, 84),
+    popularity: scalar(214000, 214000),
+    genres: list(["Action", "Comedy"], []),
+    tags: list(["Psychic", "Coming of Age"], []),
+    studios: list(["Bones"], []),
+    source: list(["Web Manga"], []),
+  },
+];
+
+function entry(index: number, id: number): AnidleGuessHistoryEntry {
+  return {
+    guess: EVALUATIONS[index].title,
+    guessMediaId: id,
+    evaluation: EVALUATIONS[index],
+    evaluationVersion: 1,
+  };
+}
+
+function progressFor(state: FixtureState): GameProgress | undefined {
+  if (state === "empty") return undefined;
+  const history: AnidleGuessHistoryEntry[] =
+    state === "progress"
+      ? [entry(0, 2104), entry(1, 5114), entry(2, 101921)]
+      : state === "solved"
+        ? [entry(0, 2104), entry(1, 5114), entry(3, 21507)]
+        : Array.from({ length: 8 }, (_, i) => entry(i % 3, 3000 + i));
+  return {
+    completed: state === "solved",
+    round: 1,
+    guesses: history.map((item) => item.guess),
+    anidleHistory: history,
+    attemptLimit: 8,
+  };
+}
+
+export default function AnidleFixtureClient({
+  state,
+}: {
+  state: FixtureState;
+}) {
+  const [progress, setProgress] = useState<GameProgress | undefined>(() =>
+    progressFor(state),
+  );
   return (
-    <div className="mx-auto max-w-4xl space-y-3">
+    <div className="mx-auto max-w-5xl space-y-3">
       <p className="rounded-md border border-signal-deep bg-signal-soft px-3 py-2 text-sm font-semibold text-signal-text">
-        LOCAL FIXTURE · NOT LIVE PUZZLE DATA
+        LOCAL FIXTURE · NOT LIVE PUZZLE DATA ·
+        ?state=empty|progress|solved|exhausted
       </p>
-      <GameShell
-        title="Anidle"
-        round={solved ? 2 : 1}
-        totalRounds={3}
-        roundLabel="Round"
-        actions={
-          <GameSwitcher
-            currentSlug="anidle"
-            progress={
-              initialProgress
-                ? ({ anidle: initialProgress } as DailyProgress)
-                : undefined
-            }
-          />
-        }
-      >
-        <Anidle
-          mediaId={1}
-          payload={puzzle}
-          initialProgress={initialProgress}
-          onProgressChange={() => undefined}
-          nextSlug="poster-zoomed"
-        />
-      </GameShell>
+      <AnidlePage
+        slug="anidle"
+        mediaId={1}
+        payload={puzzle}
+        progress={progress}
+        onProgressChange={setProgress}
+        nextSlug="poster-zoomed"
+      />
     </div>
   );
 }

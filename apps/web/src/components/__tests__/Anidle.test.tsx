@@ -335,7 +335,7 @@ describe("Anidle hydration", () => {
       target: { value: "Correct Title" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Submit Guess" }));
-    expect(await screen.findByText("Solved in 8 attempts")).toBeInTheDocument();
+    expect(await screen.findByText("Solved in 8/8")).toBeInTheDocument();
     expect(
       screen.queryByText("Out of guesses · Answer revealed"),
     ).not.toBeInTheDocument();
@@ -365,7 +365,7 @@ describe("Anidle hydration", () => {
     fireEvent.change(input, { target: { value: "Alias" } });
     fireEvent.click(submit);
     await waitFor(() => expect(evaluateAnidleGuessMock).toHaveBeenCalledOnce());
-    await waitFor(() => expect(submit).toHaveTextContent("Submit Guess"));
+    await waitFor(() => expect(submit).toHaveTextContent(/^Guess$/));
     expect(progress.mock.calls.at(-1)![0].guesses).toHaveLength(1);
   });
 

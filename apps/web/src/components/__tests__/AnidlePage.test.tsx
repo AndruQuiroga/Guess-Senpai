@@ -5,7 +5,6 @@ import { AnidlePage } from "../puzzle-pages/AnidlePage";
 import type { AnidleGame } from "../../types/puzzles";
 
 vi.mock("../Anidle", () => ({ default: () => <div>Anidle board</div> }));
-vi.mock("../GameSwitcher", () => ({ default: () => null }));
 
 const payload = {
   rules: { version: "2", max_attempts: 8, hint_after_incorrect: [2, 4, 6] },
@@ -15,24 +14,23 @@ const payload = {
 } as AnidleGame;
 
 describe("AnidlePage header", () => {
-  // Stage A2 removed the shell's round badge. Stage B re-adds "Guess n / 8" via
-  // GameShell's `status` slot and should un-skip these two tests.
-  it("renders no round badge in the shell header", () => {
-    render(
+  it("keeps the legacy Round wording and no pips without v2 rules", () => {
+    const { container } = render(
       <AnidlePage
         slug="anidle"
         mediaId={1}
-        payload={payload}
-        progress={{ completed: false, round: 1, guesses: ["a"] }}
+        payload={{ ...payload, rules: null }}
+        progress={{ completed: false, round: 2, guesses: ["a"] }}
         onProgressChange={() => {}}
       />,
     );
+    expect(screen.getByText("Round 2")).toBeInTheDocument();
     expect(screen.queryByText(/Guess \d+ \/ 8/)).toBeNull();
-    expect(screen.queryByText(/Round \d/)).toBeNull();
+    expect(container.querySelectorAll("[data-pip]")).toHaveLength(0);
   });
 
-  it.skip("counts guesses against the v2 budget instead of rounds", () => {
-    render(
+  it("counts guesses against the v2 budget instead of rounds", () => {
+    const { container } = render(
       <AnidlePage
         slug="anidle"
         mediaId={1}
@@ -48,9 +46,11 @@ describe("AnidlePage header", () => {
     );
     expect(screen.getByText("Guess 3 / 8")).toBeInTheDocument();
     expect(screen.queryByText(/Round/)).toBeNull();
+    expect(container.querySelectorAll('[data-pip="used"]')).toHaveLength(2);
+    expect(container.querySelectorAll("[data-pip]")).toHaveLength(8);
   });
 
-  it.skip("keeps the final count once the guesses are exhausted", () => {
+  it("keeps the final count once the guesses are exhausted", () => {
     const history = Array.from({ length: 8 }, (_, i) => ({ guess: `g${i}` }));
     render(
       <AnidlePage
@@ -68,5 +68,20 @@ describe("AnidlePage header", () => {
       />,
     );
     expect(screen.getByText("Guess 8 / 8")).toBeInTheDocument();
+  });
+
+  it("puts the Anidle rules behind the shell help button", () => {
+    render(
+      <AnidlePage
+        slug="anidle"
+        mediaId={1}
+        payload={payload}
+        onProgressChange={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "How to play Anidle" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/in 8 accepted guesses/)).toBeInTheDocument();
   });
 });

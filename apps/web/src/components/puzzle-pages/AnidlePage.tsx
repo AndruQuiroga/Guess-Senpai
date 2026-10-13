@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Anidle from "../Anidle";
-import GameSwitcher from "../GameSwitcher";
+import { AttemptMeter } from "../anidle/AttemptMeter";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { AnidleGame } from "../../types/puzzles";
@@ -21,12 +21,31 @@ interface Props {
   nextSlug?: string | null;
 }
 
+const COMPARE_RULE =
+  "Each guess is compared on year, score, popularity, genres, tags, studio and source. Green is a match, yellow is close, grey is wrong. Arrows point toward the answer.";
+
+/** Rules shown behind the GameShell "?" button. */
+function rulesCopy(rules: AnidleGame["rules"]): string[] {
+  if (rules?.version === "2") {
+    return [
+      `Find one exact anime title in ${rules.max_attempts} accepted guesses.`,
+      `Hints unlock after ${rules.hint_after_incorrect.join(", ")} wrong guesses: a partly redacted synopsis, or genres, then year, then tags when no synopsis exists.`,
+      "Invalid titles, repeated anime and failed requests cost no guess.",
+      COMPARE_RULE,
+      "The final guess can still win.",
+    ];
+  }
+  return [
+    "Guess the anime title. Each accepted title is one attempt and a wrong guess advances the round (three rounds).",
+    COMPARE_RULE,
+    "The first synopsis hint appears after 10 wrong guesses, then another every 2.",
+  ];
+}
+
 export function AnidlePage({
-  slug,
   mediaId,
   payload,
   progress,
-  dailyProgress,
   accountDifficulty,
   difficultyHint,
   onProgressChange,
@@ -72,9 +91,16 @@ export function AnidlePage({
     },
     [highlightDifficulty, rules],
   );
-  const [displayRound, setDisplayRound] = useState(() =>
-    headerPosition(progress),
-  );
+  const [live, setLive] = useState(progress);
+  const displayRound = headerPosition(live);
+  const used = live?.anidleHistory?.length ?? 0;
+  const finished =
+    Boolean(live?.completed) ||
+    isProgressExhausted({
+      completed: live?.completed,
+      anidleHistory: live?.anidleHistory,
+      attemptLimit: rules?.max_attempts,
+    });
 
   useEffect(() => {
     controller.current = null;
@@ -88,35 +114,48 @@ export function AnidlePage({
   }, [controllerReady, highlightDifficulty, progress?.completed]);
 
   useEffect(() => {
-    setDisplayRound(headerPosition(progress));
-  }, [progress, headerPosition]);
+    setLive(progress);
+  }, [progress]);
 
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
-      setDisplayRound(headerPosition(state));
+      setLive(state);
       onProgressChange(state);
     },
-    [headerPosition, onProgressChange],
+    [onProgressChange],
   );
+
+  const registerController = useCallback((fn: (round: number) => void) => {
+    controller.current = fn;
+    setControllerReady(true);
+  }, []);
 
   return (
     <div className="space-y-6">
       <GameShell
         title="Anidle"
-        round={displayRound}
-        totalRounds={totalRounds}
-        roundLabel={rules ? "Guess" : "Round"}
-        actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
+        slug="anidle"
+        rules={rulesCopy(payload.rules)}
+        status={
+          rules ? (
+            <AttemptMeter
+              used={used}
+              max={rules.max_attempts}
+              hintAfter={rules.hint_after_incorrect}
+              position={displayRound}
+              finished={finished}
+            />
+          ) : (
+            <span>Round {displayRound}</span>
+          )
+        }
       >
         <Anidle
           mediaId={mediaId}
           payload={payload}
           initialProgress={progress}
           onProgressChange={handleProgressChange}
-          registerRoundController={(fn) => {
-            controller.current = fn;
-            setControllerReady(true);
-          }}
+          registerRoundController={registerController}
           nextSlug={nextSlug}
           accountDifficulty={selectedDifficulty}
         />
