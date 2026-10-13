@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import { getPuzzleTitleFromSlug } from "../utils/puzzleTitles";
 
@@ -14,7 +15,10 @@ function buildClassName(base: string, extra?: string) {
 }
 
 export default function NextPuzzleButton({ nextSlug, className }: Props) {
-  const href = nextSlug ? `/games/${nextSlug}` : "/games/daily";
+  // Stay on the same archive day when playing through a past set.
+  const day = useSearchParams()?.get("d");
+  const query = day ? `?d=${encodeURIComponent(day)}` : "";
+  const href = nextSlug ? `/games/${nextSlug}${query}` : "/games/daily";
   const nextTitle = getPuzzleTitleFromSlug(nextSlug);
   const label = nextSlug
     ? `Play ${nextTitle ?? "the next game"}`

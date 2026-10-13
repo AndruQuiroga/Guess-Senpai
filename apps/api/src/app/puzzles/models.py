@@ -489,6 +489,12 @@ class GameProgressPayload(BaseModel):
         validation_alias=AliasChoices("hints_revealed", "hintsRevealed"),
         serialization_alias="hintsRevealed",
     )
+    # Anidle clue types bought (genres, year, synopsis); each has its own price.
+    anidle_hints: Optional[List[str]] = Field(
+        default=None,
+        validation_alias=AliasChoices("anidle_hints", "anidleHints"),
+        serialization_alias="anidleHints",
+    )
 
     @model_validator(mode="after")
     def _normalize(self) -> "GameProgressPayload":

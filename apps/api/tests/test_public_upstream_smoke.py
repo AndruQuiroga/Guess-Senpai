@@ -6,6 +6,26 @@ import pytest
 from fastapi import FastAPI
 
 from app.routers import puzzles
+from app.services import anilist
+
+
+@pytest.mark.skipif(os.environ.get("RUN_PUBLIC_UPSTREAM_SMOKE") != "1", reason="explicit public-network smoke opt-in")
+@pytest.mark.asyncio
+async def test_public_full_pool_page_and_batch_details_agree():
+    # Two public reads verify the actual query complexity and response shape.
+    pool = await anilist.fetch_popular_pool(pages=1)
+    assert len(pool) == anilist.MAX_PER_PAGE
+    ids = [pool[0].id, pool[-1].id]
+    details = await anilist.fetch_media_details_batch(ids)
+    assert set(details) == set(ids)
+    for media in (pool[0], pool[-1]):
+        # Live counters can change between requests; tied tag ranks can also
+        # arrive in a different order even though the metadata is equivalent.
+        pool_record = media.model_dump(exclude={"popularity", "averageScore"})
+        batch_record = details[media.id].model_dump(exclude={"popularity", "averageScore"})
+        for record in (pool_record, batch_record):
+            record["tags"] = sorted(record["tags"], key=lambda tag: tag["name"])
+        assert pool_record == batch_record
 
 
 @pytest.mark.skipif(os.environ.get("RUN_PUBLIC_UPSTREAM_SMOKE") != "1", reason="explicit public-network smoke opt-in")

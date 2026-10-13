@@ -342,6 +342,27 @@ def test_gate_paces_to_the_reported_limit() -> None:
     exhausted = anilist._RateGate()
     exhausted.observe(200, httpx.Headers({"X-RateLimit-Limit": "90", "X-RateLimit-Remaining": "0"}), 0.0)
     assert exhausted.delay(0.0) > 0
+    assert exhausted.delay(60.0) == 0
+
+
+def test_exhausted_gate_recovers_after_its_last_send_ages_out() -> None:
+    gate = anilist._RateGate()
+    gate.record_send(0.0)
+    gate.observe(200, httpx.Headers({"X-RateLimit-Remaining": "0"}), 1.0)
+    assert gate.delay(60.0) == pytest.approx(1.0)
+    assert gate.delay(61.0) == 0
+    gate.record_send(61.0)
+    assert gate.delay(62.0) == 0
+
+
+def test_gate_uses_reported_reset_and_preserves_long_retry_after(monkeypatch) -> None:
+    monkeypatch.setattr(anilist.time, "time", lambda: 1_000.0)
+    gate = anilist._RateGate()
+    gate.observe(200, httpx.Headers({"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1010"}), 5.0)
+    assert gate.delay(5.0) == pytest.approx(10.0)
+    assert gate.delay(15.0) == 0
+    assert gate.observe(429, httpx.Headers({"Retry-After": "300"}), 20.0) == 300
+    assert gate.delay(21.0) == pytest.approx(299.0)
 
 
 @pytest.mark.asyncio
@@ -360,4 +381,5 @@ async def test_identical_concurrent_requests_share_one_call(fake_anilist: FakeAn
 def test_search_cache_keys_keep_non_latin_terms_apart() -> None:
     assert engine._search_cache_key("進撃の巨人", 5) != engine._search_cache_key("鬼滅の刃", 5)
     assert engine._search_cache_key("AoT", 5) == engine._search_cache_key(" aot ", 5)
-
+    assert engine._search_cache_key("Naruto 疾風伝", 5) != engine._search_cache_key("Naruto", 5)
+    assert engine._search_cache_key("K-On!", 5) != engine._search_cache_key("K On", 5)

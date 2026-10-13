@@ -491,6 +491,7 @@ def rate_limit_patience(max_wait_seconds: float) -> Iterator[None]:
 class _RateGate:
     limit: int = DEFAULT_RATE_LIMIT
     remaining: Optional[int] = None
+    remaining_reset_at: float = 0.0
     blocked_until: float = 0.0
     sent: Deque[float] = field(default_factory=deque)
 
@@ -501,13 +502,15 @@ class _RateGate:
     def delay(self, now: float) -> float:
         """Seconds until a request may be sent without overrunning the limit."""
         self._prune(now)
+        if self.remaining is not None and now >= self.remaining_reset_at:
+            self.remaining = None
         wait = max(0.0, self.blocked_until - now)
         window_wait = self.sent[0] + RATE_WINDOW_SECONDS - now if self.sent else RATE_WINDOW_SECONDS
         if len(self.sent) >= max(1, self.limit - 1):
             wait = max(wait, window_wait)
         if self.remaining is not None and self.remaining <= 0:
             # Other clients (or workers) on this IP spent the budget.
-            wait = max(wait, window_wait)
+            wait = max(wait, self.remaining_reset_at - now)
         return wait
 
     def record_send(self, now: float) -> None:
@@ -523,6 +526,9 @@ class _RateGate:
         remaining = _int_header(headers, "X-RateLimit-Remaining")
         if remaining is not None:
             self.remaining = remaining
+            reset_at = _float_header(headers, "X-RateLimit-Reset")
+            reset_wait = max(0.0, reset_at - time.time()) if reset_at is not None else RATE_WINDOW_SECONDS
+            self.remaining_reset_at = now + reset_wait
         if status != 429:
             return None
         retry_after = _float_header(headers, "Retry-After")
@@ -532,7 +538,6 @@ class _RateGate:
                 retry_after = reset_at - time.time()
         if retry_after is None or retry_after < 0:
             retry_after = RATE_WINDOW_SECONDS
-        retry_after = min(retry_after, 2 * RATE_WINDOW_SECONDS)
         self.blocked_until = max(self.blocked_until, now + retry_after)
         # Retry-After says when the budget is back; the next response reports it.
         self.remaining = None

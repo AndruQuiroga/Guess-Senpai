@@ -17,14 +17,20 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
   "http://localhost:8000";
 
-async function fetchDailyPuzzles(): Promise<DailyPuzzleResponse | null> {
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** `?d=YYYY-MM-DD` opens that day's set (archive); otherwise today's. */
+async function fetchDailyPuzzles(
+  day?: string,
+): Promise<DailyPuzzleResponse | null> {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("guesssenpai_session");
     const headers = sessionCookie
       ? { cookie: `guesssenpai_session=${sessionCookie.value}` }
       : undefined;
-    const response = await fetch(`${API_BASE}/puzzles/today`, {
+    const query = day ? `?d=${encodeURIComponent(day)}` : "";
+    const response = await fetch(`${API_BASE}/puzzles/today${query}`, {
       cache: "no-store",
       headers,
     });
@@ -41,10 +47,17 @@ async function fetchDailyPuzzles(): Promise<DailyPuzzleResponse | null> {
 
 export default async function PuzzleGamePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ d?: string | string[] }>;
 }) {
   const { slug } = await params;
+  const requested = (await searchParams)?.d;
+  const day =
+    typeof requested === "string" && DATE_PATTERN.test(requested)
+      ? requested
+      : undefined;
   const slugDefinition = findPuzzleSlug(slug);
 
   if (!slugDefinition) {
@@ -57,7 +70,9 @@ export default async function PuzzleGamePage({
     notFound();
   }
 
-  const data = await fetchDailyPuzzles();
+  const data = await fetchDailyPuzzles(day);
+  const isArchiveDay =
+    Boolean(data?.date) && data!.date < new Date().toISOString().slice(0, 10);
 
   const pageContent = (
     <div className="space-y-4">
@@ -67,7 +82,7 @@ export default async function PuzzleGamePage({
         </h1>
       )}
 
-      {data && <DailyRolloverNotice date={data.date} />}
+      {data && !isArchiveDay ? <DailyRolloverNotice date={data.date} /> : null}
       <PuzzleSlugContent data={data} slug={slugDefinition} />
     </div>
   );

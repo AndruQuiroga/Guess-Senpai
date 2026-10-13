@@ -204,3 +204,17 @@ describe("scoreGame: rounds v3", () => {
     expect(scoreGame("redacted_synopsis", progress)).toBe(3000);
   });
 });
+
+describe("scoreGame: Anidle clues", () => {
+  it("subtracts each bought clue at its own price", () => {
+    const solved = { ...anidle(1), attemptLimit: 20 };
+    expect(scoreGame("anidle", solved)).toBe(3000);
+    expect(
+      scoreGame("anidle", { ...solved, anidleHints: ["genres", "synopsis"] }),
+    ).toBe(3000 - 150 - 300);
+    // Older saves stored a count: the first N clue types.
+    expect(scoreGame("anidle", { ...solved, hintsRevealed: 2 })).toBe(
+      3000 - 150 - 150,
+    );
+  });
+});

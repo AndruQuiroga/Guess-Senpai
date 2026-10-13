@@ -275,6 +275,21 @@ evaluation; unknown ids and searches (including empty results) are cached.
 under `rate_limit_patience`, which the backfill uses) and coalesces identical
 in-flight anonymous requests. Tests block AniList network access by default.
 
+Reviewed against merged PR #195 on 2026-10-13: legacy republishing and rules-v3
+progress identity are preserved. Exhausted rate-limit counters expire at the
+reported reset (or after a minute); long Retry-After values are preserved.
+Search cache keys preserve punctuation and mixed scripts. The limiter and
+in-flight coalescing remain process-local; API and operator backfill processes
+can still share an upstream IP budget and encounter 429 responses.
+
+Validation: 90 backend tests passed with three opt-in tests skipped in a
+disposable container. Two public upstream smoke tests passed separately,
+including a full 50-record pool page, equivalent batch details, title search,
+evaluation and processed poster imagery. Request-count tests use fake upstream
+responses: four calls for a cold daily set, none for fourteen further archive
+dates on the same warm cache. Production deployment/backfill was not performed
+as part of this review.
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.

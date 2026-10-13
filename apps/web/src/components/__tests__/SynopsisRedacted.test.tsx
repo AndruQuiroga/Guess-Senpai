@@ -95,7 +95,9 @@ describe("SynopsisRedacted rounds", () => {
     expect(
       screen.getAllByRole("img", { name: "redacted word" }).length,
     ).toBeLessThan(hidden);
-    expect(screen.getByText("1 of 3 bought")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /buy reveal some words/i }),
+    ).toHaveTextContent("1/3");
 
     fireEvent.change(
       screen.getByRole("combobox", { name: "Synopsis anime title" }),

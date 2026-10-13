@@ -45,6 +45,7 @@ Merging a release PR does not rebuild images (`paths-ignore`). A build whose
 commit is no longer the newest code on `main` leaves the PR to the newer build.
 
 One-time setup:
+
 - Repository Settings → Actions → General → enable "Allow GitHub Actions to
   create and approve pull requests" so `GITHUB_TOKEN` can open the release PR.
 - Portainer stack `guesssenpai` → Git settings: reference `refs/heads/main`,
@@ -66,9 +67,22 @@ example after a fresh database), run inside the API container:
     python -m app.puzzles.backfill --days 14
 
 It only publishes days that have no set, from current popularity data seeded by
-each date, and never replaces a published day. All days share one popularity
-fetch (four AniList requests), and AniList calls wait out rate limiting rather
-than fail.
+each date, and never replaces a published day. Days generated in the same UTC
+day share one popularity fetch (four AniList requests on a cold cache). Calls
+can wait for rate limiting within a bounded budget; failed dates retry.
+
+To upgrade legacy sets as well, deploy an API image containing the rules-v3
+backfill first, then run inside that API container:
+
+    python -m app.puzzles.backfill --days 15 --republish-legacy
+
+This considers fifteen past UTC dates and today's existing set. Current-format
+sets stay unchanged; legacy sets already containing round content are relabelled
+without regeneration, while older content is regenerated. Progress under the
+old rules version does not attach to the upgraded set. A missing set for today
+is still published through the normal daily endpoint. Check the log for
+"Giving up" entries: the command reports completed dates but does not exit with
+an error status when a date exhausts its retries.
 
 ## Storage and availability
 

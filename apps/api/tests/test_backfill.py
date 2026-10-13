@@ -54,3 +54,61 @@ async def test_backfill_retries_a_rate_limited_day(local_generation, monkeypatch
     published = await backfill.backfill(1, today=today, pause_seconds=0, retry_wait_seconds=0)
     assert published == [today - timedelta(days=1)]
     assert calls["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_republish_legacy_upgrades_old_sets_only(local_generation):  # noqa: F811
+    today = datetime.now(timezone.utc).date()
+    current_day = today - timedelta(days=1)
+    current = await engine.publish_daily_puzzle(current_day)
+    assert current.rules_version == engine.CURRENT_RULES_VERSION
+
+    # A set stored by the old format, today included.
+    await engine.publish_daily_puzzle(today)
+    async with get_session_factory()() as session:
+        row = await session.get(DailyPuzzleSet, today)
+        row.rules_version = "2"
+        # Old format: a single synopsis without rounds.
+        games = dict(row.content["games"])
+        games["redacted_synopsis"] = {
+            **games["redacted_synopsis"],
+            "puzzle": {**games["redacted_synopsis"]["puzzle"], "rounds": []},
+        }
+        row.content = {**row.content, "games": games, "marker": "legacy"}
+        await session.commit()
+
+    assert await backfill.missing_days(1, today=today) == []
+    assert await backfill.missing_days(1, today=today, include_legacy=True) == [today]
+
+    published = await backfill.backfill(
+        1, today=today, pause_seconds=0, retry_wait_seconds=0, republish_legacy=True
+    )
+    assert published == [today]
+    async with get_session_factory()() as session:
+        upgraded = await session.get(DailyPuzzleSet, today)
+        assert upgraded.rules_version == engine.CURRENT_RULES_VERSION
+        assert "marker" not in upgraded.content
+    # The current-format day was not regenerated.
+    again = await engine.get_daily_puzzle(current_day)
+    assert again.model_dump() == current.model_dump()
+    response = await engine.get_daily_puzzle(today)
+    assert response.mode_puzzle_ids["anidle"].endswith(":v3")
+
+
+@pytest.mark.asyncio
+async def test_republish_relabels_round_content_without_regenerating(local_generation, monkeypatch):  # noqa: F811
+    today = datetime.now(timezone.utc).date()
+    day = today - timedelta(days=1)
+    original = await engine.publish_daily_puzzle(day)
+    async with get_session_factory()() as session:
+        row = await session.get(DailyPuzzleSet, day)
+        row.rules_version = "2"
+        await session.commit()
+
+    async def must_not_generate(*args, **kwargs):
+        raise AssertionError("round-format content must not be regenerated")
+
+    monkeypatch.setattr(engine, "_assemble_daily_puzzle", must_not_generate)
+    upgraded = await engine.publish_daily_puzzle(day, replace_legacy=True)
+    assert upgraded.rules_version == engine.CURRENT_RULES_VERSION
+    assert upgraded.games.model_dump() == original.games.model_dump()

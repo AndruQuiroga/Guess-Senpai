@@ -33,6 +33,7 @@ import {
   RoundResult,
   RoundTabs,
   VERDICT,
+  useReportStake,
 } from "./rounds/RoundUI";
 import {
   buildOutcome,
@@ -177,6 +178,12 @@ function CharacterRound({
     0,
   );
   const perCard = Math.floor(ROUND_POINTS / entries.length);
+  const roundMax = perCard * entries.length;
+  useReportStake(
+    Math.max(0, roundMax - spentOnCards),
+    roundMax,
+    !record.submitted,
+  );
   const half = Math.floor(perCard / 2);
 
   const update = (card: number, patch: Partial<CardDraft>) =>
@@ -316,27 +323,13 @@ function CharacterRound({
 
   return (
     <form onSubmit={checkAll} className="space-y-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-sm">
-        <p className="text-muted">
-          <span className="font-semibold text-paper">
-            {ART_MODE_LABELS[mode]}
-          </span>{" "}
-          · Name each character and their anime, then check them all at once.
-          Each card is worth {perCard} (half name, half anime).
-        </p>
-        <p className="font-semibold text-paper">
-          Playing for{" "}
-          <span
-            className="font-display text-lg tabular-nums"
-            aria-live="polite"
-          >
-            {formatPoints(Math.max(0, perCard * entries.length - spentOnCards))}
-          </span>{" "}
-          <span className="font-normal text-muted">
-            / {formatPoints(perCard * entries.length)} pts
-          </span>
-        </p>
-      </div>
+      <p className="text-sm text-muted">
+        <span className="font-semibold text-paper">
+          {ART_MODE_LABELS[mode]}
+        </span>{" "}
+        · Name each character and their anime, then check them all at once. Each
+        card is worth {perCard} (half name, half anime).
+      </p>
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {entries.map((entry, card) => {
           const sharpened = Math.min(ART_LEVELS - 1, hintsByCard[card] ?? 0);

@@ -5,7 +5,7 @@ import type { AnidleGame as AnidlePayload } from "../types/puzzles";
 import { GuessGrid } from "./anidle/GuessGrid";
 import { GuessInput } from "./anidle/GuessInput";
 import { HintStrip } from "./anidle/HintStrip";
-import { ANIDLE_HINT_COST, anidleStake } from "./anidle/hints";
+import { anidleStake } from "./anidle/hints";
 import { HintShop } from "./rounds/RoundUI";
 import { POINTS_PER_GAME } from "../utils/dailyScore";
 import { KnowledgeSummary } from "./anidle/KnowledgeSummary";
@@ -68,42 +68,34 @@ export default function Anidle({
           error={game.errorMessage}
         />
       ) : null}
-      {game.rules && !game.finished ? (
+      {game.rules && !game.finished && game.attemptsUsed > 0 ? (
         <HintShop
           max={POINTS_PER_GAME}
+          // What solving on the next guess would score (guesses and clues
+          // both lower it); shown in the header badge.
           spent={
             POINTS_PER_GAME -
             anidleStake(
               POINTS_PER_GAME,
               game.rules.max_attempts,
               game.attemptsUsed,
-              game.hintsUsed,
+              game.clueCost,
             )
           }
-          note={`Solving on your next guess scores this. Each guess costs ${Math.round(
-            POINTS_PER_GAME / game.rules.max_attempts,
-          )}; hints are optional.`}
-          onBuy={() => game.revealHint()}
-          clues={
-            game.hintsTotal > 0
-              ? [
-                  {
-                    id: "hint",
-                    label: "Hint",
-                    cost: ANIDLE_HINT_COST,
-                    uses: { used: game.hintsUsed, max: game.hintsTotal },
-                    lockedReason:
-                      game.hintsPending > 0
-                        ? undefined
-                        : game.nextHintIn != null
-                          ? `Unlocks after ${game.nextHintIn} more wrong ${
-                              game.nextHintIn === 1 ? "guess" : "guesses"
-                            }`
-                          : undefined,
-                  },
-                ]
-              : []
-          }
+          onBuy={game.buyClue}
+          clues={game.clues.map((clue) => {
+            const remaining = clue.unlockAt - game.incorrectGuessCount;
+            return {
+              id: clue.id,
+              label: clue.label,
+              cost: clue.cost,
+              bought: clue.bought,
+              lockedReason:
+                remaining > 0
+                  ? `after ${remaining} more ${remaining === 1 ? "miss" : "misses"}`
+                  : undefined,
+            };
+          })}
         />
       ) : null}
       <HintStrip hints={game.hints} />
