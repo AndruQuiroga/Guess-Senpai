@@ -8,6 +8,23 @@ export type AggregatedHint =
   | { type: "synopsis"; label: string; ratio: number; text: string };
 
 export const LEGACY_TOTAL_ROUNDS = 3;
+/** Points a bought Anidle hint costs (one guess's worth at 3,000 / 20). */
+export const ANIDLE_HINT_COST = 150;
+
+/**
+ * What solving on the next guess would score: the game's points shrink by one
+ * guess's share per accepted guess, and each bought hint costs ANIDLE_HINT_COST.
+ */
+export function anidleStake(
+  maxPoints: number,
+  attemptLimit: number,
+  used: number,
+  hintsUsed: number,
+): number {
+  const limit = Math.max(1, attemptLimit);
+  const base = (maxPoints * Math.max(0, limit - used)) / limit;
+  return Math.max(0, Math.round(base - hintsUsed * ANIDLE_HINT_COST));
+}
 const MIN_INCORRECT_GUESSES_FOR_HINT = 10;
 const INCORRECT_GUESS_INTERVAL = 2;
 

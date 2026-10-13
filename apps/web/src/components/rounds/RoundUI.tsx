@@ -81,6 +81,131 @@ export function RoundTabs({
   );
 }
 
+export interface ShopClue {
+  id: string;
+  label: string;
+  cost: number;
+  /** Repeatable clues (zoom out, reveal words): how many of how many. */
+  uses?: { used: number; max: number };
+  /** One-off clues: already bought. */
+  bought?: boolean;
+  /** Why it can't be bought yet (e.g. another clue must come first). */
+  lockedReason?: string;
+  /** Shown under the clue once bought. */
+  reveal?: ReactNode;
+}
+
+/**
+ * One place to buy clues. The round starts at `max` points; every clue shows
+ * its price up front and lowers what the round can still score, which the
+ * meter at the top tracks.
+ */
+export function HintShop({
+  clues,
+  spent,
+  onBuy,
+  max = ROUND_POINTS,
+  disabled = false,
+  note = "Clues are optional and lower the most this round can score.",
+}: {
+  clues: ShopClue[];
+  /** One line under the meter explaining what lowers the points. */
+  note?: string;
+  /** Points already spent on clues this round. */
+  spent: number;
+  onBuy(id: string): void;
+  max?: number;
+  disabled?: boolean;
+}) {
+  const left = Math.max(0, max - spent);
+  return (
+    <section
+      aria-label="Clues"
+      className="space-y-3 rounded-lg border border-line bg-panel p-3 sm:p-4"
+    >
+      <div className="space-y-1.5">
+        <p className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+          <span className="font-semibold text-paper">
+            Playing for{" "}
+            <span
+              className="font-display text-lg tabular-nums"
+              aria-live="polite"
+            >
+              {formatPoints(left)}
+            </span>{" "}
+            <span className="text-muted">/ {formatPoints(max)} pts</span>
+          </span>
+          <span className="text-xs text-muted">{note}</span>
+        </p>
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-ink"
+          role="presentation"
+        >
+          <div
+            className="h-full bg-signal transition-[width]"
+            style={{ width: `${(left / max) * 100}%` }}
+          />
+        </div>
+      </div>
+      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {clues.map((clue) => {
+          const maxed = clue.uses
+            ? clue.uses.used >= clue.uses.max
+            : Boolean(clue.bought);
+          const locked = Boolean(clue.lockedReason) && !maxed;
+          const state = clue.uses
+            ? `${clue.uses.used} of ${clue.uses.max} bought`
+            : clue.bought
+              ? "Bought"
+              : null;
+          return (
+            <li
+              key={clue.id}
+              className={`space-y-2 rounded-md border px-3 py-2 ${
+                clue.bought || (clue.uses?.used ?? 0) > 0
+                  ? "border-signal bg-signal-soft"
+                  : "border-line bg-ink"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-paper">
+                    {clue.label}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {locked
+                      ? clue.lockedReason
+                      : (state ?? `−${formatPoints(clue.cost)} pts`)}
+                  </p>
+                </div>
+                {maxed ? null : (
+                  <button
+                    type="button"
+                    onClick={() => onBuy(clue.id)}
+                    disabled={disabled || locked}
+                    aria-label={`Buy ${clue.label.toLowerCase()} for ${clue.cost} points`}
+                    className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-panel-raised px-3 text-sm font-semibold text-paper transition hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Buy
+                    <span className="text-xs font-normal text-muted">
+                      −{formatPoints(clue.cost)}
+                    </span>
+                  </button>
+                )}
+              </div>
+              {clue.reveal && (clue.bought || (clue.uses?.used ?? 0) > 0) ? (
+                <div className="text-sm text-paper" aria-live="polite">
+                  {clue.reveal}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /** An optional clue; its cost is always shown before it is taken. */
 export function HintButton({
   label,

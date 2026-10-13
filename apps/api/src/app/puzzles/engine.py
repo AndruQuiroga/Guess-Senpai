@@ -933,6 +933,8 @@ async def _build_guess_opening_round(
         artist=clip_model.artist,
         sequence=clip_model.sequence,
         season=f"{media.season} {media.seasonYear}" if media.seasonYear and media.season else None,
+        genres=[genre for genre in media.genres if genre][:4],
+        year=_poster_release_year(media),
         roundOrder=order,
         roundTotal=total_rounds,
     )
@@ -1326,7 +1328,10 @@ async def _assemble_daily_puzzle(
             if len(excluded) >= len(round_pool):
                 break
             candidate = _choose_tiered(
-                base_seed, f"character_silhouette:{order}", round_pool, tiers, difficulty, excluded, attempt=attempt
+                # Every character round uses popular shows; the round difficulty
+                # comes from how the art is hidden (black and white, close-up,
+                # mosaic), not from obscure characters.
+                base_seed, f"character_silhouette:{order}", round_pool, tiers, 1, excluded, attempt=attempt
             )
             tried_for_characters.add(candidate.id)
             character_media = await _load_media_details(candidate.id, cache, settings)

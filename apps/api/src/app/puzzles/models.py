@@ -172,6 +172,9 @@ class GuessOpeningMeta(BaseModel):
     artist: Optional[str] = None
     sequence: Optional[int] = None
     season: Optional[str] = None
+    # Buyable clues (rounds v3): the show genres and release year.
+    genres: List[str] = Field(default_factory=list)
+    year: Optional[int] = None
     roundOrder: Optional[int] = None
     roundTotal: Optional[int] = None
 

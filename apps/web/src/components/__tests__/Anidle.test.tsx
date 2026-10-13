@@ -297,24 +297,24 @@ describe("Anidle hydration", () => {
         onProgressChange={progress}
       />,
     );
+    const shop = () => screen.getByRole("region", { name: "Clues" });
     expect(screen.queryByText("First clue")).not.toBeInTheDocument();
-    expect(screen.getByText(/2 hints are available/)).toBeInTheDocument();
+    // 8 guesses, 4 used: solving next scores 3,000 × 4/8.
+    expect(shop()).toHaveTextContent("Playing for 1,500 / 3,000 pts");
+    expect(shop()).toHaveTextContent("0 of 3 bought");
 
-    fireEvent.click(screen.getByRole("button", { name: "Reveal hint" }));
+    fireEvent.click(screen.getByRole("button", { name: /buy hint/i }));
     expect(screen.getByText("First clue")).toBeInTheDocument();
-    expect(screen.getByText(/A hint is available/)).toBeInTheDocument();
+    expect(shop()).toHaveTextContent("Playing for 1,350");
     expect(progress).toHaveBeenLastCalledWith(
       expect.objectContaining({ hintsRevealed: 1 }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Reveal hint" }));
+    fireEvent.click(screen.getByRole("button", { name: /buy hint/i }));
     expect(screen.getByText("Second clue")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Reveal hint" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/Next hint available after 2 more/),
-    ).toBeInTheDocument();
+    // The third hint waits for more misses.
+    expect(screen.getByRole("button", { name: /buy hint/i })).toBeDisabled();
+    expect(shop()).toHaveTextContent("Unlocks after 2 more wrong guesses");
   });
 
   it("accepts the eighth miss, reveals the answer, and resumes exhaustion without awarding a solve", async () => {

@@ -32,16 +32,37 @@ async def missing_days(days: int, today: Optional[date] = None) -> List[date]:
         return [day for day in wanted if await session.get(DailyPuzzleSet, day) is None]
 
 
-async def backfill(days: int, *, today: Optional[date] = None) -> List[date]:
+async def backfill(
+    days: int,
+    *,
+    today: Optional[date] = None,
+    pause_seconds: float = 45.0,
+    retries: int = 4,
+    retry_wait_seconds: float = 90.0,
+) -> List[date]:
+    """Publish each missing day, pausing between days and retrying failures.
+
+    Every new day needs dozens of AniList lookups; back-to-back days exceed
+    AniList's per-minute limit (HTTP 429), so days are spaced out and a failed
+    day waits and tries again before moving on.
+    """
     published: List[date] = []
-    for day in await missing_days(days, today):
-        try:
-            await engine.publish_daily_puzzle(day, include_guess_opening=settings.animethemes_enabled)
-        except Exception:
-            logger.exception("Failed to publish %s; continuing with the next day", day)
-            continue
-        published.append(day)
-        logger.info("Published %s", day)
+    for index, day in enumerate(await missing_days(days, today)):
+        if index and pause_seconds:
+            await asyncio.sleep(pause_seconds)
+        for attempt in range(retries + 1):
+            try:
+                await engine.publish_daily_puzzle(day, include_guess_opening=settings.animethemes_enabled)
+            except Exception:
+                logger.warning("Publishing %s failed (attempt %d)", day, attempt + 1, exc_info=True)
+                if attempt < retries:
+                    await asyncio.sleep(retry_wait_seconds)
+                continue
+            published.append(day)
+            logger.info("Published %s", day)
+            break
+        else:
+            logger.error("Giving up on %s", day)
     return published
 
 

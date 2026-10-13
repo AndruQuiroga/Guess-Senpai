@@ -5,6 +5,9 @@ import type { AnidleGame as AnidlePayload } from "../types/puzzles";
 import { GuessGrid } from "./anidle/GuessGrid";
 import { GuessInput } from "./anidle/GuessInput";
 import { HintStrip } from "./anidle/HintStrip";
+import { ANIDLE_HINT_COST, anidleStake } from "./anidle/hints";
+import { HintShop } from "./rounds/RoundUI";
+import { POINTS_PER_GAME } from "../utils/dailyScore";
 import { KnowledgeSummary } from "./anidle/KnowledgeSummary";
 import { ResultCard } from "./anidle/ResultCard";
 import type { AnidleEvaluationView } from "./anidle/tiles";
@@ -65,23 +68,45 @@ export default function Anidle({
           error={game.errorMessage}
         />
       ) : null}
-      <HintStrip
-        hints={game.hints}
-        offer={
-          game.rules &&
-          game.hintsTotal > 0 &&
-          game.attemptsUsed > 0 &&
-          !game.finished
-            ? {
-                pending: game.hintsPending,
-                used: game.hintsUsed,
-                total: game.hintsTotal,
-                nextHintIn: game.nextHintIn,
-                onReveal: game.revealHint,
-              }
-            : null
-        }
-      />
+      {game.rules && !game.finished ? (
+        <HintShop
+          max={POINTS_PER_GAME}
+          spent={
+            POINTS_PER_GAME -
+            anidleStake(
+              POINTS_PER_GAME,
+              game.rules.max_attempts,
+              game.attemptsUsed,
+              game.hintsUsed,
+            )
+          }
+          note={`Solving on your next guess scores this. Each guess costs ${Math.round(
+            POINTS_PER_GAME / game.rules.max_attempts,
+          )}; hints are optional.`}
+          onBuy={() => game.revealHint()}
+          clues={
+            game.hintsTotal > 0
+              ? [
+                  {
+                    id: "hint",
+                    label: "Hint",
+                    cost: ANIDLE_HINT_COST,
+                    uses: { used: game.hintsUsed, max: game.hintsTotal },
+                    lockedReason:
+                      game.hintsPending > 0
+                        ? undefined
+                        : game.nextHintIn != null
+                          ? `Unlocks after ${game.nextHintIn} more wrong ${
+                              game.nextHintIn === 1 ? "guess" : "guesses"
+                            }`
+                          : undefined,
+                  },
+                ]
+              : []
+          }
+        />
+      ) : null}
+      <HintStrip hints={game.hints} />
       {game.finished ? (
         <ResultCard
           solved={game.completed}

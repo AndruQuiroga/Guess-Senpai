@@ -3,40 +3,39 @@
 import { useEffect, useMemo, useRef } from "react";
 
 /**
- * How a character card hides its art. Easy and Medium rounds use the ink
- * shadow; Hard rounds rotate through the other three so each Hard lineup asks
- * for a different kind of recognition. Every mode has three levels (0-2); each
- * Sharpen hint moves one level clearer.
+ * How a character card hides its art. Every round uses popular characters;
+ * the round decides the view: Easy is black and white, Medium a full-colour
+ * close-up of one detail, Hard a full-colour mosaic. Each mode has three
+ * levels (0-2) and each bought "Sharpen" moves a card one level clearer.
  */
-export type ArtMode = "shadow" | "crop" | "mosaic" | "tiles";
+export type ArtMode = "mono" | "crop" | "mosaic";
 
 export const ART_LEVELS = 3;
 
-const SHADOW_FILTERS = [
-  "grayscale(1) contrast(8) brightness(0.22) blur(4px)",
-  "grayscale(1) contrast(2.6) brightness(0.6) blur(1.5px)",
-  "grayscale(0.5) blur(0.5px)",
+const MONO_FILTERS = [
+  "grayscale(1) contrast(1.15) blur(3px)",
+  "grayscale(1) blur(1.2px)",
+  "grayscale(1)",
 ] as const;
 /** Close-up zoom per level: roughly a seventh, a quarter, then half the art. */
 const CROP_SCALES = [2.6, 1.9, 1.4] as const;
 /** Mosaic blocks across the card per level. */
-const MOSAIC_BLOCKS = [7, 12, 20] as const;
-/** Tiles put back in place per level (of 9). */
-const TILES_FIXED = [0, 3, 6] as const;
+const MOSAIC_BLOCKS = [8, 13, 22] as const;
 
-const HARD_ROTATION: ArtMode[] = ["crop", "mosaic", "tiles"];
+const MODE_BY_DIFFICULTY: Record<number, ArtMode> = {
+  1: "mono",
+  2: "crop",
+  3: "mosaic",
+};
 
-export function artModeFor(difficulty: number, card: number): ArtMode {
-  return difficulty >= 3
-    ? HARD_ROTATION[card % HARD_ROTATION.length]
-    : "shadow";
+export function artModeFor(difficulty: number): ArtMode {
+  return MODE_BY_DIFFICULTY[difficulty] ?? "mono";
 }
 
 export const ART_MODE_LABELS: Record<ArtMode, string> = {
-  shadow: "Shadow",
+  mono: "Black and white",
   crop: "Close-up",
   mosaic: "Mosaic",
-  tiles: "Scrambled",
 };
 
 /** Small deterministic PRNG so a card looks the same after a reload. */
@@ -48,32 +47,6 @@ function seeded(seed: number) {
     state ^= state << 5;
     return ((state >>> 0) % 10_000) / 10_000;
   };
-}
-
-/** A derangement-ish shuffle of 9 tiles with `fixed` of them in place. */
-function tileOrder(seed: number, fixed: number): number[] {
-  const random = seeded(seed + 7);
-  const order = Array.from({ length: 9 }, (_, index) => index);
-  for (let index = order.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(random() * (index + 1));
-    [order[index], order[swap]] = [order[swap], order[index]];
-  }
-  // Make sure nothing starts in place, so level 0 is fully scrambled.
-  for (let index = 0; index < order.length; index += 1) {
-    if (order[index] === index) {
-      const other = (index + 1) % order.length;
-      [order[index], order[other]] = [order[other], order[index]];
-    }
-  }
-  // Restore tiles in a fixed, seeded sequence as the level rises.
-  const restoreOrder = Array.from({ length: 9 }, (_, index) => index).sort(
-    () => random() - 0.5,
-  );
-  for (const position of restoreOrder.slice(0, fixed)) {
-    const current = order.indexOf(position);
-    [order[position], order[current]] = [order[current], order[position]];
-  }
-  return order;
 }
 
 function Mosaic({ src, blocks }: { src: string; blocks: number }) {
@@ -114,8 +87,7 @@ function Mosaic({ src, blocks }: { src: string; blocks: number }) {
       ref={canvasRef}
       width={300}
       height={400}
-      data-art="mosaic"
-      className="aspect-[3/4] w-full"
+      className="h-full w-full"
     />
   );
 }
@@ -140,10 +112,6 @@ export function CharacterArt({
     // so a close-up shows hair, eyes or an accessory, not a blank torso.
     return { x: 30 + random() * 40, y: 8 + random() * 27 };
   }, [seed]);
-  const order = useMemo(
-    () => (mode === "tiles" ? tileOrder(seed, TILES_FIXED[step]) : []),
-    [mode, seed, step],
-  );
 
   return (
     <div
@@ -153,14 +121,14 @@ export function CharacterArt({
       data-level={step}
       className="relative aspect-[3/4] w-full overflow-hidden bg-ink"
     >
-      {mode === "shadow" ? (
+      {mode === "mono" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt=""
           draggable={false}
           className="h-full w-full object-cover"
-          style={{ filter: SHADOW_FILTERS[step] }}
+          style={{ filter: MONO_FILTERS[step] }}
         />
       ) : null}
       {mode === "crop" ? (
@@ -178,22 +146,6 @@ export function CharacterArt({
       ) : null}
       {mode === "mosaic" ? (
         <Mosaic src={src} blocks={MOSAIC_BLOCKS[step]} />
-      ) : null}
-      {mode === "tiles" ? (
-        <div className="grid h-full w-full grid-cols-3 grid-rows-3 gap-px bg-ink">
-          {order.map((tile, position) => (
-            <div
-              key={position}
-              data-tile={tile}
-              data-in-place={tile === position ? "true" : undefined}
-              style={{
-                backgroundImage: `url("${src}")`,
-                backgroundSize: "300% 300%",
-                backgroundPosition: `${(tile % 3) * 50}% ${Math.floor(tile / 3) * 50}%`,
-              }}
-            />
-          ))}
-        </div>
       ) : null}
     </div>
   );

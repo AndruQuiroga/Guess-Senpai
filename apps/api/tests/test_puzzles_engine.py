@@ -571,8 +571,8 @@ async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: py
     card_media = [entry.mediaId for r in characters for entry in r.entries]
     assert all(len(r.entries) == engine.CHARACTERS_PER_ROUND for r in characters)
     assert len(card_media) == len(set(card_media))
-    for r in characters:
-        assert all(entry.mediaId in tiers[r.difficulty] for entry in r.entries)
+    # Characters always come from popular shows; rounds differ in how the art is hidden.
+    assert all(entry.mediaId in tiers[1] for r in characters for entry in r.entries)
 
     openings = result.games.guess_the_opening.puzzle.rounds
     assert [r.difficulty for r in openings] == [1, 2, 3]
@@ -594,3 +594,28 @@ def test_sequels_are_detected_from_relations() -> None:
     assert engine._is_sequel(sequel) is True
     assert engine._is_sequel(first) is False
     assert engine._is_sequel(make_media(3, "No relations")) is False
+
+
+@pytest.mark.asyncio
+async def test_opening_rounds_carry_buyable_genre_and_year(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import animethemes
+
+    media = make_media(42, "Clip Show")
+    media.genres = ["Action", "Drama", "Mystery", "Sci-Fi", "Thriller"]
+
+    async def fake_clip(_variants):
+        return animethemes.OpeningClip(
+            title="Clip Show",
+            audio_url=None,
+            video_url="https://v.example/42.webm",
+            song_title="Song",
+            artist="Singer",
+            sequence=1,
+            length_seconds=90,
+        )
+
+    monkeypatch.setattr(animethemes, "find_opening_clip", fake_clip)
+    opening = await engine._build_guess_opening_round(media, DummyCache(), order=1, total_rounds=3, difficulty=1)
+    assert opening is not None
+    assert opening.meta.genres == ["Action", "Drama", "Mystery", "Sci-Fi"]
+    assert opening.meta.year == 2024

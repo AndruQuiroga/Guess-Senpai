@@ -1,8 +1,9 @@
 "use client";
 
 import GuessOpening, {
-  ARTIST_HINT_COST,
+  GENRE_HINT_COST,
   VIDEO_HINT_COST,
+  YEAR_HINT_COST,
 } from "../GuessOpening";
 import { ROUND_RULES, RoundGamePage } from "./RoundGamePage";
 import type { GameProgress } from "../../types/progress";
@@ -18,7 +19,7 @@ interface Props {
 const RULES = [
   ...ROUND_RULES,
   "Name the anime from a 30-second slice of its opening, audio only.",
-  `Clues: unlock the video (−${VIDEO_HINT_COST}) or show the artist (−${ARTIST_HINT_COST}). The full opening plays on the results screen.`,
+  `Clues: buy the genres (−${GENRE_HINT_COST}) or release year (−${YEAR_HINT_COST}); after one of those you can unlock the video (−${VIDEO_HINT_COST}). The full opening plays on the results screen.`,
 ];
 
 export function GuessOpeningPage({

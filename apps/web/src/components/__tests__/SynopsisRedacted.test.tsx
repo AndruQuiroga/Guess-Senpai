@@ -89,11 +89,13 @@ describe("SynopsisRedacted rounds", () => {
     const hidden = screen.getAllByRole("img", { name: "redacted word" }).length;
     expect(hidden).toBe(6);
 
-    fireEvent.click(screen.getByRole("button", { name: /Reveal some words/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /buy reveal some words/i }),
+    );
     expect(
       screen.getAllByRole("img", { name: "redacted word" }).length,
     ).toBeLessThan(hidden);
-    expect(screen.getByText(/1\/3 reveals used/)).toBeInTheDocument();
+    expect(screen.getByText("1 of 3 bought")).toBeInTheDocument();
 
     fireEvent.change(
       screen.getByRole("combobox", { name: "Synopsis anime title" }),
@@ -130,7 +132,9 @@ describe("SynopsisRedacted rounds", () => {
         onProgressChange={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Reveal some words/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /buy reveal some words/i }),
+    );
     fireEvent.change(
       screen.getByRole("combobox", { name: "Synopsis anime title" }),
       {

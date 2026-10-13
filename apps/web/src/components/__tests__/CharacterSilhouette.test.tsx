@@ -80,7 +80,7 @@ describe("CharacterSilhouette check-all rounds", () => {
     const art = screen.getAllByRole("img", { name: /obscured/ });
     expect(art).toHaveLength(2);
     art.forEach((card) => {
-      expect(card).toHaveAttribute("data-art", "shadow");
+      expect(card).toHaveAttribute("data-art", "mono");
       expect(card).toHaveAttribute("data-level", "0");
     });
     expect(screen.queryByAltText("Lelouch")).toBeNull();
@@ -95,7 +95,9 @@ describe("CharacterSilhouette check-all rounds", () => {
         onProgressChange={progress}
       />,
     );
-    fireEvent.click(screen.getAllByRole("button", { name: /Sharpen/ })[1]);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Buy a clearer view/ })[1],
+    );
     const art = screen.getAllByRole("img", { name: /obscured/ });
     expect(art[0]).toHaveAttribute("data-level", "0");
     expect(art[1]).toHaveAttribute("data-level", "1");
@@ -105,51 +107,36 @@ describe("CharacterSilhouette check-all rounds", () => {
     });
   });
 
-  it("mixes close-up, mosaic and scrambled tiles in a Hard round", () => {
-    const hard: CharacterSilhouetteGame = {
-      ...payload,
-      rounds: [
-        {
-          order: 1,
-          difficulty: 3,
-          entries: [
-            card(5, "A", "Show A", 500),
-            card(6, "B", "Show B", 600),
-            card(7, "C", "Show C", 700),
-            card(8, "D", "Show D", 800),
-          ],
-        },
+  it("shows close-ups in Medium and mosaics in Hard, in full colour", () => {
+    const rounds = [2, 3].map((difficulty) => ({
+      order: difficulty,
+      difficulty,
+      entries: [
+        card(difficulty * 10, "A", "Show A", difficulty * 100),
+        card(difficulty * 10 + 1, "B", "Show B", difficulty * 100 + 1),
       ],
-    };
-    render(
-      <CharacterSilhouette
-        payload={hard}
-        mediaId={500}
-        onProgressChange={vi.fn()}
-      />,
-    );
-    const art = screen.getAllByRole("img", { name: /obscured/ });
-    expect(art.map((item) => item.getAttribute("data-art"))).toEqual([
-      "crop",
-      "mosaic",
-      "tiles",
-      "crop",
-    ]);
-    // Close-up: a zoomed slice; mosaic: a canvas; tiles: nine, none in place.
-    expect(art[0].querySelector("img")?.style.transform).toBe("scale(2.6)");
-    expect(art[1].querySelector("canvas")).not.toBeNull();
-    const tiles = art[2].querySelectorAll("[data-tile]");
-    expect(tiles).toHaveLength(9);
-    expect(art[2].querySelectorAll('[data-in-place="true"]')).toHaveLength(0);
-    expect(screen.getByText(/#1 · Close-up/)).toBeInTheDocument();
-
-    // Each Sharpen puts three more tiles back.
-    fireEvent.click(screen.getAllByRole("button", { name: /Sharpen/ })[2]);
-    expect(
-      screen
-        .getAllByRole("img", { name: /obscured/ })[2]
-        .querySelectorAll('[data-in-place="true"]').length,
-    ).toBeGreaterThanOrEqual(3);
+    }));
+    for (const round of rounds) {
+      const view = render(
+        <CharacterSilhouette
+          payload={{ ...payload, rounds: [round] }}
+          mediaId={1}
+          onProgressChange={vi.fn()}
+        />,
+      );
+      const art = screen.getAllByRole("img", { name: /obscured/ });
+      if (round.difficulty === 2) {
+        expect(art.every((item) => item.dataset.art === "crop")).toBe(true);
+        expect(art[0].querySelector("img")?.style.transform).toBe("scale(2.6)");
+        expect(art[0].querySelector("img")?.style.filter).toBe("");
+        expect(screen.getByText("Close-up")).toBeInTheDocument();
+      } else {
+        expect(art.every((item) => item.dataset.art === "mosaic")).toBe(true);
+        expect(art[0].querySelector("canvas")).not.toBeNull();
+        expect(screen.getByText("Mosaic")).toBeInTheDocument();
+      }
+      view.unmount();
+    }
   });
 
   it("checks every card against its own character and anime", async () => {
