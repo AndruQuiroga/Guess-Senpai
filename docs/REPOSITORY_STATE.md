@@ -260,6 +260,21 @@ function that did not exist). Anidle returned to a one-column-per-attribute
 table and limits studios to main animation studios. The profile difficulty
 preference no longer changes any game (it used to skip to a later round).
 
+### AniList request budget — 2026-10-13
+
+AniList allows 30–90 requests per minute per IP and caps `perPage` at 50, so
+the "400-entry" ranking above is really 200 entries (four pages of 50). On the
+`claude/anilist-efficiency` branch the popularity pool query returns full
+details records (characters, studios, links) and seeds the per-anime cache, so
+a cold daily set costs four AniList requests and further days generated the
+same UTC day (archive backfill) cost none. Per-anime misses are batched
+(`id_in`, 50 per request) for search warming, verify, stats and Anidle
+evaluation; unknown ids and searches (including empty results) are cached.
+`services/anilist.gql_request` paces from `X-RateLimit-*` headers, honours
+`Retry-After` within a per-call wait budget (about 4 s interactively, longer
+under `rate_limit_patience`, which the backfill uses) and coalesces identical
+in-flight anonymous requests. Tests block AniList network access by default.
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.

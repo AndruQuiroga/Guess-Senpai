@@ -66,7 +66,9 @@ example after a fresh database), run inside the API container:
     python -m app.puzzles.backfill --days 14
 
 It only publishes days that have no set, from current popularity data seeded by
-each date, and never replaces a published day.
+each date, and never replaces a published day. All days share one popularity
+fetch (four AniList requests), and AniList calls wait out rate limiting rather
+than fail.
 
 ## Storage and availability
 

@@ -202,6 +202,10 @@ class AnidleEvaluationService:
         if not guess_value:
             raise HTTPException(status_code=400, detail="Guess cannot be empty")
 
+        await self._prefetch(
+            [payload.puzzle_media_id]
+            + ([payload.guess_media_id] if payload.guess_media_id is not None else [])
+        )
         try:
             target_media = await self._load_media(payload.puzzle_media_id)
         except Exception as exc:  # pragma: no cover - defensive upstream guard
@@ -217,6 +221,7 @@ class AnidleEvaluationService:
         index_matches: List[title_index.TitleMatch] = []
         if guess_media is None:
             index_matches = await self._search_title_matches(guess_value, limit=5)
+            await self._prefetch([match.media_id for match in index_matches])
             best_candidate: Optional[Media] = None
             for match in index_matches:
                 candidate = await self._load_media_optional(match.media_id)
@@ -236,6 +241,7 @@ class AnidleEvaluationService:
 
         if guess_media is None and not index_matches:
             search_results = await self._search_remote_titles(guess_value, limit=5)
+            await self._prefetch([pair.id for pair in search_results])
             best_candidate: Optional[Media] = None
             for pair in search_results:
                 candidate = await self._load_media_optional(pair.id)
@@ -329,6 +335,12 @@ class AnidleEvaluationService:
             matched=guess_media is not None or correct,
         )
 
+    async def _prefetch(self, media_ids: List[int]) -> None:
+        """Batch the uncached ids into one AniList request before per-id loads."""
+        pending = [media_id for media_id in media_ids if media_id not in self._media_cache]
+        if pending:
+            await puzzle_engine._warm_media_details(pending, self._cache, settings)
+
     async def _load_media(self, media_id: int) -> Media:
         if media_id in self._media_cache:
             return self._media_cache[media_id]
@@ -366,8 +378,26 @@ class AnidleEvaluationService:
         cached = self._remote_search_cache.get(key)
         if cached is not None:
             return cached
-        self._metrics["remote_search_calls"] += 1
-        token = self._user.access_token if self._user else None
-        results = await search_media(query, limit=limit, token=token)
+        # Shares /search-titles' cache entry shape, so a term searched once
+        # (including "no results") is not sent to AniList again for a day.
+        shared_key = puzzle_engine._search_cache_key(query, limit)
+        try:
+            cached_pairs = await self._cache.get(shared_key)
+        except Exception:  # a cache outage must not block evaluation
+            cached_pairs = None
+        if isinstance(cached_pairs, list):
+            results = [MediaTitlePair.model_validate(item) for item in cached_pairs]
+        else:
+            self._metrics["remote_search_calls"] += 1
+            token = self._user.access_token if self._user else None
+            results = await search_media(query, limit=limit, token=token)
+            try:
+                await self._cache.set(
+                    shared_key,
+                    [pair.model_dump(mode="json") for pair in results],
+                    settings.anilist_cache_ttl_seconds,
+                )
+            except Exception:
+                logger.debug("Unable to cache AniList search for %r", query)
         self._remote_search_cache[key] = results
         return results
