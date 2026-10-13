@@ -268,6 +268,7 @@ async def get_stats(request: Request) -> PuzzleStatsPayload:
     )
 
     recent_media: list[RecentMediaSummary] = []
+    await puzzle_engine._warm_media_details(recent_ids, cache, settings)
     for media_id in recent_ids:
         try:
             media = await puzzle_engine._load_media_details(media_id, cache, settings)
@@ -307,6 +308,12 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
         raise HTTPException(status_code=400, detail="Guess cannot be empty")
 
     cache = await get_cache(settings.redis_url)
+    # One AniList request covers both the answer and the guess on a cold cache.
+    await puzzle_engine._warm_media_details(
+        [payload.media_id] + ([payload.guess_media_id] if payload.guess_media_id else []),
+        cache,
+        settings,
+    )
     try:
         media = await puzzle_engine._load_media_details(payload.media_id, cache, settings)
     except Exception as exc:  # pragma: no cover - defensive catch for upstream failures
@@ -556,7 +563,7 @@ async def search_titles(
     # Index miss: ask AniList once per term, then serve the cached answer
     # (including "no results") so repeat searches never leave the server.
     cache = await get_cache(settings.redis_url)
-    search_key = f"anilist:search:{limit}:{title_index.normalize_title(search_term)}"
+    search_key = puzzle_engine._search_cache_key(search_term, limit)
     cached_pairs = await cache.get(search_key)
     if isinstance(cached_pairs, list):
         remote_results = [MediaTitlePair.model_validate(item) for item in cached_pairs]
@@ -593,6 +600,8 @@ _WARM_CONCURRENCY = 4
 
 async def _warm_title_index(media_ids: List[int], cache) -> None:
     """Load details for search hits so later searches and guesses stay local."""
+    # One batched AniList request for every hit; the loads below hit the cache.
+    await puzzle_engine._warm_media_details(media_ids, cache, settings)
     semaphore = asyncio.Semaphore(_WARM_CONCURRENCY)
 
     async def warm(media_id: int) -> None:

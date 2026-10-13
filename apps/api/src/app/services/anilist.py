@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import time
+from collections import deque
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Deque, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 import httpx
 from pydantic import BaseModel, Field
@@ -11,6 +17,8 @@ from .cache import CacheBackend
 
 ANILIST_GQL = "https://graphql.anilist.co"
 ANILIST_AUTH_BASE = "https://anilist.co/api/v2/oauth"
+# AniList's largest page size; anything bigger is silently clamped to it.
+MAX_PER_PAGE = 50
 
 
 class AniListError(RuntimeError):
@@ -146,6 +154,86 @@ query AuthenticatedViewer {
 """
 
 
+# Everything the engine, evaluator and title/character indexes read from a
+# media. Shared by the single, batch and popular-pool queries so a pool item is
+# a complete details record and no follow-up lookup is needed. A page of 50
+# with these fields was confirmed to stay under AniList's query complexity cap.
+MEDIA_DETAIL_FIELDS = """
+    id
+    title {
+      romaji
+      english
+      native
+      userPreferred
+    }
+    synonyms
+    season
+    seasonYear
+    startDate { year }
+    episodes
+    duration
+    genres
+    tags { name rank isGeneralSpoiler }
+    popularity
+    averageScore
+    source
+    description(asHtml: false)
+    status
+    format
+    coverImage { extraLarge large medium color }
+    bannerImage
+    isAdult
+    studios {
+      edges {
+        isMain
+        node { id name }
+      }
+    }
+    relations {
+      edges {
+        relationType
+        node {
+          id
+          title { romaji }
+          type
+          format
+        }
+      }
+    }
+    rankings {
+      season
+      year
+      rank
+      type
+    }
+    trailer {
+      site
+      id
+      thumbnail
+    }
+    externalLinks {
+      site
+      url
+    }
+    characters(perPage: 10, sort: [ROLE, RELEVANCE]) {
+      edges {
+        role
+        node {
+          id
+          name {
+            full
+            native
+            userPreferred
+          }
+          image {
+            large
+            medium
+          }
+        }
+      }
+    }
+"""
+
 POPULAR_POOL_QUERY = """
 query PopularPool($page: Int!, $perPage: Int!) {
   Page(page: $page, perPage: $perPage) {
@@ -161,34 +249,11 @@ query PopularPool($page: Int!, $perPage: Int!) {
       format_in: [TV, TV_SHORT, MOVIE, ONA, OVA]
       status_not_in: [NOT_YET_RELEASED, CANCELLED]
     ) {
-      id
-      title {
-        romaji
-        english
-        native
-        userPreferred
-      }
-      synonyms
-      season
-      seasonYear
-      startDate { year }
-      episodes
-      duration
-      genres
-      tags { name rank isGeneralSpoiler }
-      popularity
-      averageScore
-      description(asHtml: false)
-      status
-      format
-      coverImage { extraLarge large medium color }
-      bannerImage
-      isAdult
-      relations { edges { relationType } }
+%s
     }
   }
 }
-"""
+""" % MEDIA_DETAIL_FIELDS
 
 TOP_RATED_QUERY = """
 query TopRated($page: Int!, $perPage: Int!) {
@@ -348,82 +413,20 @@ query SearchMedia($search: String!, $perPage: Int!) {
 MEDIA_DETAILS_QUERY = """
 query MediaDetails($id: Int!) {
   Media(id: $id, type: ANIME) {
-    id
-    title {
-      romaji
-      english
-      native
-      userPreferred
-    }
-    synonyms
-    season
-    seasonYear
-    startDate { year }
-    episodes
-    duration
-    genres
-    tags { name rank isGeneralSpoiler }
-    popularity
-    averageScore
-    source
-    description(asHtml: false)
-    status
-    format
-    coverImage { extraLarge large medium color }
-    bannerImage
-    isAdult
-    studios {
-      edges {
-        isMain
-        node { id name }
-      }
-    }
-    relations {
-      edges {
-        relationType
-        node {
-          id
-          title { romaji }
-          type
-          format
-        }
-      }
-    }
-    rankings {
-      season
-      year
-      rank
-      type
-    }
-    trailer {
-      site
-      id
-      thumbnail
-    }
-    externalLinks {
-      site
-      url
-    }
-    characters(perPage: 10, sort: [ROLE, RELEVANCE]) {
-      edges {
-        role
-        node {
-          id
-          name {
-            full
-            native
-            userPreferred
-          }
-          image {
-            large
-            medium
-          }
-        }
-      }
+%s
+  }
+}
+""" % MEDIA_DETAIL_FIELDS
+
+MEDIA_DETAILS_BATCH_QUERY = """
+query MediaDetailsBatch($ids: [Int], $perPage: Int!) {
+  Page(page: 1, perPage: $perPage) {
+    media(id_in: $ids, type: ANIME) {
+%s
     }
   }
 }
-"""
+""" % MEDIA_DETAIL_FIELDS
 
 USER_LISTS_QUERY = """
 query UserMediaLists($userId: Int!) {
@@ -452,21 +455,183 @@ query UserMediaLists($userId: Int!) {
 """
 
 
-async def gql_request(query: str, variables: Dict[str, Any], token: str | None = None) -> Dict[str, Any]:
+class AniListRateLimited(AniListError):
+    """AniList is rate limiting us and the wait exceeds the caller's budget."""
+
+    def __init__(self, retry_after: float) -> None:
+        super().__init__(f"AniList rate limit; retry after {retry_after:.0f}s")
+        self.retry_after = retry_after
+
+
+# AniList limits requests per IP per rolling minute (90 normally, 30 while
+# degraded) and answers an overrun with HTTP 429 plus a timeout, so requests
+# are paced client side from the X-RateLimit-* headers instead of discovering
+# the limit by tripping it.
+RATE_WINDOW_SECONDS = 60.0
+DEFAULT_RATE_LIMIT = 30  # assume the degraded limit until AniList reports one
+MAX_ATTEMPTS = 3
+# Longest a request waits for the rate limit before failing. Interactive
+# requests keep the default; batch jobs raise it with `rate_limit_patience`.
+INTERACTIVE_WAIT_SECONDS = 4.0
+
+_wait_budget: ContextVar[float] = ContextVar("anilist_wait_budget", default=INTERACTIVE_WAIT_SECONDS)
+
+
+@contextmanager
+def rate_limit_patience(max_wait_seconds: float) -> Iterator[None]:
+    """Let AniList calls inside this block wait up to `max_wait_seconds` per call."""
+    token = _wait_budget.set(max(0.0, max_wait_seconds))
+    try:
+        yield
+    finally:
+        _wait_budget.reset(token)
+
+
+@dataclass
+class _RateGate:
+    limit: int = DEFAULT_RATE_LIMIT
+    remaining: Optional[int] = None
+    remaining_reset_at: float = 0.0
+    blocked_until: float = 0.0
+    sent: Deque[float] = field(default_factory=deque)
+
+    def _prune(self, now: float) -> None:
+        while self.sent and self.sent[0] <= now - RATE_WINDOW_SECONDS:
+            self.sent.popleft()
+
+    def delay(self, now: float) -> float:
+        """Seconds until a request may be sent without overrunning the limit."""
+        self._prune(now)
+        if self.remaining is not None and now >= self.remaining_reset_at:
+            self.remaining = None
+        wait = max(0.0, self.blocked_until - now)
+        window_wait = self.sent[0] + RATE_WINDOW_SECONDS - now if self.sent else RATE_WINDOW_SECONDS
+        if len(self.sent) >= max(1, self.limit - 1):
+            wait = max(wait, window_wait)
+        if self.remaining is not None and self.remaining <= 0:
+            # Other clients (or workers) on this IP spent the budget.
+            wait = max(wait, self.remaining_reset_at - now)
+        return wait
+
+    def record_send(self, now: float) -> None:
+        self.sent.append(now)
+        if self.remaining is not None:
+            self.remaining -= 1
+
+    def observe(self, status: int, headers: httpx.Headers, now: float) -> Optional[float]:
+        """Update from response headers; return the retry delay for a 429."""
+        limit = _int_header(headers, "X-RateLimit-Limit")
+        if limit and limit > 0:
+            self.limit = limit
+        remaining = _int_header(headers, "X-RateLimit-Remaining")
+        if remaining is not None:
+            self.remaining = remaining
+            reset_at = _float_header(headers, "X-RateLimit-Reset")
+            reset_wait = max(0.0, reset_at - time.time()) if reset_at is not None else RATE_WINDOW_SECONDS
+            self.remaining_reset_at = now + reset_wait
+        if status != 429:
+            return None
+        retry_after = _float_header(headers, "Retry-After")
+        if retry_after is None:
+            reset_at = _float_header(headers, "X-RateLimit-Reset")
+            if reset_at is not None:
+                retry_after = reset_at - time.time()
+        if retry_after is None or retry_after < 0:
+            retry_after = RATE_WINDOW_SECONDS
+        self.blocked_until = max(self.blocked_until, now + retry_after)
+        # Retry-After says when the budget is back; the next response reports it.
+        self.remaining = None
+        return retry_after
+
+
+def _int_header(headers: httpx.Headers, name: str) -> Optional[int]:
+    value = _float_header(headers, name)
+    return int(value) if value is not None else None
+
+
+def _float_header(headers: httpx.Headers, name: str) -> Optional[float]:
+    raw = headers.get(name)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+_gate = _RateGate()
+_inflight: Dict[Tuple[str, str], "asyncio.Future[Dict[str, Any]]"] = {}
+
+
+def reset_rate_state() -> None:
+    """Forget pacing state (tests, or after a long idle period)."""
+    global _gate
+    _gate = _RateGate()
+    _inflight.clear()
+
+
+async def _send(body: Dict[str, Any], headers: Dict[str, str]) -> httpx.Response:
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        return await client.post(ANILIST_GQL, json=body, headers=headers)
+
+
+async def _wait_for_slot(deadline: float) -> None:
+    while True:
+        now = time.monotonic()
+        wait = _gate.delay(now)
+        if wait <= 0:
+            # Checked and recorded without an await in between, so concurrent
+            # callers cannot both take the last slot.
+            _gate.record_send(now)
+            return
+        if now + wait > deadline:
+            raise AniListRateLimited(wait)
+        await asyncio.sleep(wait)
+
+
+async def _perform_request(query: str, variables: Dict[str, Any], token: str | None) -> Dict[str, Any]:
     headers: Dict[str, str] = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.post(
-            ANILIST_GQL,
-            json={"query": query, "variables": variables},
-            headers=headers,
-        )
+    deadline = time.monotonic() + _wait_budget.get()
+    for attempt in range(MAX_ATTEMPTS):
+        await _wait_for_slot(deadline)
+        response = await _send({"query": query, "variables": variables}, headers)
+        retry_after = _gate.observe(response.status_code, response.headers, time.monotonic())
+        if retry_after is not None:
+            if attempt + 1 < MAX_ATTEMPTS and time.monotonic() + retry_after <= deadline:
+                continue  # _wait_for_slot sleeps until the block lifts
+            raise AniListRateLimited(retry_after)
         response.raise_for_status()
         payload = response.json()
         if "errors" in payload:
             raise AniListError(payload["errors"])
         return payload["data"]
+    raise AniListRateLimited(RATE_WINDOW_SECONDS)  # pragma: no cover - loop always returns or raises
+
+
+async def gql_request(query: str, variables: Dict[str, Any], token: str | None = None) -> Dict[str, Any]:
+    """POST a query to AniList, pacing for its rate limit.
+
+    Identical anonymous requests already in flight share one upstream call.
+    A 429 is retried after `Retry-After` while the wait fits the caller's
+    budget (see `rate_limit_patience`); otherwise `AniListRateLimited` is raised.
+    """
+    if token:
+        return await _perform_request(query, variables, token)
+    key = (query, json.dumps(variables, sort_keys=True, default=str))
+    pending = _inflight.get(key)
+    if pending is not None and not pending.done() and pending.get_loop() is asyncio.get_running_loop():
+        return await asyncio.shield(pending)
+    task = asyncio.ensure_future(_perform_request(query, variables, token))
+    _inflight[key] = task
+
+    def _forget(_: "asyncio.Future[Dict[str, Any]]") -> None:
+        if _inflight.get(key) is task:
+            del _inflight[key]
+
+    task.add_done_callback(_forget)
+    return await asyncio.shield(task)
 
 
 async def search_media(query: str, *, limit: int = 10, token: str | None = None) -> List[MediaTitlePair]:
@@ -488,7 +653,13 @@ async def fetch_popular_page(page: int, per_page: int) -> Dict[str, Any]:
     return data["Page"]
 
 
-async def fetch_popular_pool(per_page: int = 100, pages: int = 2) -> List[Media]:
+async def fetch_popular_pool(per_page: int = MAX_PER_PAGE, pages: int = 2) -> List[Media]:
+    """Most popular anime, `pages` pages deep, each item a full details record.
+
+    AniList caps `perPage` at 50 (a request for 100 silently returns 50 with
+    50-item page offsets), so larger values are clamped to the same result.
+    """
+    per_page = max(1, min(per_page, MAX_PER_PAGE))
     media: List[Media] = []
     current_page = 1
     while current_page <= pages:
@@ -714,8 +885,22 @@ async def fetch_media_details(media_id: int) -> Media:
     return Media.model_validate(data["Media"])
 
 
+async def fetch_media_details_batch(media_ids: Sequence[int]) -> Dict[int, Media]:
+    """Details for many ids, one request per 50. Unknown ids are absent from the result."""
+    unique: List[int] = list(dict.fromkeys(int(media_id) for media_id in media_ids))
+    found: Dict[int, Media] = {}
+    for start in range(0, len(unique), MAX_PER_PAGE):
+        chunk = unique[start : start + MAX_PER_PAGE]
+        data = await gql_request(MEDIA_DETAILS_BATCH_QUERY, {"ids": chunk, "perPage": len(chunk)})
+        for item in (data.get("Page") or {}).get("media") or []:
+            media = Media.model_validate(item)
+            found[media.id] = media
+    return found
+
+
 async def fetch_media_bulk(media_ids: Sequence[int]) -> List[Media]:
-    return [await fetch_media_details(media_id) for media_id in media_ids]
+    found = await fetch_media_details_batch(media_ids)
+    return [found[media_id] for media_id in media_ids if media_id in found]
 
 
 async def fetch_user_media_lists(user_id: int, token: str) -> MediaListCollection:

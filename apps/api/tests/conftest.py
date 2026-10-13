@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 import asyncio
@@ -39,3 +40,26 @@ def setup_test_database() -> None:
         db_module._engine = original_engine
         db_module._session_factory = original_factory
         asyncio.run(engine.dispose())
+
+
+@pytest.fixture(autouse=True)
+def isolate_anilist(monkeypatch: pytest.MonkeyPatch):
+    """No test reaches AniList unless it opts into the public smoke run.
+
+    Tests that need upstream behaviour patch `anilist._send` (or a higher
+    level helper) themselves; pacing state starts fresh for every test.
+    """
+    from app.services import anilist
+    from app.services import cache as cache_module
+
+    anilist.reset_rate_state()
+    # Shared AniList cache entries (searches, details) must not leak between tests.
+    monkeypatch.setattr(cache_module, "_cache", None)
+    if os.environ.get("RUN_PUBLIC_UPSTREAM_SMOKE") != "1":
+
+        async def offline_send(body, headers):  # pragma: no cover - only hit by unpatched code
+            raise anilist.AniListError("AniList network access is disabled in tests")
+
+        monkeypatch.setattr(anilist, "_send", offline_send)
+    yield
+    anilist.reset_rate_state()

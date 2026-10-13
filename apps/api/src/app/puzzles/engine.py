@@ -102,7 +102,8 @@ CHARACTERS_PER_ROUND = 4
 # legacy set never attaches to its replacement.
 CURRENT_RULES_VERSION = "3"
 
-# Popularity ranking depth (pages of 100); Hard draws from its bottom third.
+# Popularity ranking depth in AniList pages (50 each, its maximum); Hard draws
+# from the bottom third.
 POPULAR_POOL_PAGES = 4
 
 if hasattr(Image, "Resampling"):
@@ -970,41 +971,123 @@ async def _build_guess_opening_round(
     )
 
 
+def _media_cache_key(media_id: int) -> str:
+    return f"anilist:media:{media_id}"
+
+
+def _search_cache_key(term: str, limit: int) -> str:
+    """Cache key for an AniList title search, shared by search and Anidle evaluation."""
+    # Preserve punctuation and every script: SQL's ASCII title normalization
+    # would merge distinct upstream searches, including mixed-script titles.
+    normalized = " ".join(term.split()).casefold()
+    return f"anilist:search:v2:{limit}:{normalized}"
+
+
+def _missing_media_cache_key(media_id: int) -> str:
+    return f"anilist:media-missing:{media_id}"
+
+
+# Unknown ids (typos, deleted or non-anime entries) are remembered briefly so
+# repeated lookups do not each cost an AniList request.
+MISSING_MEDIA_TTL_SECONDS = 3_600
+
+
 async def _load_popular_pool(day: date, cache: CacheBackend, settings: Settings) -> List[Media]:
-    # v2: four pages (deeper Hard tier) with relation types for sequel filtering.
-    cache_key = f"anilist:popular:v2:{day.isoformat()}"
+    """The popularity ranking, as full details records, fetched once per UTC day.
+
+    The ranking is always today's (AniList keeps no history), so every target
+    day generated today, including archive backfills, shares one fetch.
+    v3: pool items carry every details field, and each is also stored under
+    its media details key so building a set needs no per-anime lookups.
+    """
+    fetched_on = datetime.now(timezone.utc).date()
+    cache_key = f"anilist:popular:v3:{fetched_on.isoformat()}"
+    ttl = settings.anilist_cache_ttl_seconds
 
     async def creator() -> List[dict]:
         media = await anilist.fetch_popular_pool(pages=POPULAR_POOL_PAGES)
-        return [m.model_dump(mode="json") for m in media]
+        raw = [m.model_dump(mode="json") for m in media]
+        for item in raw:
+            await cache.set(_media_cache_key(item["id"]), item, ttl)
+        return raw
 
-    raw_media = await cache.remember(cache_key, settings.anilist_cache_ttl_seconds, creator)
+    raw_media = await cache.remember(cache_key, ttl, creator)
     return [Media.model_validate(item) for item in raw_media]
 
 
-async def _load_media_details(media_id: int, cache: CacheBackend, settings: Settings) -> Media:
-    cache_key = f"anilist:media:{media_id}"
+async def _prefetch_media_details(
+    media_ids: Sequence[int], cache: CacheBackend, settings: Settings
+) -> dict[int, Media]:
+    """Details for `media_ids` from the cache, fetching every miss in one batch.
 
-    async def creator() -> dict:
-        details = await anilist.fetch_media_details(media_id)
-        return details.model_dump(mode="json")
+    Ids AniList does not know are left out of the result and remembered as
+    missing for an hour. Search indexes are not touched here.
+    """
+    found: dict[int, Media] = {}
+    to_fetch: List[int] = []
+    for media_id in dict.fromkeys(int(value) for value in media_ids):
+        raw = await cache.get(_media_cache_key(media_id))
+        if raw is not None:
+            found[media_id] = Media.model_validate(raw)
+        elif await cache.get(_missing_media_cache_key(media_id)) is None:
+            to_fetch.append(media_id)
+    if not to_fetch:
+        return found
 
-    raw = await cache.remember(cache_key, settings.anilist_cache_ttl_seconds, creator)
-    media = Media.model_validate(raw)
+    fetched = await anilist.fetch_media_details_batch(to_fetch)
+    for media_id in to_fetch:
+        media = fetched.get(media_id)
+        if media is None:
+            await cache.set(_missing_media_cache_key(media_id), True, MISSING_MEDIA_TTL_SECONDS)
+            continue
+        await cache.set(_media_cache_key(media_id), media.model_dump(mode="json"), settings.anilist_cache_ttl_seconds)
+        found[media_id] = media
+    return found
 
-    variants = _title_variants(media)
+
+async def _warm_media_details(media_ids: Sequence[int], cache: CacheBackend, settings: Settings) -> None:
+    """Best-effort `_prefetch_media_details` so later per-id loads hit the cache."""
+    if not media_ids:
+        return
+    try:
+        await _prefetch_media_details(media_ids, cache, settings)
+    except Exception as exc:  # per-id loads still work (and report errors) without it
+        logger.debug("Batch media prefetch failed: %s", exc)
+
+
+async def _ingest_media_indices(media_items: Sequence[Media]) -> None:
+    if not media_items:
+        return
     session_factory = get_session_factory()
     async with session_factory() as session:
         try:
-            await title_index.ingest_media(session, media, variants)
-            await character_index.ingest_characters(
-                session, media.characters.edges if media.characters else []
-            )
+            for media in media_items:
+                await title_index.ingest_media(session, media, _title_variants(media))
+                await character_index.ingest_characters(
+                    session, media.characters.edges if media.characters else []
+                )
             await session.commit()
         except Exception:  # pragma: no cover - index warming must not break gameplay
             await session.rollback()
-            logger.exception("Failed to warm search indices for media %s", media.id)
+            logger.exception(
+                "Failed to warm search indices for media %s", [media.id for media in media_items]
+            )
 
+
+async def _load_media_details_many(
+    media_ids: Sequence[int], cache: CacheBackend, settings: Settings
+) -> dict[int, Media]:
+    """Like `_load_media_details` for many ids: at most one AniList request per 50 misses."""
+    found = await _prefetch_media_details(media_ids, cache, settings)
+    await _ingest_media_indices(list(found.values()))
+    return found
+
+
+async def _load_media_details(media_id: int, cache: CacheBackend, settings: Settings) -> Media:
+    found = await _load_media_details_many([media_id], cache, settings)
+    media = found.get(int(media_id))
+    if media is None:
+        raise LookupError(f"AniList has no anime with id {media_id}")
     return media
 
 

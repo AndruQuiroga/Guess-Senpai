@@ -22,6 +22,7 @@ from typing import List, Optional
 from ..core.config import settings
 from ..core.database import get_session_factory
 from ..db.models import DailyPuzzleSet
+from ..services import anilist
 from . import engine
 
 logger = logging.getLogger(__name__)
@@ -59,16 +60,19 @@ async def backfill(
     days: int,
     *,
     today: Optional[date] = None,
-    pause_seconds: float = 45.0,
+    pause_seconds: float = 5.0,
     retries: int = 4,
     retry_wait_seconds: float = 90.0,
+    rate_limit_wait_seconds: float = 120.0,
     republish_legacy: bool = False,
 ) -> List[date]:
     """Publish each missing day, pausing between days and retrying failures.
 
-    Every new day needs dozens of AniList lookups; back-to-back days exceed
-    AniList's per-minute limit (HTTP 429), so days are spaced out and a failed
-    day waits and tries again before moving on.
+    AniList data comes from one shared popularity fetch per run (the pool
+    carries full details), so extra days cost almost no AniList requests.
+    Calls made here may wait out AniList's rate limit for up to
+    `rate_limit_wait_seconds` instead of failing; the short pause between days
+    spaces out AnimeThemes lookups, and a failed day still retries.
     """
     published: List[date] = []
     for index, day in enumerate(await missing_days(days, today, include_legacy=republish_legacy)):
@@ -76,11 +80,12 @@ async def backfill(
             await asyncio.sleep(pause_seconds)
         for attempt in range(retries + 1):
             try:
-                await engine.publish_daily_puzzle(
-                    day,
-                    include_guess_opening=settings.animethemes_enabled,
-                    replace_legacy=republish_legacy,
-                )
+                with anilist.rate_limit_patience(rate_limit_wait_seconds):
+                    await engine.publish_daily_puzzle(
+                        day,
+                        include_guess_opening=settings.animethemes_enabled,
+                        replace_legacy=republish_legacy,
+                    )
             except Exception:
                 logger.warning("Publishing %s failed (attempt %d)", day, attempt + 1, exc_info=True)
                 if attempt < retries:
