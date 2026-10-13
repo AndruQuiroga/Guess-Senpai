@@ -49,12 +49,19 @@ export default function SynopsisRedacted({
 }: Props) {
   const [round, setRound] = useState(initialProgress?.round ?? 1);
   const [guess, setGuess] = useState("");
-  const [guesses, setGuesses] = useState<string[]>(initialProgress?.guesses ?? []);
-  const [completed, setCompleted] = useState(initialProgress?.completed ?? false);
+  const [guesses, setGuesses] = useState<string[]>(
+    initialProgress?.guesses ?? [],
+  );
+  const [completed, setCompleted] = useState(
+    initialProgress?.completed ?? false,
+  );
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
 
-  const normalizedAnswer = useMemo(() => payload.answer.trim().toLowerCase(), [payload.answer]);
+  const normalizedAnswer = useMemo(
+    () => payload.answer.trim().toLowerCase(),
+    [payload.answer],
+  );
 
   useEffect(() => {
     if (!initialProgress) {
@@ -99,7 +106,9 @@ export default function SynopsisRedacted({
       return totalMasked;
     }
 
-    const activeSpecs = payload.spec.filter((spec) => spec.difficulty <= hintRound);
+    const activeSpecs = payload.spec.filter(
+      (spec) => spec.difficulty <= hintRound,
+    );
     let maxTokens = 0;
     activeSpecs.forEach((spec) => {
       spec.hints.forEach((hint) => {
@@ -135,7 +144,10 @@ export default function SynopsisRedacted({
       const isMasked = segment.masked && !revealSet.has(index);
       if (isMasked) {
         return (
-          <span key={`segment-${index}`} className="relative inline-flex align-baseline">
+          <span
+            key={`segment-${index}`}
+            className="relative inline-flex align-baseline"
+          >
             <span className="sr-only">Masked word</span>
             <span
               aria-hidden
@@ -153,7 +165,13 @@ export default function SynopsisRedacted({
         </span>
       );
     });
-  }, [completed, payload.masked_word_indices, payload.segments, payload.text, wordsToReveal]);
+  }, [
+    completed,
+    payload.masked_word_indices,
+    payload.segments,
+    payload.text,
+    wordsToReveal,
+  ]);
 
   useEffect(() => {
     onProgressChange({ completed, round, guesses });
@@ -240,12 +258,12 @@ export default function SynopsisRedacted({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[1.8rem] border border-white/10 bg-white/5 p-5 text-base leading-relaxed text-neutral-100 shadow-inner shadow-black/10 whitespace-pre-wrap">
+      <div className="rounded-lg border border-line-strong bg-panel-raised p-5 text-base leading-relaxed text-paper   whitespace-pre-wrap">
         {renderedSynopsis}
       </div>
-      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
+      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-muted">
         {revealedWordCount > 0 && (
-          <span className="rounded-full border border-brand-400/30 bg-brand-500/10 px-3 py-1 font-semibold text-white/90">
+          <span className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 font-semibold text-paper">
             Revealed words: {revealedWordCount}
           </span>
         )}
@@ -264,20 +282,20 @@ export default function SynopsisRedacted({
         />
         <button
           type="submit"
-          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-lg bg-signal !text-signal-ink px-6 py-3 text-sm font-semibold uppercase tracking-wide text-paper  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={completed}
         >
           Submit
         </button>
       </form>
-      <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
+      <div className="space-y-3 text-sm text-muted" aria-live="polite">
         {guesses.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-muted">
             Attempts
             {guesses.map((value, index) => (
               <span
                 key={`${value}-${index}`}
-                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
+                className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 text-sm text-muted"
               >
                 {value}
               </span>
@@ -285,12 +303,12 @@ export default function SynopsisRedacted({
           </div>
         )}
         {feedback?.type === "error" && (
-          <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger-ink">
             {feedback.message}
           </div>
         )}
         {feedback?.type === "success" && (
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <div className="rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm text-correct-ink">
             {feedback.message}
           </div>
         )}

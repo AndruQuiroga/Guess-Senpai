@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-import logging
-from datetime import date
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import settings
 from .core.database import register_database
-from .puzzles.engine import get_daily_puzzle
 from .routers import auth, health, live, notifications, profile, puzzles
 
-
-logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -53,12 +47,5 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-@app.on_event("startup")
-async def warm_puzzle_cache() -> None:
-    try:
-        await get_daily_puzzle(
-            date.today(),
-            include_guess_opening=settings.animethemes_enabled,
-        )
-    except Exception as exc:
-        logger.warning("Failed to warm puzzle cache: %s", exc)
+# Daily publication is lazy. Upstream metadata/media work must not block startup
+# or prevent health checks and unrelated routes from becoming available.

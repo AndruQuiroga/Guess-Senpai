@@ -3,17 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import CharacterSilhouette from "../CharacterSilhouette";
-import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
-import type { DailyProgress, GameProgress } from "../../types/progress";
+import type { GameProgress } from "../../types/progress";
 import type { CharacterSilhouetteGame } from "../../types/puzzles";
 
 interface Props {
-  slug: string;
   mediaId: number;
   payload: CharacterSilhouetteGame;
   progress?: GameProgress;
-  dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
@@ -21,11 +18,9 @@ interface Props {
 }
 
 export function CharacterSilhouettePage({
-  slug,
   mediaId,
   payload,
   progress,
-  dailyProgress,
   accountDifficulty,
   difficultyHint,
   onProgressChange,
@@ -96,9 +91,11 @@ export function CharacterSilhouettePage({
     <div className="space-y-6">
       <GameShell
         title="Character Silhouette"
-        round={displayRound}
-        totalRounds={totalRounds}
-        actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
+        status={
+          <>
+            Round {displayRound} / {totalRounds}
+          </>
+        }
       >
         <CharacterSilhouette
           mediaId={mediaId}

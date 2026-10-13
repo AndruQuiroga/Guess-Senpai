@@ -22,3 +22,8 @@ docker-compose.override.yml
 .DS_Store
 .vscode
 .idea
+
+# Build/tool outputs
+*.tsbuildinfo
+artifacts/
+.next-*/

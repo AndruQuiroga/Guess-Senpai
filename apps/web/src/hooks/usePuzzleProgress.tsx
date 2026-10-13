@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { useAccount } from "./useAccount";
 import type { AnidleGuessHistoryEntry } from "../types/anidle";
 import { normalizeAnidleEvaluation } from "../utils/normalizeAnidleEvaluation";
 import type {
@@ -57,6 +58,8 @@ interface PuzzleProgressContextValue {
 
 interface PuzzleProgressProviderProps {
   date: string;
+  puzzleId?: string;
+  rulesVersion?: string;
   initialProgress?: DailyProgress | null;
   children: ReactNode;
 }
@@ -95,7 +98,9 @@ function stableStringify(value: unknown): string {
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`);
+      .map(
+        ([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`,
+      );
     return `{${entries.join(",")}}`;
   }
   return JSON.stringify(value);
@@ -235,7 +240,7 @@ function normalizeAnidleHistoryEntry(
   const evaluation =
     rawEvaluation === undefined || rawEvaluation === null
       ? undefined
-      : normalizeAnidleEvaluation(rawEvaluation, guess) ?? undefined;
+      : (normalizeAnidleEvaluation(rawEvaluation, guess) ?? undefined);
 
   const entry: AnidleGuessHistoryEntry = {
     guess,
@@ -354,8 +359,7 @@ function normalizeGameRoundProgress(value: unknown): GameRoundProgress | null {
         ? String((record as Record<string, unknown>)["poster_image_url"])
         : undefined;
   const feedbackTypeRaw =
-    record.feedbackType ??
-    (record as Record<string, unknown>)["feedback_type"];
+    record.feedbackType ?? (record as Record<string, unknown>)["feedback_type"];
   const feedbackMessageRaw =
     record.feedbackMessage ??
     (record as Record<string, unknown>)["feedback_message"];
@@ -430,11 +434,7 @@ function normalizeGameRoundProgress(value: unknown): GameRoundProgress | null {
 
   if (typeof feedbackTypeRaw === "string") {
     const lowered = feedbackTypeRaw.trim().toLowerCase();
-    if (
-      lowered === "success" ||
-      lowered === "partial" ||
-      lowered === "error"
-    ) {
+    if (lowered === "success" || lowered === "partial" || lowered === "error") {
       normalized.feedbackType = lowered as RoundFeedbackType;
     }
   }
@@ -520,6 +520,14 @@ function normalizeGameProgressEntry(value: unknown): GameProgress | null {
     normalized.anidleHistory = anidleHistory;
   }
 
+  const attemptLimit = coercePositiveInteger(
+    recordEntries["attemptLimit"] ?? recordEntries["attempt_limit"],
+    1,
+  );
+  if (attemptLimit !== undefined) {
+    normalized.attemptLimit = attemptLimit;
+  }
+
   return normalized;
 }
 
@@ -553,9 +561,7 @@ function getDateStorageKey(date: string): string {
   return `${STORAGE_KEY_PREFIX}${date}`;
 }
 
-function normalizePersistedState(
-  value: unknown,
-): PersistedDailyState | null {
+function normalizePersistedState(value: unknown): PersistedDailyState | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -612,7 +618,10 @@ function readLocalStorageState(date: string): PersistedDailyState | null {
       const payload = JSON.stringify({ progress: { ...normalized.progress } });
       window.localStorage.setItem(directKey, payload);
     } catch (error) {
-      console.warn("Failed to migrate puzzle progress to optimized storage", error);
+      console.warn(
+        "Failed to migrate puzzle progress to optimized storage",
+        error,
+      );
     }
 
     try {
@@ -748,336 +757,335 @@ function readStoredState(date: string): PersistedDailyState {
   return cloneState(EMPTY_STATE);
 }
 
+/** Same-tab signal so read-only views (navigation) can follow progress writes. */
+export const PROGRESS_CHANGED_EVENT = "guesssenpai:progress-changed";
+
+function notifyStoredProgressChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(PROGRESS_CHANGED_EVENT));
+}
+
 function writeStoredState(date: string, value: PersistedDailyState) {
   if (!date) return;
   writeLocalStorageState(date, value);
   writeCookieState(date, value);
 }
 
+// A sync response must never replace a more advanced local game. Keep whole
+// attempts together rather than fabricating a history by unioning guesses.
+export function mergeProgress(
+  local: DailyProgress,
+  remote: DailyProgress,
+  preferRemoteOnTie = false,
+): DailyProgress {
+  const merged = { ...local };
+  const rank = (entry: GameProgress) => [
+    Number(entry.completed),
+    entry.round,
+    entry.rounds?.filter((round) => round.completed).length ?? 0,
+    entry.guesses.length +
+      (entry.rounds?.reduce((n, round) => n + round.guesses.length, 0) ?? 0),
+  ];
+  for (const [key, candidate] of Object.entries(remote)) {
+    if (!candidate) continue;
+    const game = key as GameKey;
+    const current = merged[game];
+    if (!current) {
+      merged[game] = candidate;
+      continue;
+    }
+    const a = rank(current),
+      b = rank(candidate);
+    const difference = a.findIndex((value, index) => value !== b[index]);
+    if (
+      (difference >= 0 && b[difference] > a[difference]) ||
+      (difference < 0 && preferRemoteOnTie)
+    )
+      merged[game] = candidate;
+  }
+  return merged;
+}
+
 function usePuzzleProgressController(
   date: string,
   initialProgress?: DailyProgress | null,
+  puzzleId = `daily:${date}`,
+  rulesVersion = "1",
+  userId: number | null = null,
+  enabled = true,
 ): UsePuzzleProgressValue {
-  const normalizedInitialProgress = useMemo<DailyProgress | null>(() => {
-    if (initialProgress && Object.keys(initialProgress).length > 0) {
-      return normalizeProgress(initialProgress);
-    }
-    return null;
-  }, [initialProgress]);
-
-  const [state, setState] = useState<PersistedDailyState>(() => {
-    const baseState = readStoredState(date);
-    if (normalizedInitialProgress) {
-      const merged: PersistedDailyState = {
-        progress: { ...baseState.progress, ...normalizedInitialProgress },
-      };
-      if (
-        stableStringify(merged.progress) !==
-        stableStringify(baseState.progress)
-      ) {
-        writeStoredState(date, merged);
-        return merged;
-      }
-    }
-    return baseState;
-  });
+  // Guest keys retain the first shared-daily format. Account state is isolated;
+  // unowned records are never silently imported into a signed-in account.
+  const storageKey = `${date}:${puzzleId}:v${rulesVersion}${userId === null ? "" : `:user:${userId}`}`;
+  const [state, setState] = useState<PersistedDailyState>(() => ({
+    progress: {},
+  }));
+  const stateRef = useRef(state);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<ProgressFetchError | null>(
     null,
   );
-
-  useEffect(() => {
-    const nextState = readStoredState(date);
-    let targetState = nextState;
-
-    if (normalizedInitialProgress) {
-      const merged: PersistedDailyState = {
-        progress: { ...nextState.progress, ...normalizedInitialProgress },
-      };
-      if (
-        stableStringify(merged.progress) !==
-        stableStringify(nextState.progress)
-      ) {
-        targetState = merged;
-        writeStoredState(date, merged);
-      }
-    }
-
-    setState((previous) => {
-      if (
-        stableStringify(previous.progress) ===
-        stableStringify(targetState.progress)
-      ) {
-        return previous;
-      }
-      return targetState;
-    });
-  }, [date, normalizedInitialProgress]);
+  const generation = useRef(0);
+  const active = useRef(false);
+  const pending = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushing = useRef(false);
+  const flushRef = useRef<() => Promise<void>>(async () => {});
+  const abortRef = useRef<AbortController | null>(null);
 
   const persist = useCallback(
-    (updater: (previous: PersistedDailyState) => PersistedDailyState) => {
-      setState((prev) => {
-        const base = cloneState(prev);
-        const next = updater(base);
-        writeStoredState(date, next);
-        return next;
-      });
+    (progress: DailyProgress) => {
+      const next = { progress };
+      stateRef.current = next;
+      writeStoredState(storageKey, next);
+      setState(next);
+      notifyStoredProgressChanged();
     },
-    [date],
+    [storageKey],
   );
 
-  const fetchProgressFromServer = useCallback(
-    async (signal?: AbortSignal): Promise<DailyProgress | null> => {
-      if (!date) {
-        return null;
-      }
+  const scheduleFlush = useCallback(
+    (delay = FLUSH_DELAY_MS) => {
+      if (userId === null || !active.current || timer.current) return;
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        void flushRef.current();
+      }, delay);
+    },
+    [userId],
+  );
 
-      const response = await fetch(`${API_BASE}/puzzles/progress?d=${date}`, {
+  const flush = useCallback(async () => {
+    if (
+      !active.current ||
+      userId === null ||
+      !pending.current ||
+      flushing.current
+    )
+      return;
+    const version = generation.current;
+    flushing.current = true;
+    pending.current = false;
+    try {
+      const response = await fetch(`${API_BASE}/puzzles/progress`, {
+        method: "PUT",
         credentials: "include",
-        signal,
+        signal: abortRef.current?.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          puzzle_id: puzzleId,
+          rules_version: rulesVersion,
+          account_user_id: userId,
+          progress: stateRef.current.progress,
+        }),
       });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          const authError = new Error("Unauthorized") as ProgressFetchError;
-          authError.status = response.status;
-          throw authError;
-        }
-        const statusError = new Error(
-          `Request failed with status ${response.status}`,
-        ) as ProgressFetchError;
-        statusError.status = response.status;
-        throw statusError;
+      if (!response.ok) throw new Error("Progress sync failed. Please retry.");
+      if (active.current && version === generation.current)
+        setRefreshError(null);
+    } catch (error) {
+      if (active.current && version === generation.current) {
+        pending.current = true;
+        setRefreshError(error as ProgressFetchError);
       }
-
-      const payload = (await response.json()) as ProgressResponse;
-      if (!payload || typeof payload !== "object") {
-        return {};
+    } finally {
+      if (version === generation.current) {
+        flushing.current = false;
+        if (pending.current) scheduleFlush(RETRY_DELAY_MS);
       }
+    }
+  }, [date, puzzleId, rulesVersion, userId, scheduleFlush]);
+  flushRef.current = flush;
 
-      const serverProgress = payload.progress ?? {};
-      const normalized = normalizeProgress(serverProgress);
-      persist(() => ({
-        progress: normalized,
-      }));
-      return normalized;
-    },
-    [date, persist],
-  );
+  const refresh = useCallback(async (): Promise<RefreshResult> => {
+    if (!enabled || !date || !active.current) return { success: false };
+    // Guest progress is exclusively local. An empty unauthenticated response
+    // must never clear a game, and guest data must never enter an account queue.
+    if (userId === null)
+      return { success: true, progress: stateRef.current.progress };
+    const version = generation.current;
+    setIsRefreshing(true);
+    setRefreshError(null);
+    try {
+      const query = new URLSearchParams({
+        d: date,
+        puzzle_id: puzzleId,
+        rules_version: rulesVersion,
+        account_user_id: String(userId),
+      });
+      const response = await fetch(`${API_BASE}/puzzles/progress?${query}`, {
+        credentials: "include",
+        signal: abortRef.current?.signal,
+      });
+      if (!response.ok) throw new Error("Unable to refresh saved progress");
+      const payload = await response.json();
+      if (
+        payload.date !== date ||
+        payload.puzzle_id !== puzzleId ||
+        payload.rules_version !== rulesVersion ||
+        payload.account_user_id !== userId
+      ) {
+        throw new Error(
+          "Progress response does not match this account and puzzle",
+        );
+      }
+      if (!active.current || version !== generation.current)
+        return { success: false };
+      const remote = normalizeProgress(payload.progress);
+      const progress = mergeProgress(stateRef.current.progress, remote);
+      persist(progress);
+      if (stableStringify(progress) !== stableStringify(remote)) {
+        pending.current = true;
+        scheduleFlush();
+      }
+      return { success: true, progress };
+    } catch (error) {
+      if (active.current && version === generation.current)
+        setRefreshError(error as ProgressFetchError);
+      return { success: false, error: error as ProgressFetchError };
+    } finally {
+      if (active.current && version === generation.current)
+        setIsRefreshing(false);
+    }
+  }, [date, puzzleId, rulesVersion, userId, enabled, persist, scheduleFlush]);
 
   useEffect(() => {
-    if (!date) return;
-
-    const abortController = new AbortController();
-    let cancelled = false;
-
-    fetchProgressFromServer(abortController.signal)
-      .then((serverProgress) => {
-        if (cancelled || !serverProgress) {
-          return;
-        }
-      })
-      .catch((error: ProgressFetchError) => {
-        if (error?.name === "AbortError") {
-          return;
-        }
-        if (error?.status === 401) {
-          return;
-        }
-        console.warn("Failed to hydrate puzzle progress from server", error);
-      });
-
+    if (!enabled || !date) return;
+    active.current = true;
+    ++generation.current;
+    abortRef.current = new AbortController();
+    const local = readStoredState(storageKey);
+    const progress = mergeProgress(
+      local.progress,
+      normalizeProgress(initialProgress),
+    );
+    stateRef.current = { progress };
+    setState({ progress });
+    void refresh();
     return () => {
-      cancelled = true;
-      abortController.abort();
+      active.current = false;
+      ++generation.current;
+      abortRef.current?.abort();
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+      pending.current = false;
+      flushing.current = false;
+      // Local state is already durable. Do not send on unmount: cookies may
+      // now belong to another account. Next hydration retries this owner's data.
     };
-  }, [date, fetchProgressFromServer]);
-
-  const pendingUpdatesRef = useRef<DailyProgress>({});
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const pushUpdatesToServer = useCallback(
-    async (updates: DailyProgress): Promise<boolean> => {
-      if (!date || Object.keys(updates).length === 0) {
-        return true;
-      }
-
-      try {
-        const normalizedUpdates = normalizeProgress(updates);
-        const response = await fetch(`${API_BASE}/puzzles/progress`, {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date,
-            progress: normalizedUpdates,
-          }),
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            return true;
-          }
-          console.warn(
-            "Failed to update puzzle progress on server",
-            response.statusText,
-          );
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.warn("Failed to update puzzle progress on server", error);
-        return false;
-      }
-    },
-    [date],
-  );
-
-  const flushPendingUpdates = useCallback(async () => {
-    if (!date) {
-      pendingUpdatesRef.current = {};
-      flushTimerRef.current = null;
-      return;
-    }
-
-    const updates = pendingUpdatesRef.current;
-    pendingUpdatesRef.current = {};
-    flushTimerRef.current = null;
-
-    if (Object.keys(updates).length === 0) {
-      return;
-    }
-
-    const wasSuccessful = await pushUpdatesToServer(updates);
-    if (!wasSuccessful) {
-      pendingUpdatesRef.current = {
-        ...updates,
-        ...pendingUpdatesRef.current,
-      };
-
-      if (!flushTimerRef.current) {
-        flushTimerRef.current = setTimeout(() => {
-          void flushPendingUpdates();
-        }, RETRY_DELAY_MS);
-      }
-    }
-  }, [date, pushUpdatesToServer]);
-
-  const scheduleFlush = useCallback(() => {
-    if (flushTimerRef.current) {
-      return;
-    }
-
-    flushTimerRef.current = setTimeout(() => {
-      void flushPendingUpdates();
-    }, FLUSH_DELAY_MS);
-  }, [flushPendingUpdates]);
-
-  useEffect(() => {
-    return () => {
-      if (flushTimerRef.current) {
-        clearTimeout(flushTimerRef.current);
-        flushTimerRef.current = null;
-      }
-
-      const pending = pendingUpdatesRef.current;
-      pendingUpdatesRef.current = {};
-
-      if (date && Object.keys(pending).length > 0) {
-        void pushUpdatesToServer(pending);
-      }
-    };
-  }, [date, pushUpdatesToServer]);
+  }, [enabled, date, storageKey, refresh]);
 
   const recordGame = useCallback(
     (game: GameKey, progressState: GameProgress) => {
+      if (!active.current || !enabled) return;
       const normalized = normalizeGameProgressEntry(progressState);
-      if (!normalized) {
+      if (
+        !normalized ||
+        areGameProgressEntriesEqual(stateRef.current.progress[game], normalized)
+      )
         return;
-      }
-
-      const current = state.progress[game];
-      if (areGameProgressEntriesEqual(current, normalized)) {
+      const progress = mergeProgress(
+        stateRef.current.progress,
+        { [game]: normalized },
+        true,
+      );
+      if (
+        stableStringify(progress) === stableStringify(stateRef.current.progress)
+      )
         return;
-      }
-
-      persist((prev) => ({
-        progress: { ...prev.progress, [game]: normalized },
-      }));
-      pendingUpdatesRef.current = {
-        ...pendingUpdatesRef.current,
-        [game]: normalized,
-      };
+      persist(progress);
+      pending.current = true;
       scheduleFlush();
     },
-    [persist, scheduleFlush, state.progress],
+    [enabled, persist, scheduleFlush],
   );
 
-  const refresh = useCallback(async (): Promise<RefreshResult> => {
-    if (!date) {
-      const error = new Error(
-        "No date available to refresh progress",
-      ) as ProgressFetchError;
-      setRefreshError(error);
-      return { success: false, error };
-    }
-
-    setIsRefreshing(true);
-    setRefreshError(null);
-
-    try {
-      const serverProgress = await fetchProgressFromServer();
-      if (!serverProgress) {
-        const error = new Error(
-          "No remote progress available",
-        ) as ProgressFetchError;
-        setRefreshError(error);
-        return { success: false, error };
-      }
-      return { success: true, progress: serverProgress };
-    } catch (error) {
-      const normalized =
-        error instanceof Error
-          ? (error as ProgressFetchError)
-          : (new Error(String(error)) as ProgressFetchError);
-      setRefreshError(normalized);
-      return { success: false, error: normalized };
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [date, fetchProgressFromServer]);
-
-  const value = useMemo<UsePuzzleProgressValue>(
-    () => ({
-      progress: state.progress,
-      recordGame,
-      refresh,
-      isRefreshing,
-      refreshError,
-    }),
-    [state.progress, recordGame, refresh, isRefreshing, refreshError],
-  );
-
-  return value;
+  return {
+    progress: state.progress,
+    recordGame,
+    refresh,
+    isRefreshing,
+    refreshError,
+  };
 }
 
-export function PuzzleProgressProvider({
+function ScopedProgressProvider({
   date,
+  puzzleId,
+  rulesVersion,
   initialProgress,
   children,
-}: PuzzleProgressProviderProps) {
-  const value = usePuzzleProgressController(date, initialProgress);
-  const contextValue = useMemo<PuzzleProgressContextValue>(
-    () => ({ date, value }),
-    [date, value],
+  userId,
+}: PuzzleProgressProviderProps & { userId: number | null }) {
+  const value = usePuzzleProgressController(
+    date,
+    initialProgress,
+    puzzleId,
+    rulesVersion,
+    userId,
   );
-
+  const contextValue = useMemo(() => ({ date, value }), [date, value]);
   return (
     <PuzzleProgressContext.Provider value={contextValue}>
+      {value.refreshError && (
+        <div role="status" className="panel mb-4 p-4">
+          Account progress could not sync. Your current game is still open.{" "}
+          <button className="button" onClick={() => void value.refresh()}>
+            Retry sync
+          </button>
+        </div>
+      )}
       {children}
     </PuzzleProgressContext.Provider>
   );
+}
+
+export function PuzzleProgressProvider(props: PuzzleProgressProviderProps) {
+  const { account, loading, resolved } = useAccount();
+  const userId = account.authenticated ? (account.user?.id ?? null) : null;
+  if (loading && !resolved) return <p role="status">Loading saved progress…</p>;
+  return (
+    <ScopedProgressProvider
+      {...props}
+      userId={userId}
+      key={`${props.date}:${props.puzzleId}:${props.rulesVersion}:${userId ?? "guest"}`}
+    />
+  );
+}
+
+/**
+ * Read-only view of the progress that provider-backed pages persist. Used by
+ * navigation, which lives outside any PuzzleProgressProvider and must not start
+ * its own sync. Returns null until the daily identity and account are known,
+ * so callers never claim "new" before they actually know.
+ */
+export function useStoredDailyProgress(
+  daily: { date: string; puzzle_id: string; rules_version: string } | null,
+): DailyProgress | null {
+  const { account, loading, resolved } = useAccount();
+  const userId = account.authenticated ? (account.user?.id ?? null) : null;
+  const ready = Boolean(daily) && (!loading || resolved);
+  const storageKey = daily
+    ? `${daily.date}:${daily.puzzle_id}:v${daily.rules_version}${userId === null ? "" : `:user:${userId}`}`
+    : "";
+  const [progress, setProgress] = useState<DailyProgress | null>(null);
+
+  useEffect(() => {
+    if (!ready || !storageKey) {
+      setProgress(null);
+      return;
+    }
+    const read = () => setProgress(readStoredState(storageKey).progress);
+    read();
+    window.addEventListener(PROGRESS_CHANGED_EVENT, read);
+    window.addEventListener("storage", read);
+    return () => {
+      window.removeEventListener(PROGRESS_CHANGED_EVENT, read);
+      window.removeEventListener("storage", read);
+    };
+  }, [ready, storageKey]);
+
+  return progress;
 }
 
 export function usePuzzleProgress(
@@ -1085,9 +1093,16 @@ export function usePuzzleProgress(
   initialProgress?: DailyProgress | null,
 ) {
   const context = useContext(PuzzleProgressContext);
-  if (context && context.date === date) {
-    return context.value;
-  }
-
-  return usePuzzleProgressController(date, initialProgress);
+  const { account, loading } = useAccount();
+  const matching = context?.date === date;
+  // Always call the hook; a provider appearing later must not change hook order.
+  const fallback = usePuzzleProgressController(
+    date,
+    initialProgress,
+    undefined,
+    undefined,
+    account.authenticated ? (account.user?.id ?? null) : null,
+    !matching && !loading,
+  );
+  return matching ? context.value : fallback;
 }

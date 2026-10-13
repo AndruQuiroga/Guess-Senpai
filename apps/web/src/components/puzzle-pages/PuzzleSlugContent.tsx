@@ -13,7 +13,10 @@ import { CharacterSilhouettePage } from "./CharacterSilhouettePage";
 import { PosterZoomedPage } from "./PosterZoomedPage";
 import { RedactedSynopsisPage } from "./RedactedSynopsisPage";
 import { GuessOpeningPage } from "./GuessOpeningPage";
-import { PUZZLE_SLUGS, type PuzzleSlugDefinition } from "../../app/games/[slug]/slugs";
+import {
+  PUZZLE_SLUGS,
+  type PuzzleSlugDefinition,
+} from "../../app/games/[slug]/slugs";
 import type {
   AnidleGame,
   CharacterSilhouetteGame,
@@ -60,12 +63,15 @@ export function PuzzleSlugContent({ data, slug }: Props) {
     });
   }, [data]);
 
-  const progressHandlers = useMemo<Record<GameKey, (state: GameProgress) => void>>(
+  const progressHandlers = useMemo<
+    Record<GameKey, (state: GameProgress) => void>
+  >(
     () => ({
       anidle: (state) => recordGame("anidle", state),
       poster_zoomed: (state) => recordGame("poster_zoomed", state),
       redacted_synopsis: (state) => recordGame("redacted_synopsis", state),
-      character_silhouette: (state) => recordGame("character_silhouette", state),
+      character_silhouette: (state) =>
+        recordGame("character_silhouette", state),
       guess_the_opening: (state) => recordGame("guess_the_opening", state),
     }),
     [recordGame],
@@ -89,40 +95,36 @@ export function PuzzleSlugContent({ data, slug }: Props) {
 
   if (!data) {
     return (
-      <div className="relative flex min-h-[50vh] flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 text-center text-neutral-100 shadow-ambient backdrop-blur-xl">
-        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-        <p className="max-w-md text-sm text-neutral-200">
-          Couldn&apos;t load today&apos;s puzzles. Please refresh or try again later.
+      <div className="panel flex min-h-[40vh] flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="max-w-md text-sm text-muted">
+          Couldn&apos;t load today&apos;s puzzles. Your saved progress is kept.
         </p>
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   if (!gameKey) {
-    return (
-      <PlaceholderPuzzlePage
-        title={slug.title}
-        slug={slug.slug}
-        description={slug.description}
-        dailyProgress={progress}
-      />
-    );
+    return <PlaceholderPuzzlePage title={slug.title} />;
   }
 
   switch (gameKey) {
     case "anidle":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
-        const anidleBundle = bundle as { mediaId: number; puzzle: AnidleGame };
+        const anidleBundle = bundle as {
+          mediaId: number;
+          puzzle: AnidleGame;
+          solution?: { coverImage?: string | null };
+        };
         return (
           <AnidlePage
             slug={slug.slug}
@@ -134,28 +136,23 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.anidle}
             nextSlug={nextSlug}
+            answerCoverImage={anidleBundle.solution?.coverImage ?? null}
           />
         );
       }
     case "poster_zoomed":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
-        const posterBundle = bundle as { mediaId: number; puzzle: PosterZoomGame };
+        const posterBundle = bundle as {
+          mediaId: number;
+          puzzle: PosterZoomGame;
+        };
         return (
           <PosterZoomedPage
-            slug={slug.slug}
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.poster_zoomed}
@@ -165,14 +162,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
     case "character_silhouette":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
         const silhouetteBundle = bundle as {
@@ -181,11 +171,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         };
         return (
           <CharacterSilhouettePage
-            slug={slug.slug}
             mediaId={silhouetteBundle.mediaId}
             payload={silhouetteBundle.puzzle}
             progress={progress.character_silhouette}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.character_silhouette}
@@ -195,14 +183,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
     case "redacted_synopsis":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
         const synopsisBundle = bundle as {
@@ -211,11 +192,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         };
         return (
           <RedactedSynopsisPage
-            slug={slug.slug}
             mediaId={synopsisBundle.mediaId}
             payload={synopsisBundle.puzzle}
             progress={progress.redacted_synopsis}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.redacted_synopsis}
@@ -225,24 +204,18 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
     case "guess_the_opening":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
-        const openingBundle = bundle as { mediaId: number; puzzle: GuessOpeningGame };
+        const openingBundle = bundle as {
+          mediaId: number;
+          puzzle: GuessOpeningGame;
+        };
         return (
           <GuessOpeningPage
-            slug={slug.slug}
             mediaId={openingBundle.mediaId}
             payload={openingBundle.puzzle}
             progress={progress.guess_the_opening}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.guess_the_opening}
@@ -251,13 +224,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         );
       }
     default:
-      return (
-        <PlaceholderPuzzlePage
-          title={slug.title}
-          slug={slug.slug}
-          description={slug.description}
-          dailyProgress={progress}
-        />
-      );
+      return <PlaceholderPuzzlePage title={slug.title} />;
   }
 }

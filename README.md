@@ -1,5 +1,7 @@
 # GuessSenpai
 
+For a source-based inventory of implemented features, unfinished work, setup findings, and validation limits, see [Repository State](docs/REPOSITORY_STATE.md) (reviewed 2026-10-12). Some feature descriptions and roadmap items below predate the current implementation.
+
 GuessSenpai is a glassy, modern web experience for daily anime guessing challenges powered by AniList and AnimeThemes. Players test their knowledge across multiple game modes, track streaks, and share results in style.
 
 ---

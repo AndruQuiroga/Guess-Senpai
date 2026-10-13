@@ -45,3 +45,18 @@ export function formatDurationFromMs(durationMs: number): string {
 
   return `${hoursPart}:${minutesPart}:${secondsPart}`;
 }
+
+/**
+ * Milliseconds from `now` to the next 00:00 UTC. Always in (0, 24h]; it does
+ * not depend on the puzzle payload, whose `reset_at` can arrive without a
+ * timezone suffix and then be misread as local time (hours over 24).
+ */
+export function getMsUntilNextUtcMidnight(now: number = Date.now()): number {
+  const date = new Date(now);
+  const next = Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate() + 1,
+  );
+  return next - now;
+}

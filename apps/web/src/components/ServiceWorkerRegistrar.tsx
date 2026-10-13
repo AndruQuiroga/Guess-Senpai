@@ -17,9 +17,8 @@ export default function ServiceWorkerRegistrar(): null {
 
     const register = async () => {
       try {
-        const registration = await navigator.serviceWorker.register(
-          SERVICE_WORKER_PATH,
-        );
+        const registration =
+          await navigator.serviceWorker.register(SERVICE_WORKER_PATH);
 
         if (cancelled) {
           await registration.unregister();
@@ -56,11 +55,17 @@ export default function ServiceWorkerRegistrar(): null {
       }
     };
 
-    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      handleControllerChange,
+    );
     handleControllerChange();
 
     return () => {
-      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        handleControllerChange,
+      );
     };
   }, []);
 

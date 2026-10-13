@@ -13,10 +13,9 @@ import {
 
 import {
   buildRuntimeGamesDirectory,
+  getPlayableGames,
   type GameDirectoryEntry,
 } from "../config/games";
-import type { DailyPuzzleResponse } from "../types/puzzles";
-
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 declare global {
@@ -36,39 +35,51 @@ function logDailyAvailabilityError() {
 
 interface DailyAvailabilityState {
   guessTheOpeningEnabled: boolean;
-  loading: boolean;
-  error: boolean;
+  status: "pending" | "ready" | "error";
+  daily: {
+    date: string;
+    puzzle_id: string;
+    rules_version: string;
+    reset_at: string;
+    available_modes: string[];
+  } | null;
 }
 
 interface DailyAvailabilityContextValue extends DailyAvailabilityState {
+  loading: boolean;
+  error: boolean;
   refresh: () => Promise<void>;
 }
 
-const DailyAvailabilityContext = createContext<DailyAvailabilityContextValue | null>(null);
+const DailyAvailabilityContext =
+  createContext<DailyAvailabilityContextValue | null>(null);
 
-function extractGuessOpeningEnabled(payload: DailyPuzzleResponse | null): boolean {
-  return Boolean(payload?.guess_the_opening_enabled);
-}
-
-export function DailyAvailabilityProvider({ children }: { children: ReactNode }) {
+export function DailyAvailabilityProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [state, setState] = useState<DailyAvailabilityState>({
     guessTheOpeningEnabled: false,
-    loading: true,
-    error: false,
+    status: "pending",
+    daily: null,
   });
   const mountedRef = useRef(true);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
   }, []);
 
   const fetchAvailability = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: false }));
+    const requestId = ++requestIdRef.current;
+    setState((prev) => ({ ...prev, status: "pending" }));
 
     try {
-      const response = await fetch(`${API_BASE}/puzzles/today`, {
+      const response = await fetch(`${API_BASE}/puzzles/availability`, {
         credentials: "include",
         cache: "no-store",
       });
@@ -77,32 +88,49 @@ export function DailyAvailabilityProvider({ children }: { children: ReactNode })
         throw new Error(`Request failed with status ${response.status}`);
       }
 
-      let payload: DailyPuzzleResponse | null = null;
-      try {
-        payload = (await response.json()) as DailyPuzzleResponse;
-      } catch (error) {
-        console.warn("Failed to parse daily availability payload", error);
+      const payload: unknown = await response.json();
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        typeof (payload as { guess_the_opening_enabled?: unknown })
+          .guess_the_opening_enabled !== "boolean"
+      ) {
+        throw new Error("Malformed daily availability response");
       }
 
-      if (!mountedRef.current) {
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
         return;
       }
 
+      const daily = payload as NonNullable<DailyAvailabilityState["daily"]>;
+      if (
+        typeof daily.date !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(daily.date) ||
+        typeof daily.puzzle_id !== "string" ||
+        typeof daily.rules_version !== "string" ||
+        !Number.isFinite(Date.parse(daily.reset_at)) ||
+        !Array.isArray(daily.available_modes)
+      ) {
+        throw new Error("Malformed daily identity response");
+      }
+
       setState({
-        guessTheOpeningEnabled: extractGuessOpeningEnabled(payload),
-        loading: false,
-        error: false,
+        guessTheOpeningEnabled: Boolean(
+          (payload as { guess_the_opening_enabled: boolean })
+            .guess_the_opening_enabled,
+        ),
+        status: "ready",
+        daily,
       });
     } catch (error) {
       console.warn("Failed to load daily availability", error);
       logDailyAvailabilityError();
-      if (!mountedRef.current) {
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
         return;
       }
       setState((prev) => ({
         ...prev,
-        loading: false,
-        error: true,
+        status: "error",
       }));
     }
   }, []);
@@ -114,6 +142,8 @@ export function DailyAvailabilityProvider({ children }: { children: ReactNode })
   const value = useMemo<DailyAvailabilityContextValue>(
     () => ({
       ...state,
+      loading: state.status === "pending",
+      error: state.status === "error",
       refresh: fetchAvailability,
     }),
     [state, fetchAvailability],
@@ -129,18 +159,27 @@ export function DailyAvailabilityProvider({ children }: { children: ReactNode })
 export function useDailyAvailability(): DailyAvailabilityContextValue {
   const context = useContext(DailyAvailabilityContext);
   if (!context) {
-    throw new Error("useDailyAvailability must be used within a DailyAvailabilityProvider");
+    throw new Error(
+      "useDailyAvailability must be used within a DailyAvailabilityProvider",
+    );
   }
   return context;
 }
 
+/**
+ * User-facing game list: only modes that are playable right now. Unreleased
+ * modes never appear, and the optional opening mode appears only when today's
+ * availability enables it (hidden while availability is pending or failed).
+ */
 export function useRuntimeGamesDirectory(): GameDirectoryEntry[] {
   const { guessTheOpeningEnabled } = useDailyAvailability();
   return useMemo(
     () =>
-      buildRuntimeGamesDirectory({
-        guessTheOpeningEnabled,
-      }),
+      getPlayableGames(
+        buildRuntimeGamesDirectory({
+          guessTheOpeningEnabled,
+        }),
+      ),
     [guessTheOpeningEnabled],
   );
 }

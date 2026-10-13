@@ -168,9 +168,7 @@ export function ShareComposer({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <p className="text-sm font-medium text-neutral-200/80">
-          Customize your card
-        </p>
+        <p className="text-sm font-medium text-muted">Customize your card</p>
         <div className="flex flex-wrap gap-3">
           {SHARE_CARD_THEMES.map((theme) => {
             const active = selectedTheme === theme.id;
@@ -179,7 +177,7 @@ export function ShareComposer({
                 key={theme.id}
                 type="button"
                 onClick={() => handleThemeSelect(theme.id)}
-                className={`group relative overflow-hidden rounded-2xl border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${active ? "border-white/80 shadow-[0_0_24px_rgba(148,163,184,0.6)]" : "border-white/15 shadow-ambient"}`}
+                className={`group relative overflow-hidden rounded-lg border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${active ? "border-line-strong" : "border-line-strong"}`}
                 style={{
                   background: theme.previewGradient,
                   color: theme.textColor,
@@ -187,14 +185,13 @@ export function ShareComposer({
                 aria-pressed={active}
               >
                 <div className="relative z-10 space-y-1">
-                  <span className="text-xs font-semibold uppercase tracking-[0.3em] text-white/70">
+                  <span className="text-xs font-semibold uppercase tracking-[0.3em] text-paper">
                     Theme
                   </span>
-                  <p className="text-sm font-medium text-white/90">
+                  <p className="text-sm font-medium text-paper">
                     {theme.label}
                   </p>
                 </div>
-                <div className="pointer-events-none absolute inset-0 bg-black/10 mix-blend-soft-light" />
               </button>
             );
           })}
@@ -205,14 +202,18 @@ export function ShareComposer({
           type="button"
           onClick={handleShareCard}
           disabled={shareLocked || isProcessing}
-          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(147,51,234,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-lg border border-signal bg-signal hover:bg-signal-hover px-5 py-2 text-sm font-semibold text-signal-ink transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {shareLocked ? "Play a round to unlock" : isProcessing ? "Preparing…" : "Share card"}
+          {shareLocked
+            ? "Play a round to unlock"
+            : isProcessing
+              ? "Preparing…"
+              : "Share card"}
         </button>
         <button
           type="button"
           onClick={handleShareSummary}
-          className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/90 shadow-ambient transition hover:border-brand-400/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+          className="inline-flex items-center justify-center rounded-lg border border-line-strong bg-panel-raised px-5 py-2 text-sm font-semibold text-paper transition hover:border-signal hover:text-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
         >
           Share summary
         </button>
@@ -220,13 +221,13 @@ export function ShareComposer({
           href={shareIntentUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center rounded-2xl border border-sky-400/40 bg-sky-500/20 px-5 py-2 text-sm font-semibold text-sky-100 shadow-ambient transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200/80"
+          className="inline-flex items-center justify-center rounded-lg border border-info bg-info-soft px-5 py-2 text-sm font-semibold text-info-ink transition hover:border-info hover:text-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200/80"
         >
           Post to X
         </a>
       </div>
       {status ? (
-        <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs text-white/90 shadow-inner transition">
+        <p className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-panel-raised px-4 py-1.5 text-xs text-paper transition">
           {status}
         </p>
       ) : null}

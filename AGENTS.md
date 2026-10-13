@@ -1,5 +1,10 @@
 # Repository Guidelines
 
+## Repository Context
+- Read `docs/REPOSITORY_STATE.md` for the reviewed architecture, implemented versus planned features, setup gaps, and validation limits (reviewed 2026-10-12).
+- Read `docs/UX_UI_AUDIT.md` before changing navigation, game discovery, dialogs, or shared UI patterns; it records known interaction defects and outstanding visual QA.
+- Recheck the source before relying on that snapshot, and update it when material architecture or feature boundaries change.
+
 ## Project Structure & Module Organization
 - `apps/api`: FastAPI backend with domain packages under `src/app` (`routers`, `services`, `puzzles`, `core`).
 - `apps/web`: Next.js frontend; routes live in `src/app`, shared UI in `src/components`, global styles in `src/styles`.

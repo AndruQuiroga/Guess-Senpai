@@ -21,7 +21,7 @@ export default function NextPuzzleButton({ nextSlug, className }: Props) {
     : "Back to daily puzzles";
 
   const combinedClassName = buildClassName(
-    "mt-3 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-5 py-2 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.02]",
+    "button button-primary mt-3 w-full sm:w-auto",
     className,
   );
 

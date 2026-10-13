@@ -1,11 +1,22 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime, timezone
+from typing import Annotated, Any, Dict, List, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from ..services.anilist import Title
+
+
+def ensure_utc(value: datetime) -> datetime:
+    """Return an aware UTC datetime. SQLite drops tzinfo on read; treat naive values as UTC."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+# Serialises with an explicit offset ("Z") so browsers never parse it as local time.
+UtcDatetime = Annotated[datetime, AfterValidator(ensure_utc)]
 
 
 class RoundSpec(BaseModel):
@@ -29,10 +40,17 @@ class AnidleHints(BaseModel):
     synopsis: List[SynopsisHint] = Field(default_factory=list)
 
 
+class AnidleRules(BaseModel):
+    version: str = "2"
+    max_attempts: int = 8
+    hint_after_incorrect: List[int] = Field(default_factory=lambda: [2, 4, 6])
+
+
 class AnidleGame(BaseModel):
     spec: List[RoundSpec]
     answer: str
     hints: AnidleHints
+    rules: Optional[AnidleRules] = None
 
 
 class PosterZoomMeta(BaseModel):
@@ -154,6 +172,14 @@ class AnidlePuzzleBundle(BaseModel):
     solution: SolutionPayload
 
 
+class AnidlePracticeResponse(BaseModel):
+    """A throwaway Unlimited Anidle game. Never published or stored server side."""
+
+    practice_id: str
+    rules_version: str = "2"
+    anidle: AnidlePuzzleBundle
+
+
 class PosterZoomPuzzleBundle(BaseModel):
     mediaId: int
     puzzle: PosterZoomGame
@@ -233,6 +259,11 @@ class SolutionPayload(BaseModel):
 
 class DailyPuzzleResponse(BaseModel):
     date: date
+    puzzle_id: str
+    rules_version: str
+    reset_at: UtcDatetime
+    available_modes: List[str] = Field(default_factory=list)
+    mode_puzzle_ids: Dict[str, str] = Field(default_factory=dict)
     games: GamesPayload
     guess_the_opening_enabled: bool = False
 
@@ -413,6 +444,12 @@ class GameProgressPayload(BaseModel):
         validation_alias=AliasChoices("anidle_history", "anidleHistory"),
         serialization_alias="anidleHistory",
     )
+    attempt_limit: Optional[int] = Field(
+        default=None,
+        ge=1,
+        validation_alias=AliasChoices("attempt_limit", "attemptLimit"),
+        serialization_alias="attemptLimit",
+    )
 
     @model_validator(mode="after")
     def _normalize(self) -> "GameProgressPayload":
@@ -522,6 +559,9 @@ class GameProgressPayload(BaseModel):
 
 class DailyProgressPayload(BaseModel):
     date: date
+    puzzle_id: Optional[str] = None
+    rules_version: Optional[str] = None
+    account_user_id: Optional[int] = None
     progress: Dict[str, GameProgressPayload] = Field(default_factory=dict)
 
 

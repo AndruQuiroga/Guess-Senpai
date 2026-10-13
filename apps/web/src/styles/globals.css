@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -8,54 +8,179 @@
 
 :root {
   color-scheme: dark;
+
+  /* Surfaces */
+  --ink: #171819; /* page background */
+  --panel: #242628; /* cards, fields */
+  --panel-raised: #2c2f31; /* raised cards, buttons, menus */
+  --hover: #34373a; /* hover surface on panels */
+
+  /* Lines */
+  --line: #484b4d; /* default 1px border */
+  --line-subtle: #383a3c; /* dividers inside a panel */
+  --line-strong: #686b6d; /* interactive borders, hover borders */
+
+  /* Text */
+  --paper: #f4f0e7; /* primary text */
+  --muted: #c1c2bd; /* secondary text */
+
+  /* Brand */
+  --signal: #ff7658; /* vermilion accent, primary button fill */
+  --signal-hover: #ff8a70;
+  --signal-text: #ff987f; /* accent used as text/links */
+  --signal-soft: #3a2a25; /* accent-tinted opaque surface */
+  --signal-deep: #a44b38; /* accent border on soft surface */
+  --signal-ink: #27110b; /* text on --signal */
+  --focus: #ff9b83; /* focus ring */
+
+  /* Puzzle feedback. DEFAULT = fill/border/text, -soft = surface, -ink = text on -soft */
+  --correct: #5aa97c;
+  --correct-soft: #1f3a2c;
+  --correct-ink: #9fd8b0;
+  --close: #c9a13e;
+  --close-soft: #3d3220;
+  --close-ink: #f2c36b;
+  --wrong: #8f9293;
+  --wrong-soft: #2c2f31;
+  --wrong-ink: #b4b6b1;
+
+  /* Status */
+  --danger: #e07a8d;
+  --danger-soft: #40242a;
+  --danger-ink: #ffb3bf;
+  --info: #4b87a6;
+  --info-soft: #22343f;
+  --info-ink: #a9d8ef;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius: 10px;
+
+  /* Type */
+  --font-display: "Bricolage Grotesque", "DM Sans", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  @apply font-sans text-neutral-100 bg-[#020617];
+  @apply font-sans;
   min-height: 100vh;
-  background-color: #020617;
-  background-image: radial-gradient(
-      circle at 20% 15%,
-      rgba(59, 130, 246, 0.12),
-      rgba(15, 23, 42, 0.7) 52%,
-      rgba(2, 6, 23, 0.95) 92%
-    ),
-    radial-gradient(
-      circle at 75% 8%,
-      rgba(236, 72, 153, 0.08),
-      rgba(2, 6, 23, 0.9) 55%
-    );
-  background-attachment: fixed;
-  background-size: cover;
-  background-position: center;
-  position: relative;
+  background: var(--ink);
+  color: var(--paper);
   overflow-x: hidden;
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  inset: -10%;
-  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='240'%20viewBox='0%200%20240%20240'%3E%3Cfilter%20id='noise'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.9'%20numOctaves='3'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23noise)'%20opacity='0.08'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 480px 480px;
-  mix-blend-mode: screen;
-  opacity: 0.28;
-  filter: saturate(110%) blur(0.35px);
-  z-index: -2;
-  pointer-events: none;
+* {
+  scrollbar-color: var(--line-strong) var(--panel);
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+*:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+a {
+  color: inherit;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.5);
-  border-radius: 9999px;
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.skip-link {
+  position: absolute;
+  z-index: 100;
+  top: 0.5rem;
+  left: 0.5rem;
+  transform: translateY(-160%);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.75rem 1rem;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.game-shell input {
+  min-height: 44px;
+}
+
+.button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 1.15rem;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button-primary {
+  background: var(--signal);
+  color: var(--signal-ink);
+  border: 1px solid var(--signal);
+}
+
+.button-primary:hover {
+  background: var(--signal-hover);
+}
+
+.status-pill {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Native form controls stay readable across puzzle modes. */
+.game-shell button,
+.game-shell select {
+  min-height: 44px;
+}
+.game-shell select,
+.game-shell input {
+  font-size: 1rem;
+}
+.game-shell select option {
+  background: var(--panel-raised);
+  color: var(--paper);
+}
+.game-shell button:disabled {
+  cursor: not-allowed;
+}
+.game-shell form > *,
+.game-shell form > div > * {
+  min-width: 0;
 }

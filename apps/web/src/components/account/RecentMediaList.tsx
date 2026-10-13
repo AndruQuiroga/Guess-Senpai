@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { GlassSection } from "../GlassSection";
+import { PanelSection } from "../PanelSection";
 
 interface MediaTitle {
   romaji?: string | null;
@@ -20,27 +20,37 @@ interface RecentMediaListProps {
 
 function resolveTitle(title: MediaTitle): string {
   return (
-    title.userPreferred || title.english || title.romaji || title.native || "Unknown title"
+    title.userPreferred ||
+    title.english ||
+    title.romaji ||
+    title.native ||
+    "Unknown title"
   );
 }
 
 export function RecentMediaList({ items }: RecentMediaListProps) {
   return (
-    <GlassSection innerClassName="space-y-4" className="h-full">
+    <PanelSection innerClassName="space-y-4" className="h-full">
       <header className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-brand-200/80">Recent puzzles</p>
-        <h2 className="text-lg font-semibold text-white">Recently featured titles</h2>
+        <p className="text-xs uppercase tracking-wider text-signal-text">
+          Recent puzzles
+        </p>
+        <h2 className="text-lg font-semibold text-paper">
+          Recently featured titles
+        </h2>
       </header>
       {items.length === 0 ? (
-        <p className="text-sm text-neutral-300">Play a few rounds to start building your personal anime timeline.</p>
+        <p className="text-sm text-muted">
+          Play a few rounds to start building your personal anime timeline.
+        </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-neutral-200 transition hover:border-brand-300/60"
+              className="flex items-center gap-3 rounded-lg border border-line bg-panel p-3 text-sm text-muted transition hover:border-signal"
             >
-              <div className="h-16 w-12 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+              <div className="h-16 w-12 overflow-hidden rounded-lg border border-line bg-ink">
                 {item.coverImage ? (
                   <img
                     src={item.coverImage}
@@ -49,19 +59,21 @@ export function RecentMediaList({ items }: RecentMediaListProps) {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[0.65rem] uppercase tracking-wide text-neutral-400">
+                  <div className="flex h-full w-full items-center justify-center text-[0.65rem] uppercase tracking-wide text-muted">
                     No art
                   </div>
                 )}
               </div>
               <div className="space-y-1">
-                <p className="font-semibold text-white/90">{resolveTitle(item.title)}</p>
-                <p className="text-xs text-neutral-400">AniList #{item.id}</p>
+                <p className="font-semibold text-paper">
+                  {resolveTitle(item.title)}
+                </p>
+                <p className="text-xs text-muted">AniList #{item.id}</p>
               </div>
             </li>
           ))}
         </ul>
       )}
-    </GlassSection>
+    </PanelSection>
   );
 }

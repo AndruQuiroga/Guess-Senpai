@@ -1,40 +1,92 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Semantic colours resolve to CSS variables declared on :root in
+ * src/styles/globals.css (the single source of truth). Opacity modifiers
+ * (e.g. `bg-signal/50`) are intentionally unsupported; use a token instead.
+ */
+const v = (name: string) => `var(--${name})`;
+
 export default {
   darkMode: ["class"],
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      borderRadius: { "2xl": "1.25rem", "3xl": "1.75rem" },
+      borderRadius: {
+        sm: "var(--radius-sm)",
+        md: "var(--radius-sm)",
+        DEFAULT: "var(--radius)",
+        lg: "var(--radius)",
+        xl: "var(--radius)",
+        "2xl": "var(--radius)",
+        "3xl": "var(--radius)",
+      },
       fontFamily: {
-        sans: ["'Inter'", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["'Space Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)"],
+        display: ["var(--font-display)"],
       },
       colors: {
+        ink: v("ink"),
+        panel: { DEFAULT: v("panel"), raised: v("panel-raised") },
+        hover: v("hover"),
+        line: {
+          DEFAULT: v("line"),
+          subtle: v("line-subtle"),
+          strong: v("line-strong"),
+        },
+        paper: v("paper"),
+        muted: v("muted"),
+        focus: v("focus"),
+        signal: {
+          DEFAULT: v("signal"),
+          hover: v("signal-hover"),
+          text: v("signal-text"),
+          soft: v("signal-soft"),
+          deep: v("signal-deep"),
+          ink: v("signal-ink"),
+        },
+        correct: {
+          DEFAULT: v("correct"),
+          soft: v("correct-soft"),
+          ink: v("correct-ink"),
+        },
+        close: {
+          DEFAULT: v("close"),
+          soft: v("close-soft"),
+          ink: v("close-ink"),
+        },
+        wrong: {
+          DEFAULT: v("wrong"),
+          soft: v("wrong-soft"),
+          ink: v("wrong-ink"),
+        },
+        danger: {
+          DEFAULT: v("danger"),
+          soft: v("danger-soft"),
+          ink: v("danger-ink"),
+        },
+        info: {
+          DEFAULT: v("info"),
+          soft: v("info-soft"),
+          ink: v("info-ink"),
+        },
+        // Legacy aliases kept for existing utilities; prefer the tokens above.
         brand: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e3a8a",
-          900: "#172554",
+          50: "#fff1ed",
+          100: "#ffe1d9",
+          200: "#ffc2b3",
+          300: "#ffa18b",
+          400: "#ff896e",
+          500: "#ff7658",
+          600: "#e95c3e",
+          700: "#b8422a",
+          800: "#70291c",
+          900: "#3a1d17",
         },
         surface: {
-          base: "rgba(12, 17, 36, 0.9)",
-          raised: "rgba(18, 26, 46, 0.8)",
+          base: v("ink"),
+          raised: v("panel-raised"),
         },
-      },
-      boxShadow: {
-        glow: "0 25px 65px -20px rgba(59, 130, 246, 0.45)",
-        ambient: "0 30px 80px -40px rgba(15, 23, 42, 0.8)",
-      },
-      backgroundImage: {
-        "aurora": "radial-gradient(circle at 20% 20%, rgba(59,130,246,0.35), transparent 45%), radial-gradient(circle at 80% 0%, rgba(236,72,153,0.25), transparent 40%), radial-gradient(circle at 50% 80%, rgba(34,211,238,0.25), transparent 45%)",
-        "grid-dark": "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
       },
     },
   },

@@ -9,10 +9,7 @@ import {
   useState,
 } from "react";
 
-import {
-  GameProgress,
-  GameRoundProgress,
-} from "../hooks/usePuzzleProgress";
+import { GameProgress, GameRoundProgress } from "../hooks/usePuzzleProgress";
 import { PosterZoomGame as PosterPayload } from "../types/puzzles";
 import { resolveHintRound } from "../utils/difficulty";
 import { formatMediaFormatLabel } from "../utils/formatMediaFormatLabel";
@@ -205,7 +202,8 @@ export default function PosterZoom({
         resolvedTitle: entry.resolvedTitle ?? entry.resolvedAnswer,
         resolvedYear: entry.resolvedYear,
         seasonGuess:
-          typeof entry.seasonGuess === "string" && entry.seasonGuess.trim().length > 0
+          typeof entry.seasonGuess === "string" &&
+          entry.seasonGuess.trim().length > 0
             ? entry.seasonGuess.trim().toUpperCase()
             : undefined,
         seasonYearGuess: entry.seasonYearGuess,
@@ -238,7 +236,10 @@ export default function PosterZoom({
           activeHintCount = totalStages - 1;
         } else {
           const clampedRound = Math.max(1, Math.min(totalStages, hintRound));
-          activeHintCount = Math.max(0, Math.min(totalStages - 1, clampedRound - 1));
+          activeHintCount = Math.max(
+            0,
+            Math.min(totalStages - 1, clampedRound - 1),
+          );
         }
       }
 
@@ -247,9 +248,12 @@ export default function PosterZoom({
           ? `${API_BASE}/puzzles/poster/${round.mediaId}/image`
           : null;
       const cropImageUrl =
-        posterImageBase !== null ? `${posterImageBase}?hints=${activeHintCount}` : null;
+        posterImageBase !== null
+          ? `${posterImageBase}?hints=${activeHintCount}`
+          : null;
       const unlocked =
-        index <= 0 || roundStates.slice(0, index).every((entry) => entry.completed);
+        index <= 0 ||
+        roundStates.slice(0, index).every((entry) => entry.completed);
 
       return {
         roundNumber: index + 1,
@@ -270,11 +274,16 @@ export default function PosterZoom({
     roundControllersRef.current = roundControllers;
   }, [roundControllers]);
 
-  const updateRoundDraft = useCallback((index: number, patch: Partial<RoundDraft>) => {
-    setRoundDrafts((prev) =>
-      prev.map((entry, idx) => (idx === index ? { ...entry, ...patch } : entry)),
-    );
-  }, []);
+  const updateRoundDraft = useCallback(
+    (index: number, patch: Partial<RoundDraft>) => {
+      setRoundDrafts((prev) =>
+        prev.map((entry, idx) =>
+          idx === index ? { ...entry, ...patch } : entry,
+        ),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     const fallbackIndex = clampRoundIndex((initialProgress?.round ?? 1) - 1);
@@ -312,11 +321,13 @@ export default function PosterZoom({
         : [];
 
       const storedSeason =
-        typeof stored?.seasonGuess === "string" && stored.seasonGuess.trim().length > 0
+        typeof stored?.seasonGuess === "string" &&
+        stored.seasonGuess.trim().length > 0
           ? stored.seasonGuess.trim().toUpperCase()
           : undefined;
       const storedSeasonYear =
-        typeof stored?.seasonYearGuess === "number" && Number.isFinite(stored.seasonYearGuess)
+        typeof stored?.seasonYearGuess === "number" &&
+        Number.isFinite(stored.seasonYearGuess)
           ? Math.trunc(stored.seasonYearGuess)
           : undefined;
       const storedFeedbackType = stored?.feedbackType;
@@ -452,12 +463,7 @@ export default function PosterZoom({
     setSeasonSelection(nextDrafts[targetIndex]?.season ?? "");
     setSeasonYear(nextDrafts[targetIndex]?.year ?? "");
     guessFieldRef.current?.close();
-  }, [
-    clampRoundIndex,
-    initialProgress,
-    payload,
-    storedRoundMap,
-  ]);
+  }, [clampRoundIndex, initialProgress, payload, storedRoundMap]);
 
   useEffect(() => {
     if (!registerRoundController) return;
@@ -515,7 +521,8 @@ export default function PosterZoom({
   );
 
   const puzzleCompleted = useMemo(
-    () => roundStates.length > 0 && roundStates.every((state) => state.completed),
+    () =>
+      roundStates.length > 0 && roundStates.every((state) => state.completed),
     [roundStates],
   );
 
@@ -528,7 +535,11 @@ export default function PosterZoom({
   const hintRound = currentController
     ? currentController.hintRound
     : currentState && currentRound
-      ? resolveHintRound(currentState.stage, totalStagesForRound, accountDifficulty)
+      ? resolveHintRound(
+          currentState.stage,
+          totalStagesForRound,
+          accountDifficulty,
+        )
       : 1;
 
   const activeHintCount = currentController?.activeHintCount ?? 0;
@@ -562,7 +573,9 @@ export default function PosterZoom({
             hints.push(`Season: ${currentRound.meta.season}`);
           }
           if (hint === "format" && currentRound.meta.format) {
-            const formattedLabel = formatMediaFormatLabel(currentRound.meta.format);
+            const formattedLabel = formatMediaFormatLabel(
+              currentRound.meta.format,
+            );
             hints.push(`Format: ${formattedLabel}`);
           }
         });
@@ -647,14 +660,16 @@ export default function PosterZoom({
                 resolvedYear:
                   round.meta.year ?? parsedYear ?? entry.resolvedYear,
                 lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
-                lastSeasonYearGuess:
-                  parsedYear ?? entry.lastSeasonYearGuess,
+                lastSeasonYearGuess: parsedYear ?? entry.lastSeasonYearGuess,
               };
             }
 
             if (result.animeMatch) {
               let partialMessage = "Title correct! ";
-              if (result.seasonMatch === false && result.seasonYearMatch === false) {
+              if (
+                result.seasonMatch === false &&
+                result.seasonYearMatch === false
+              ) {
                 partialMessage += "Check the release season and year.";
               } else if (result.seasonMatch === false) {
                 partialMessage += "Check the release season.";
@@ -670,8 +685,7 @@ export default function PosterZoom({
                 canonicalTitle: matchTitle,
                 feedback: createFeedback("partial", partialMessage),
                 lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
-                lastSeasonYearGuess:
-                  parsedYear ?? entry.lastSeasonYearGuess,
+                lastSeasonYearGuess: parsedYear ?? entry.lastSeasonYearGuess,
               };
             }
 
@@ -680,15 +694,11 @@ export default function PosterZoom({
               ...entry,
               guesses: [...entry.guesses, trimmed],
               yearGuesses,
-              feedback: createFeedback(
-                "error",
-                "Not quite. Keep trying!",
-              ),
+              feedback: createFeedback("error", "Not quite. Keep trying!"),
               stage: nextStage,
               hintUsed: nextStage > entry.stage ? true : entry.hintUsed,
               lastSeasonGuess: seasonGuessValue ?? entry.lastSeasonGuess,
-              lastSeasonYearGuess:
-                parsedYear ?? entry.lastSeasonYearGuess,
+              lastSeasonYearGuess: parsedYear ?? entry.lastSeasonYearGuess,
             };
           });
 
@@ -708,7 +718,11 @@ export default function PosterZoom({
           setGuess("");
           setSeasonSelection("");
           setSeasonYear("");
-          updateRoundDraft(activeRoundIndex, { guess: "", season: "", year: "" });
+          updateRoundDraft(activeRoundIndex, {
+            guess: "",
+            season: "",
+            year: "",
+          });
         } else if (result.animeMatch) {
           setGuess(matchTitle);
           updateRoundDraft(activeRoundIndex, { guess: matchTitle });
@@ -781,49 +795,58 @@ export default function PosterZoom({
 
   useEffect(() => {
     const aggregatedGuesses = roundStates.flatMap((state) => state.guesses);
-    const roundsProgress: GameRoundProgress[] = roundStates.map((state, index) => {
-      const controller = roundControllers[index];
-      const guesses = [...state.guesses];
-      const titleGuesses = guesses.length ? [...guesses] : undefined;
-      const yearGuesses = state.yearGuesses.length ? [...state.yearGuesses] : undefined;
-      const feedbackType = state.feedback?.type;
-      const feedbackMessage = state.feedback?.message;
-      const seasonGuess = state.lastSeasonGuess
-        ? state.lastSeasonGuess.trim().toUpperCase()
-        : undefined;
-      const seasonYearGuess =
-        state.lastSeasonYearGuess !== undefined &&
-        Number.isFinite(state.lastSeasonYearGuess)
-          ? Math.trunc(state.lastSeasonYearGuess)
+    const roundsProgress: GameRoundProgress[] = roundStates.map(
+      (state, index) => {
+        const controller = roundControllers[index];
+        const guesses = [...state.guesses];
+        const titleGuesses = guesses.length ? [...guesses] : undefined;
+        const yearGuesses = state.yearGuesses.length
+          ? [...state.yearGuesses]
           : undefined;
-      const resolvedTitleCandidate = state.canonicalTitle?.trim();
-      const includeResolvedTitle =
-        resolvedTitleCandidate && (state.completed || feedbackType === "partial");
+        const feedbackType = state.feedback?.type;
+        const feedbackMessage = state.feedback?.message;
+        const seasonGuess = state.lastSeasonGuess
+          ? state.lastSeasonGuess.trim().toUpperCase()
+          : undefined;
+        const seasonYearGuess =
+          state.lastSeasonYearGuess !== undefined &&
+          Number.isFinite(state.lastSeasonYearGuess)
+            ? Math.trunc(state.lastSeasonYearGuess)
+            : undefined;
+        const resolvedTitleCandidate = state.canonicalTitle?.trim();
+        const includeResolvedTitle =
+          resolvedTitleCandidate &&
+          (state.completed || feedbackType === "partial");
 
-      return {
-        round: index + 1,
-        guesses,
-        titleGuesses,
-        yearGuesses,
-        seasonGuess,
-        seasonYearGuess,
-        stage: state.stage,
-        completed: state.completed,
-        hintUsed: state.hintUsed,
-        resolvedAnswer:
-          state.completed && resolvedTitleCandidate ? resolvedTitleCandidate : undefined,
-        resolvedTitle: includeResolvedTitle ? resolvedTitleCandidate : undefined,
-        resolvedYear:
-          state.completed && state.resolvedYear !== undefined
-            ? state.resolvedYear
+        return {
+          round: index + 1,
+          guesses,
+          titleGuesses,
+          yearGuesses,
+          seasonGuess,
+          seasonYearGuess,
+          stage: state.stage,
+          completed: state.completed,
+          hintUsed: state.hintUsed,
+          resolvedAnswer:
+            state.completed && resolvedTitleCandidate
+              ? resolvedTitleCandidate
+              : undefined,
+          resolvedTitle: includeResolvedTitle
+            ? resolvedTitleCandidate
             : undefined,
-        mediaId: controller?.mediaId ?? undefined,
-        posterImageBase: controller?.posterImageBase ?? undefined,
-        posterImageUrl: controller?.cropImageUrl ?? undefined,
-        feedbackType,
-        feedbackMessage: feedbackType ? feedbackMessage : undefined,
-      };
-    });
+          resolvedYear:
+            state.completed && state.resolvedYear !== undefined
+              ? state.resolvedYear
+              : undefined,
+          mediaId: controller?.mediaId ?? undefined,
+          posterImageBase: controller?.posterImageBase ?? undefined,
+          posterImageUrl: controller?.cropImageUrl ?? undefined,
+          feedbackType,
+          feedbackMessage: feedbackType ? feedbackMessage : undefined,
+        };
+      },
+    );
     const activeRoundNumber = roundStates.length
       ? Math.max(1, Math.min(roundStates.length, activeRoundIndex + 1))
       : 1;
@@ -861,7 +884,7 @@ export default function PosterZoom({
 
   if (!currentRound || !currentState) {
     return (
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-neutral-200">
+      <div className="rounded-lg border border-line-strong bg-panel-raised p-6 text-muted">
         Unable to load Poster Zoom right now. Please try again later.
       </div>
     );
@@ -876,22 +899,25 @@ export default function PosterZoom({
           {payload.rounds.map((round, index) => {
             const controller = roundControllers[index];
             const unlocked = controller?.unlocked ?? index === 0;
-            const completed = controller?.completed ?? roundStates[index]?.completed;
+            const completed =
+              controller?.completed ?? roundStates[index]?.completed;
             const isActive = index === activeRoundIndex;
             return (
               <button
                 key={round.mediaId ?? round.order ?? index}
                 type="button"
-                onClick={() => (unlocked ? setActiveRoundIndex(index) : undefined)}
+                onClick={() =>
+                  unlocked ? setActiveRoundIndex(index) : undefined
+                }
                 disabled={!unlocked}
-                className={`inline-flex items-center rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition focus:outline-none focus:ring-2 focus:ring-brand-400/60 ${
+                className={`inline-flex items-center min-h-11 rounded-md border px-4 py-1.5 text-sm font-semibold uppercase tracking-wider transition  focus:ring-2 focus:ring-focus ${
                   isActive
-                    ? "border-brand-400/60 bg-brand-400/20 text-white"
+                    ? "border-signal bg-signal-soft text-paper"
                     : completed
-                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100"
+                      ? "border-correct bg-correct-soft text-correct-ink"
                       : unlocked
-                        ? "border-white/10 bg-white/5 text-neutral-200 hover:border-brand-400/40 hover:text-white"
-                        : "border-white/5 bg-white/5 text-neutral-500 opacity-60"
+                        ? "border-line-strong bg-panel-raised text-muted hover:border-signal hover:text-paper"
+                        : "border-line-strong bg-panel-raised text-muted opacity-60"
                 }`}
               >
                 Round {index + 1}
@@ -901,7 +927,7 @@ export default function PosterZoom({
         </div>
       )}
 
-      <div className="group relative flex h-72 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/4 via-white/5 to-white/2 shadow-ambient">
+      <div className="group relative flex h-56 sm:h-72 items-center justify-center overflow-hidden rounded-lg border border-line-strong bg-panel-raised ">
         {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -909,19 +935,18 @@ export default function PosterZoom({
             alt="Anime poster"
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
+            className="h-full w-full object-contain"
           />
         ) : (
-          <div className="text-neutral-600">Poster unavailable</div>
+          <div className="text-muted">Poster unavailable</div>
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/0 to-black/40 opacity-70 mix-blend-overlay" />
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
+      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-muted">
         {activeHints.map((hint) => (
           <span
             key={hint}
-            className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-semibold text-white/90"
+            className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 font-semibold text-paper"
           >
             {hint}
           </span>
@@ -931,9 +956,11 @@ export default function PosterZoom({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-brand-400/50 hover:text-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-lg border border-line-strong bg-panel-raised px-4 py-2 text-sm font-medium text-paper transition hover:border-signal hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
           onClick={revealMore}
-          disabled={currentState.completed || currentState.stage >= totalStagesForRound}
+          disabled={
+            currentState.completed || currentState.stage >= totalStagesForRound
+          }
         >
           Reveal More
         </button>
@@ -965,7 +992,7 @@ export default function PosterZoom({
                 handleSeasonChange(event.target.value as SeasonValue)
               }
               disabled={currentState.completed || submitting || !currentRound}
-              className="w-full rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-400/60 sm:w-32"
+              className="w-full rounded-lg border border-line-strong bg-panel-raised px-3 py-2 text-base text-paper placeholder:text-muted  focus:ring-2 focus:ring-focus sm:w-32"
               aria-label="Release season"
             >
               <option value="">Season</option>
@@ -984,12 +1011,12 @@ export default function PosterZoom({
               disabled={currentState.completed || submitting || !currentRound}
               placeholder="Year"
               aria-label="Release year"
-              className="w-full rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-400/60 sm:w-24"
+              className="w-full rounded-lg border border-line-strong bg-panel-raised px-3 py-2 text-base text-paper placeholder:text-muted  focus:ring-2 focus:ring-focus sm:w-24"
             />
           </div>
           <button
             type="submit"
-            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-lg bg-signal !text-signal-ink px-6 py-3 text-sm font-semibold uppercase tracking-wide text-paper  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={currentState.completed || submitting || !currentRound}
           >
             {submitting ? "Checking…" : "Submit Guess"}
@@ -997,14 +1024,14 @@ export default function PosterZoom({
         </div>
       </form>
 
-      <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
+      <div className="space-y-3 text-sm text-muted" aria-live="polite">
         {guessesForRound.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-muted">
             Attempts
             {guessesForRound.map((value, index) => (
               <span
                 key={`${value}-${index}`}
-                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
+                className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 text-sm text-muted"
               >
                 {value}
               </span>
@@ -1012,18 +1039,18 @@ export default function PosterZoom({
           </div>
         )}
         {currentState.feedback?.type === "error" && (
-          <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger-ink">
             {currentState.feedback.message}
           </div>
         )}
         {currentState.feedback?.type === "partial" && (
-          <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <div className="rounded-lg border border-close bg-close-soft px-4 py-3 text-sm text-close-ink">
             {currentState.feedback.message}
           </div>
         )}
         {currentState.feedback?.type === "success" && (
           <div
-            className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+            className="rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm text-correct-ink"
             role="status"
             aria-label={`Poster solved! ${currentState.canonicalTitle}`}
           >

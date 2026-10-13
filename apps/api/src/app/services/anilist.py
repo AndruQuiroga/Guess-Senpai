@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Set
 
 import httpx
@@ -651,7 +651,7 @@ async def fetch_opening_pool(
     seasonal_limit: int = 25,
     ttl: int = 86_400,
 ) -> List[Media]:
-    target_day = day or date.today()
+    target_day = day or datetime.now(timezone.utc).date()
     top_rated_per_page = _clamp_per_page(top_rated_limit, 25)
     top_popular_per_page = _clamp_per_page(top_popular_limit, 50)
     seasonal_per_page = _clamp_per_page(seasonal_limit, 25)

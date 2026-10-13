@@ -21,15 +21,18 @@ function ensureToastRoot(): HTMLElement | null {
 function getVariantClasses(variant: ToastVariant): string {
   switch (variant) {
     case "success":
-      return "border-emerald-400/40 bg-emerald-500/20 text-emerald-50";
+      return "border-correct bg-correct-soft text-correct-ink";
     case "error":
-      return "border-rose-400/40 bg-rose-500/20 text-rose-50";
+      return "border-danger bg-danger-soft text-danger-ink";
     default:
-      return "border-white/15 bg-white/10 text-white";
+      return "border-line-strong bg-panel-raised text-paper";
   }
 }
 
-export function showToast(message: string, variant: ToastVariant = "default"): void {
+export function showToast(
+  message: string,
+  variant: ToastVariant = "default",
+): void {
   if (!message) {
     return;
   }
@@ -43,7 +46,7 @@ export function showToast(message: string, variant: ToastVariant = "default"): v
   toast.role = "status";
   toast.ariaLive = "polite";
   toast.textContent = message;
-  toast.className = `pointer-events-auto inline-flex max-w-full items-center justify-center rounded-2xl border px-4 py-2 text-sm font-medium shadow-ambient backdrop-blur transition duration-200 ease-out opacity-0 translate-y-2 ${getVariantClasses(variant)}`;
+  toast.className = `pointer-events-auto inline-flex max-w-full items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition duration-200 ease-out opacity-0 translate-y-2 ${getVariantClasses(variant)}`;
 
   root.appendChild(toast);
 

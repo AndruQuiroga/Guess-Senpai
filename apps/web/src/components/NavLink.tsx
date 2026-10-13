@@ -7,39 +7,42 @@ import { ComponentProps } from "react";
 interface NavLinkProps extends ComponentProps<typeof Link> {
   exact?: boolean;
   isActive?(pathname: string): boolean;
+  /** Classes applied while active / inactive; defaults suit the sidebar. */
+  activeClassName?: string;
+  inactiveClassName?: string;
+}
+
+export function matchesPath(
+  pathname: string,
+  href: string,
+  exact: boolean,
+): boolean {
+  const target = href.split(/[?#]/)[0] || "/";
+  if (exact || target === "/") return pathname === target;
+  return pathname === target || pathname.startsWith(`${target}/`);
 }
 
 export default function NavLink({
   href,
   exact = false,
   isActive: isActiveOverride,
+  activeClassName = "bg-panel-raised text-paper shadow-[inset_3px_0_0_var(--signal)]",
+  inactiveClassName = "text-muted hover:bg-hover hover:text-paper",
   className,
   children,
   ...rest
 }: NavLinkProps) {
-  const pathname = usePathname();
-  const normalizedHref = typeof href === "string" ? href : href.toString();
+  const pathname = usePathname() ?? "";
+  const hrefString = typeof href === "string" ? href : (href.pathname ?? "/");
+  const isActive = isActiveOverride
+    ? isActiveOverride(pathname)
+    : matchesPath(pathname, hrefString, exact);
 
-  let isActive = false;
-  if (isActiveOverride) {
-    isActive = isActiveOverride(pathname ?? "");
-  } else {
-    const currentPath = pathname ?? "";
-    if (exact) {
-      isActive = currentPath === normalizedHref;
-    } else {
-      isActive =
-        currentPath === normalizedHref ||
-        (normalizedHref !== "/" && currentPath.startsWith(`${normalizedHref}/`));
-    }
-  }
-
-  const baseClasses =
-    "inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300";
-  const activeClasses = "bg-white/20 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.18)]";
-  const inactiveClasses = "text-neutral-300 hover:bg-white/10 hover:text-white";
-
-  const combinedClasses = [baseClasses, isActive ? activeClasses : inactiveClasses, className]
+  const combinedClasses = [
+    "inline-flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition",
+    isActive ? activeClassName : inactiveClassName,
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
 

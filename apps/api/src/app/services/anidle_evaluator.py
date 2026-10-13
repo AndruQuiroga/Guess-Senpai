@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Iterable, List, Literal, Optional, Tuple
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..core.config import settings
@@ -46,6 +46,37 @@ class AnidleGuessEvaluationResponse(BaseModel):
     tags: List[AnidleListFeedbackItem]
     studios: List[AnidleListFeedbackItem]
     source: List[AnidleListFeedbackItem]
+    episodes: AnidleScalarFeedback = Field(
+        default_factory=lambda: AnidleScalarFeedback(status="unknown")
+    )
+    format: List[AnidleListFeedbackItem] = Field(default_factory=list)
+    cover_image: Optional[str] = None
+    # False when the guess resolved to no known anime; clients must not spend an attempt.
+    matched: bool = True
+
+
+FORMAT_LABELS = {
+    "TV": "TV",
+    "TV_SHORT": "TV Short",
+    "MOVIE": "Movie",
+    "SPECIAL": "Special",
+    "OVA": "OVA",
+    "ONA": "ONA",
+    "MUSIC": "Music",
+}
+
+
+def _format_media_format(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    return FORMAT_LABELS.get(value.upper()) or _format_enum_label(value)
+
+
+def _cover_image_url(media: Media) -> Optional[str]:
+    cover = getattr(media, "coverImage", None)
+    if not cover:
+        return None
+    return cover.large or cover.extraLarge or cover.medium
 
 
 def _normalize_text(value: str) -> str:
@@ -228,6 +259,8 @@ class AnidleEvaluationService:
         target_tags = puzzle_engine._extract_top_tags(target_media)
         target_studios = _extract_studio_names(target_media)
         target_source = _format_enum_label(getattr(target_media, "source", None))
+        target_episodes = target_media.episodes
+        target_format = _format_media_format(target_media.format)
 
         if guess_media is not None:
             resolved_title = (
@@ -245,6 +278,9 @@ class AnidleEvaluationService:
             guess_tags = puzzle_engine._extract_top_tags(guess_media)
             guess_studios = _extract_studio_names(guess_media)
             guess_source = _format_enum_label(getattr(guess_media, "source", None))
+            guess_episodes = guess_media.episodes
+            guess_format = _format_media_format(guess_media.format)
+            guess_cover = _cover_image_url(guess_media)
             correct = guess_media.id == target_media.id
         else:
             resolved_title = guess_value
@@ -256,6 +292,9 @@ class AnidleEvaluationService:
             guess_tags: List[str] = []
             guess_studios: List[str] = []
             guess_source: Optional[str] = None
+            guess_episodes: Optional[int] = None
+            guess_format: Optional[str] = None
+            guess_cover: Optional[str] = None
             correct = any(
                 variant and _normalize_text(variant) == normalized_guess
                 for variant in puzzle_engine._title_variants(target_media)
@@ -279,6 +318,13 @@ class AnidleEvaluationService:
                 [guess_source] if guess_source else [],
                 [target_source] if target_source else [],
             ),
+            episodes=_build_scalar_feedback(guess_episodes, target_episodes),
+            format=_build_list_feedback(
+                [guess_format] if guess_format else [],
+                [target_format] if target_format else [],
+            ),
+            cover_image=guess_cover,
+            matched=guess_media is not None or correct,
         )
 
     async def _load_media(self, media_id: int) -> Media:

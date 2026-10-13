@@ -489,7 +489,7 @@ export default function GuessOpening({
 
   if (!currentRound || !currentState) {
     return (
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-neutral-200">
+      <div className="rounded-lg border border-line-strong bg-panel-raised p-6 text-muted">
         Unable to load Guess the Opening right now. Please try again later.
       </div>
     );
@@ -498,7 +498,7 @@ export default function GuessOpening({
   return (
     <div className="space-y-5">
       {totalRounds > 1 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-wide text-neutral-300">
+        <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-wide text-muted">
           {payload.map((round, index) => {
             const state = roundStates[index];
             const isActive = index === activeRoundIndex;
@@ -506,12 +506,12 @@ export default function GuessOpening({
               <button
                 key={`${round.mediaId}-${index}`}
                 type="button"
-                className={`rounded-full border px-4 py-1.5 transition ${
+                className={`min-h-11 rounded-md border px-4 py-1.5 transition ${
                   isActive
-                    ? "border-brand-400/70 bg-brand-500/20 text-white"
+                    ? "border-signal bg-signal-soft text-paper"
                     : state?.completed
-                      ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                      : "border-white/10 bg-white/5 text-white/70 hover:border-white/20"
+                      ? "border-correct bg-correct-soft text-correct-ink"
+                      : "border-line-strong bg-panel-raised text-paper hover:border-line-strong"
                 }`}
                 onClick={() => setActiveRoundIndex(index)}
               >
@@ -522,12 +522,12 @@ export default function GuessOpening({
         </div>
       )}
       {hasMedia ? (
-        <div className="space-y-3 rounded-[1.8rem] border border-white/10 bg-gradient-to-br from-white/8 via-white/5 to-transparent p-5 backdrop-blur-xl">
+        <div className="space-y-3 rounded-lg border border-line-strong bg-panel-raised p-5 ">
           {audioSource && (
             <audio
               controls
               preload="none"
-              className="w-full rounded-2xl bg-black/40 px-4 py-3 text-sm text-neutral-200 shadow-inner shadow-brand-500/20"
+              className="w-full rounded-lg bg-ink px-4 py-3 text-sm text-muted  "
             >
               <source src={audioSource} type={audioMimeType} />
               Your browser does not support the audio element.
@@ -535,16 +535,12 @@ export default function GuessOpening({
           )}
           {videoSource ? (
             canRevealVideo ? (
-              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/60">
-                <div
-                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.25),_transparent_65%)]"
-                  aria-hidden="true"
-                />
+              <div className="relative overflow-hidden rounded-lg border border-line-strong bg-ink">
                 <video
                   controls
                   preload="none"
                   playsInline
-                  className="relative z-[1] w-full rounded-2xl border border-white/5 bg-black/60 text-sm text-neutral-200 shadow-inner shadow-brand-500/20 filter saturate-0 blur-sm contrast-[1.35]"
+                  className="relative z-[1] w-full rounded-lg border border-line-strong bg-ink text-sm text-muted   filter saturate-0 blur-sm contrast-[1.35]"
                 >
                   <source
                     src={videoSource}
@@ -554,22 +550,22 @@ export default function GuessOpening({
                 </video>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-white/15 bg-black/40 px-4 py-6 text-center text-sm text-neutral-300">
+              <div className="rounded-lg border border-dashed border-line-strong bg-ink px-4 py-6 text-center text-sm text-muted">
                 Guess twice or use Reveal More to unlock the video.
               </div>
             )
           ) : null}
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
+        <div className="rounded-lg border border-line-strong bg-panel-raised px-4 py-3 text-sm text-muted">
           No clip available for this title today.
         </div>
       )}
-      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
+      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-muted">
         {hints.map((hint) => (
           <span
             key={hint}
-            className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-semibold text-white/90"
+            className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 font-semibold text-paper"
           >
             {hint}
           </span>
@@ -578,7 +574,7 @@ export default function GuessOpening({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-brand-400/50 hover:text-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-lg border border-line-strong bg-panel-raised px-4 py-2 text-sm font-medium text-paper transition hover:border-signal hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
           onClick={revealMore}
           disabled={currentState.completed || currentState.stage >= totalStages}
         >
@@ -610,20 +606,20 @@ export default function GuessOpening({
         />
         <button
           type="submit"
-          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-lg bg-signal !text-signal-ink px-6 py-3 text-sm font-semibold uppercase tracking-wide text-paper  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={currentState.completed || submitting}
         >
           {submitting ? "Checking…" : "Submit Guess"}
         </button>
       </form>
-      <div className="space-y-3 text-sm text-neutral-300" aria-live="polite">
+      <div className="space-y-3 text-sm text-muted" aria-live="polite">
         {guessesForRound.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-muted">
             Attempts
             {guessesForRound.map((value, index) => (
               <span
                 key={`${value}-${index}`}
-                className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.7rem] text-neutral-200"
+                className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 text-sm text-muted"
               >
                 {value}
               </span>
@@ -631,12 +627,12 @@ export default function GuessOpening({
           </div>
         )}
         {currentState.feedback?.type === "error" && (
-          <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger-ink">
             {currentState.feedback.message}
           </div>
         )}
         {currentState.feedback?.type === "success" && (
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <div className="rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm text-correct-ink">
             {currentState.feedback.message}
           </div>
         )}

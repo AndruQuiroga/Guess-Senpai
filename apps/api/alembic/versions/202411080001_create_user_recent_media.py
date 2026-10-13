@@ -37,18 +37,13 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("user_id", "media_id"),
     )
 
-    partial_clause = None
-    if HISTORY_DAYS > 0:
-        partial_clause = sa.text(
-            f"seen_at >= (CURRENT_TIMESTAMP - INTERVAL '{HISTORY_DAYS} DAYS')"
-        )
-
+    # CURRENT_TIMESTAMP is not immutable and cannot appear in a PostgreSQL
+    # index predicate. Apply the moving history window in the query instead.
     op.create_index(
         "ix_user_recent_media_recent_window",
         "user_recent_media",
         ["user_id", "seen_at"],
         unique=False,
-        postgresql_where=partial_clause,
     )
 
 

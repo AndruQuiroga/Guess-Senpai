@@ -1,4 +1,4 @@
-import { GlassSection } from "../../components/GlassSection";
+import { PanelSection } from "../../components/PanelSection";
 
 export const metadata = {
   title: "How to Play — GuessSenpai",
@@ -8,91 +8,94 @@ export default function HowToPlayPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-12">
       <header className="space-y-4">
-        <h1 className="text-4xl font-display font-semibold tracking-tight text-white sm:text-5xl">
+        <h1 className="text-4xl font-display font-semibold tracking-tight text-paper sm:text-5xl">
           How to Play
         </h1>
-        <p className="text-lg leading-relaxed text-neutral-200">
-          GuessSenpai delivers a core lineup of four daily anime challenges,
-          plus an optional audio bonus round sourced from AniList and
-          AnimeThemes. Each puzzle escalates across three rounds of hints, and
-          the new Character Silhouette mode asks you to lock in both the
-          featured anime and the highlighted character before the spotlights
-          turn on.
+        <p className="text-lg leading-relaxed text-muted">
+          GuessSenpai delivers daily anime challenges, with an optional opening
+          mode when clips are available. Each puzzle has its own rules, and the
+          new Character Silhouette mode asks you to lock in both the featured
+          anime and the highlighted character before the spotlights turn on.
         </p>
       </header>
 
       <div className="space-y-8">
-        <GlassSection innerClassName="space-y-6">
+        <PanelSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
               Anidle
             </h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+            <p className="text-sm uppercase tracking-[0.24em] text-signal-text">
               Metadata speedrun
             </p>
           </div>
-          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
-            <li>Type your guess and press Enter to submit.</li>
-            <li>Each incorrect guess unlocks another round of hints.</li>
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
-              Hints include genres, release year, episode count, and popularity.
+              Submit an anime title guess to receive metadata comparisons.
+            </li>
+            <li>
+              Feedback compares genres, release year, episode count, popularity,
+              and other available fields.
+            </li>
+            <li>
+              Progressively revealed synopsis hints provide additional clues.
             </li>
           </ul>
-        </GlassSection>
+        </PanelSection>
 
-        <GlassSection innerClassName="space-y-6">
+        <PanelSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
               Poster Zoomed
             </h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+            <p className="text-sm uppercase tracking-[0.24em] text-signal-text">
               Reveal the key art
             </p>
           </div>
-          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
               Three rounds progressively zoom the poster out—from a tight crop
               to the full key art.
             </li>
             <li>
-              Each new round unlocks additional context like genres, format,
-              and release metadata.
+              Each new round unlocks additional context like genres, format, and
+              release metadata.
             </li>
             <li>
               Submit both the anime title and its release season or year to
               secure the clear.
             </li>
           </ul>
-        </GlassSection>
+        </PanelSection>
 
-        <GlassSection innerClassName="space-y-6">
+        <PanelSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
               Redacted Synopsis
             </h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+            <p className="text-sm uppercase tracking-[0.24em] text-signal-text">
               Decode the story
             </p>
           </div>
-          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
               Synonyms and titles are obscured with{" "}
-              <span className="font-mono text-brand-100">[REDACTED]</span>.
+              <span className="font-mono text-paper">[REDACTED]</span>.
             </li>
             <li>Each round unmasks additional tokens to guide your guess.</li>
           </ul>
-        </GlassSection>
+        </PanelSection>
 
-        <GlassSection innerClassName="space-y-6">
+        <PanelSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
               Character Silhouette
             </h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+            <p className="text-sm uppercase tracking-[0.24em] text-signal-text">
               Dual-guess spotlight
             </p>
           </div>
-          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>Four silhouettes from the same anime appear in each round.</li>
             <li>
               Submit both the anime title and the character&apos;s name to clear
@@ -103,41 +106,66 @@ export default function HowToPlayPage() {
               locked until you nail both answers.
             </li>
           </ul>
-        </GlassSection>
+        </PanelSection>
 
-        <GlassSection innerClassName="space-y-6">
+        <PanelSection innerClassName="space-y-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-semibold tracking-tight text-white">
+            <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
               Guess the Opening
             </h2>
-            <p className="text-sm uppercase tracking-[0.24em] text-brand-200/80">
+            <p className="text-sm uppercase tracking-[0.24em] text-signal-text">
               Name that tune
             </p>
           </div>
-          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-neutral-200 marker:text-brand-300">
-            <li>Listen to a short OP/ED clip sourced from AnimeThemes.moe.</li>
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
-              Three openings drop each day—clear all of them to secure the daily
-              win.
+              This optional mode appears when playable opening clips are
+              available.
+            </li>
+            <li>Use the available clip and clues to identify its anime.</li>
+          </ul>
+        </PanelSection>
+
+        <PanelSection
+          id="daily-score"
+          className="scroll-mt-20"
+          innerClassName="space-y-4"
+        >
+          <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
+            Daily score
+          </h2>
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
+            <li>
+              Each daily mode is worth up to 1,000 points, so the maximum is
+              1,000 × the modes available today.
             </li>
             <li>
-              Hints reveal the season, artist, and song title across rounds.
+              Anidle: solving on guess 1 earns 1,000 and each extra guess costs
+              125, down to 125 on guess 8.
+            </li>
+            <li>
+              Other modes: every round earns full marks, minus 25% for each
+              wrong guess or extra hint, never below 25% once solved.
+            </li>
+            <li>
+              Unsolved or out-of-guesses modes score 0. The score is computed on
+              your device for fun and is not a ranking.
             </li>
           </ul>
-        </GlassSection>
+        </PanelSection>
       </div>
 
-      <p className="text-sm leading-relaxed text-neutral-400">
+      <p className="text-sm leading-relaxed text-muted">
         Tip: use{" "}
-        <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">
+        <kbd className="rounded border border-line bg-panel px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-muted">
           Ctrl
         </kbd>
         /
-        <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">
+        <kbd className="rounded border border-line bg-panel px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-muted">
           ⌘
         </kbd>{" "}
         +{" "}
-        <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-neutral-200">
+        <kbd className="rounded border border-line bg-panel px-1.5 py-0.5 text-[0.7rem] uppercase tracking-[0.2em] text-muted">
           Backspace
         </kbd>{" "}
         to clear your current guess field quickly.

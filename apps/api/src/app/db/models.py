@@ -89,6 +89,17 @@ class DailyProgress(Base):
     user: Mapped[User] = relationship(back_populates="daily_progress_entries")
 
 
+class DailyPuzzleSet(Base):
+    __tablename__ = "daily_puzzle_sets"
+
+    puzzle_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    rules_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    content: Mapped[Dict[str, object]] = mapped_column(JSON, nullable=False)
+    available_modes: Mapped[List[str]] = mapped_column(JSON, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Streak(Base):
     __tablename__ = "streaks"
 

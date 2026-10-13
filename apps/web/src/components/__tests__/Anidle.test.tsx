@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { vi } from "vitest";
 
 import Anidle from "../Anidle";
@@ -10,26 +16,39 @@ import {
 } from "../../types/anidle";
 
 const evaluateAnidleGuessMock = vi.hoisted(() =>
-  vi.fn(async ({ guess }: { guess: string }) => {
-    await new Promise<void>((resolve) => setTimeout(resolve, 5));
-    return {
-      title: guess,
-      correct: false,
-      year: { guess: null, target: null, status: "unknown" },
-      averageScore: { guess: null, target: null, status: "unknown" },
-      popularity: { guess: null, target: null, status: "unknown" },
-      genres: [],
-      tags: [],
-      studios: [],
-      source: [],
-    } satisfies AnidleGuessEvaluation;
-  }),
+  vi.fn(
+    async ({ guess }: { guess: string }): Promise<AnidleGuessEvaluation> => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+      return {
+        title: guess,
+        correct: false,
+        year: { guess: null, target: null, status: "unknown" },
+        averageScore: { guess: null, target: null, status: "unknown" },
+        popularity: { guess: null, target: null, status: "unknown" },
+        genres: [],
+        tags: [],
+        studios: [],
+        source: [],
+      } satisfies AnidleGuessEvaluation;
+    },
+  ),
 );
 
 vi.mock("../../utils/evaluateAnidleGuess", () => ({
   evaluateAnidleGuess: (
     payload: Parameters<typeof evaluateAnidleGuessMock>[0],
   ) => evaluateAnidleGuessMock(payload),
+  evaluateAnidleGuessBatch: async (
+    payloads: Parameters<typeof evaluateAnidleGuessMock>[0][],
+  ) => Promise.all(payloads.map((payload) => evaluateAnidleGuessMock(payload))),
+}));
+
+vi.mock("../../hooks/useTitleSuggestions", () => ({
+  useTitleSuggestions: () => ({
+    suggestions: [{ id: 7, title: "Retryable Guess" }],
+    loading: false,
+    error: null,
+  }),
 }));
 
 describe("Anidle hydration", () => {
@@ -45,7 +64,7 @@ describe("Anidle hydration", () => {
       tags: [],
       synopsis: [],
     },
-  }; 
+  };
 
   beforeEach(() => {
     evaluateAnidleGuessMock.mockClear();
@@ -142,5 +161,301 @@ describe("Anidle hydration", () => {
     expect(latestCall?.anidleHistory?.[0]?.evaluation?.title).toBe(
       "Stored Guess",
     );
+  });
+
+  it("preserves the selected title and spends no attempt when evaluation fails", async () => {
+    evaluateAnidleGuessMock.mockRejectedValueOnce(new Error("API unavailable"));
+    render(
+      <Anidle mediaId={77} payload={payload} onProgressChange={vi.fn()} />,
+    );
+    const input = screen.getByRole("combobox", { name: "Anidle guess" });
+    fireEvent.change(input, { target: { value: "Retryable Guess" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Guess" }));
+
+    expect(await screen.findByText("API unavailable")).toBeInTheDocument();
+    expect(input).toHaveValue("Retryable Guess");
+    expect(screen.queryByText(/Guess history/)).not.toBeInTheDocument();
+  });
+
+  it("treats native share cancellation as neutral after solving", async () => {
+    const solvedEvaluation: AnidleGuessEvaluation = {
+      title: "Correct Title",
+      correct: true,
+      year: { guess: null, target: null, status: "unknown" },
+      averageScore: { guess: null, target: null, status: "unknown" },
+      popularity: { guess: null, target: null, status: "unknown" },
+      genres: [],
+      tags: [],
+      studios: [],
+      source: [],
+    };
+    const share = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error("cancel"), { name: "AbortError" }),
+      );
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
+    render(
+      <Anidle
+        mediaId={8}
+        payload={payload}
+        onProgressChange={vi.fn()}
+        initialProgress={{
+          completed: true,
+          round: 1,
+          guesses: ["Correct Title"],
+          anidleHistory: [
+            {
+              guess: "Correct Title",
+              guessMediaId: 4,
+              evaluation: solvedEvaluation,
+              evaluationVersion: CURRENT_ANIDLE_EVALUATION_VERSION,
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Share result" }));
+    await waitFor(() => expect(share).toHaveBeenCalledOnce());
+    expect(
+      screen.queryByText(/Share could not be opened/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Correct Title");
+  });
+
+  const finitePayload: AnidleGame = {
+    ...payload,
+    spec: [{ difficulty: 1, hints: ["synopsis"] }],
+    rules: { version: "2", max_attempts: 8, hint_after_incorrect: [2, 4, 6] },
+    hints: {
+      genres: ["Adventure"],
+      tags: ["Space"],
+      year: 2001,
+      synopsis: [
+        { ratio: 0.2, text: "First clue" },
+        { ratio: 0.35, text: "Second clue" },
+        { ratio: 0.5, text: "Third clue" },
+      ],
+    },
+  };
+
+  function stored(count: number, lastCorrect = false): GameProgress {
+    const history = Array.from({ length: count }, (_, index) => ({
+      guess: `Anime ${index}`,
+      guessMediaId: index + 100,
+      evaluation: {
+        title: `Anime ${index}`,
+        correct: lastCorrect && index === count - 1,
+        year: { guess: null, target: null, status: "unknown" as const },
+        averageScore: { guess: null, target: null, status: "unknown" as const },
+        popularity: { guess: null, target: null, status: "unknown" as const },
+        genres: [],
+        tags: [],
+        studios: [],
+        source: [],
+      },
+      evaluationVersion: CURRENT_ANIDLE_EVALUATION_VERSION,
+    }));
+    return {
+      completed: lastCorrect,
+      round: 1,
+      guesses: history.map((entry) => entry.guess),
+      anidleHistory: history,
+    };
+  }
+
+  it.each([
+    [1, null],
+    [2, "First clue"],
+    [4, "Second clue"],
+    [6, "Third clue"],
+  ])("resumes %i attempts with its unlocked hint", (count, hint) => {
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(count as number)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    if (hint) expect(screen.getByText(hint)).toBeInTheDocument();
+    else expect(screen.queryByText("First clue")).not.toBeInTheDocument();
+    expect(evaluateAnidleGuessMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts the eighth miss, reveals the answer, and resumes exhaustion without awarding a solve", async () => {
+    const progress = vi.fn();
+    const view = render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(7)}
+        onProgressChange={progress}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "Last miss" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Guess" }));
+    expect(
+      await screen.findByText("Out of guesses · Answer revealed"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    const saved = progress.mock.calls.at(-1)![0];
+    expect(saved.completed).toBe(false);
+    expect(saved.guesses).toHaveLength(8);
+    view.unmount();
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={saved}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("Out of guesses · Answer revealed"),
+    ).toBeInTheDocument();
+  });
+
+  it("allows a solve on the final attempt", async () => {
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(7)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "Correct Title" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Guess" }));
+    expect(await screen.findByText("Solved in 8/8")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Out of guesses · Answer revealed"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("rejects empty, repeated titles and canonical aliases without spending an attempt", async () => {
+    const progress = vi.fn();
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(1)}
+        onProgressChange={progress}
+      />,
+    );
+    const input = screen.getByRole("combobox");
+    const submit = screen.getByRole("button", { name: "Submit Guess" });
+    fireEvent.click(submit);
+    expect(evaluateAnidleGuessMock).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: " ANIME 0 " } });
+    fireEvent.click(submit);
+    expect(screen.getByText(/already guessed/)).toBeInTheDocument();
+    expect(evaluateAnidleGuessMock).not.toHaveBeenCalled();
+    evaluateAnidleGuessMock.mockImplementationOnce(
+      async () => stored(1).anidleHistory![0].evaluation!,
+    );
+    fireEvent.change(input, { target: { value: "Alias" } });
+    fireEvent.click(submit);
+    await waitFor(() => expect(evaluateAnidleGuessMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(submit).toHaveTextContent(/^Guess$/));
+    expect(progress.mock.calls.at(-1)![0].guesses).toHaveLength(1);
+  });
+
+  it("keeps invalid evaluation retries free under the new rules", async () => {
+    evaluateAnidleGuessMock.mockRejectedValueOnce(new Error("Unknown title"));
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(7)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "Invalid" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Guess" }));
+    expect(await screen.findByText("Unknown title")).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveValue("Invalid");
+    expect(
+      screen.queryByText("Out of guesses · Answer revealed"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not spend an attempt on a title that matches no anime", async () => {
+    evaluateAnidleGuessMock.mockImplementationOnce(async () => ({
+      ...stored(1).anidleHistory![0].evaluation!,
+      title: "zzqq",
+      matched: false,
+    }));
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(7)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "zzqq" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Guess" }));
+    expect(
+      await screen.findByText(/couldn't find that anime/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveValue("zzqq");
+    expect(
+      screen.queryByText("Out of guesses · Answer revealed"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps legacy long play unlimited with hints at ten misses", () => {
+    render(
+      <Anidle
+        mediaId={88}
+        payload={{ ...payload, hints: finitePayload.hints }}
+        initialProgress={stored(12)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    expect(screen.getByText("Second clue")).toBeInTheDocument();
+  });
+
+  it("uses progressive metadata hints when no synopsis exists", () => {
+    const view = render(
+      <Anidle
+        mediaId={88}
+        payload={{
+          ...finitePayload,
+          hints: { ...finitePayload.hints, synopsis: [] },
+        }}
+        initialProgress={stored(2)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Adventure")).toBeInTheDocument();
+    expect(screen.queryByText("2001")).not.toBeInTheDocument();
+    view.rerender(
+      <Anidle
+        mediaId={88}
+        payload={{
+          ...finitePayload,
+          hints: { ...finitePayload.hints, synopsis: [] },
+        }}
+        initialProgress={stored(6)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("2001")).toBeInTheDocument();
+    expect(screen.getByText("Space")).toBeInTheDocument();
   });
 });

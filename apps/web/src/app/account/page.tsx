@@ -1,13 +1,17 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { GlassSection } from "../../components/GlassSection";
+import { PanelSection } from "../../components/PanelSection";
 import { RecentMediaList } from "../../components/account/RecentMediaList";
 import { SharePanel } from "../../components/account/SharePanel";
 import { StreakHistoryCard } from "../../components/account/StreakHistoryCard";
 import { DifficultyPreferenceCard } from "../../components/account/DifficultyPreferenceCard";
+import { AccountUnavailable } from "../../components/account/AccountUnavailable";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const API_BASE =
+  process.env.API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  "http://localhost:8000";
 
 interface AccountUser {
   id: number;
@@ -62,22 +66,25 @@ async function fetchWithSession(path: string) {
 }
 
 export default async function AccountPage() {
-  const statsResponse = await fetchWithSession("/puzzles/stats");
-  if (statsResponse.status === 401) {
-    redirect("/login");
-  }
-  if (!statsResponse.ok) {
-    throw new Error("Unable to load account stats");
-  }
-  const stats = (await statsResponse.json()) as PuzzleStatsResponse;
+  let stats: PuzzleStatsResponse;
+  let account: AccountState;
+  try {
+    const statsResponse = await fetchWithSession("/puzzles/stats");
+    if (statsResponse.status === 401) redirect("/login");
+    if (!statsResponse.ok)
+      throw new Error(`Stats request failed (${statsResponse.status})`);
+    stats = (await statsResponse.json()) as PuzzleStatsResponse;
 
-  const accountResponse = await fetchWithSession("/auth/anilist/me");
-  const account = accountResponse.ok
-    ? ((await accountResponse.json()) as AccountState)
-    : { authenticated: false };
-
-  if (!account.authenticated) {
-    redirect("/login");
+    const accountResponse = await fetchWithSession("/auth/anilist/me");
+    if (accountResponse.status === 401) redirect("/login");
+    if (!accountResponse.ok)
+      throw new Error(`Account request failed (${accountResponse.status})`);
+    account = (await accountResponse.json()) as AccountState;
+    if (!account.authenticated) redirect("/login");
+  } catch (error) {
+    // Next redirects throw a control-flow error and must pass through unchanged.
+    if (error && typeof error === "object" && "digest" in error) throw error;
+    return <AccountUnavailable />;
   }
 
   const completionRatePercent = Math.round(stats.completion_rate * 100);
@@ -86,32 +93,42 @@ export default async function AccountPage() {
     <div className="mx-auto max-w-5xl space-y-10">
       <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-3">
-          <h1 className="text-3xl font-display font-semibold tracking-tight text-white sm:text-4xl">
-            Welcome back{account.user?.username ? `, ${account.user.username}` : ""}
+          <h1 className="text-3xl font-display font-semibold tracking-tight text-paper sm:text-4xl">
+            Welcome back
+            {account.user?.username ? `, ${account.user.username}` : ""}
           </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-neutral-300">
-            Track your GuessSenpai journey: monitor streaks, revisit recent puzzles, and share your achievements with
-            friends.
+          <p className="max-w-2xl text-sm leading-relaxed text-muted">
+            Track your GuessSenpai journey: monitor streaks, revisit recent
+            puzzles, and share your achievements with friends.
           </p>
         </div>
-        <GlassSection className="flex-1 sm:max-w-sm" innerClassName="flex items-center gap-4">
+        <PanelSection
+          className="flex-1 sm:max-w-sm"
+          innerClassName="flex items-center gap-4"
+        >
           {account.user?.avatar ? (
             <img
               src={account.user.avatar}
               alt={account.user.username ?? "AniList user"}
-              className="h-16 w-16 rounded-full border border-white/20 object-cover shadow-inner shadow-black/40"
+              className="h-16 w-16 rounded-full border border-line-strong object-cover"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-brand-500/20 text-lg font-semibold uppercase text-white">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-line-strong bg-signal-soft text-lg font-semibold uppercase text-paper">
               {(account.user?.username ?? "GS").slice(0, 2)}
             </div>
           )}
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-white/90">{account.user?.username ?? "AniList user"}</p>
-            <p className="text-xs text-neutral-400">{stats.active_days} active day{stats.active_days === 1 ? "" : "s"}</p>
-            <p className="text-xs text-neutral-400">{completionRatePercent}% completion rate</p>
+            <p className="text-sm font-semibold text-paper">
+              {account.user?.username ?? "AniList user"}
+            </p>
+            <p className="text-xs text-muted">
+              {stats.active_days} active day{stats.active_days === 1 ? "" : "s"}
+            </p>
+            <p className="text-xs text-muted">
+              {completionRatePercent}% completion rate
+            </p>
           </div>
-        </GlassSection>
+        </PanelSection>
       </header>
 
       <DifficultyPreferenceCard />

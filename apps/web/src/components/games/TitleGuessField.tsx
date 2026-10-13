@@ -11,7 +11,6 @@ import {
   useState,
   type ChangeEvent,
   type KeyboardEvent,
-  type MouseEvent,
 } from "react";
 
 import { useTitleSuggestions } from "../../hooks/useTitleSuggestions";
@@ -28,6 +27,7 @@ export interface TitleGuessFieldHandle {
 }
 
 interface TitleGuessFieldProps {
+  id?: string;
   value: string;
   onValueChange(value: string): void;
   onSubmit(selection: TitleGuessSelection): void;
@@ -50,6 +50,7 @@ export const TitleGuessField = forwardRef<
 >(function TitleGuessField(
   {
     value,
+    id,
     onValueChange,
     onSubmit,
     disabled = false,
@@ -67,7 +68,6 @@ export const TitleGuessField = forwardRef<
   ref,
 ) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const blurTimeoutRef = useRef<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
@@ -121,15 +121,6 @@ export const TitleGuessField = forwardRef<
   );
 
   useEffect(() => {
-    return () => {
-      if (blurTimeoutRef.current) {
-        window.clearTimeout(blurTimeoutRef.current);
-        blurTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     if (disabled) {
       closeMenu();
     }
@@ -153,32 +144,19 @@ export const TitleGuessField = forwardRef<
   );
 
   const handleFocus = useCallback(() => {
-    if (blurTimeoutRef.current) {
-      window.clearTimeout(blurTimeoutRef.current);
-      blurTimeoutRef.current = null;
-    }
     if (!disabled) {
       setIsMenuOpen(true);
     }
   }, [disabled]);
 
-  const handleBlur = useCallback(() => {
-    if (blurTimeoutRef.current) {
-      window.clearTimeout(blurTimeoutRef.current);
-    }
-    blurTimeoutRef.current = window.setTimeout(() => {
-      closeMenu();
-      blurTimeoutRef.current = null;
-    }, 120);
-  }, [closeMenu]);
+  const handleBlur = useCallback(() => closeMenu(), [closeMenu]);
 
   const handleSubmitSelection = useCallback(
     (selection: TitleGuessSelection) => {
       onValueChange(selection.value);
       closeMenu();
-      void onSubmit(selection);
     },
-    [closeMenu, onSubmit, onValueChange],
+    [closeMenu, onValueChange],
   );
 
   const handleKeyDown = useCallback(
@@ -216,6 +194,10 @@ export const TitleGuessField = forwardRef<
           value: suggestion.title.trim(),
           suggestionId: suggestion.id,
         });
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        const selection = findSelection();
+        if (selection) onSubmit(selection);
       } else if (event.key === "Escape") {
         closeMenu();
       }
@@ -224,7 +206,9 @@ export const TitleGuessField = forwardRef<
       closeMenu,
       disabled,
       handleSubmitSelection,
+      findSelection,
       highlightedIndex,
+      onSubmit,
       suggestions,
     ],
   );
@@ -234,7 +218,8 @@ export const TitleGuessField = forwardRef<
       <div className="relative">
         <input
           ref={inputRef}
-          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:opacity-70"
+          id={id}
+          className="w-full rounded-md border border-line-strong bg-ink px-4 py-3 text-base text-paper outline-none transition focus:border-signal-text focus:ring-2 focus:ring-signal/30 disabled:cursor-not-allowed disabled:opacity-70"
           placeholder={placeholder}
           value={value}
           onChange={handleChange}
@@ -256,19 +241,13 @@ export const TitleGuessField = forwardRef<
           }
         />
         {suggestionsVisible && (
-          <div className="absolute left-0 right-0 z-20 mt-2 min-h-[12rem] overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl backdrop-blur">
+          <div className="absolute left-0 right-0 z-20 mt-2 max-h-[min(18rem,45dvh)] overflow-hidden rounded-md border border-line-strong bg-panel">
             {loading ? (
-              <div className="px-4 py-3 text-sm text-neutral-300">
-                {loadingText}
-              </div>
+              <div className="px-4 py-3 text-sm text-muted">{loadingText}</div>
             ) : error ? (
-              <div className="px-4 py-3 text-sm text-rose-300">
-                {errorText}
-              </div>
+              <div className="px-4 py-3 text-sm text-danger">{errorText}</div>
             ) : suggestions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-neutral-400">
-                {emptyText}
-              </div>
+              <div className="px-4 py-3 text-sm text-muted">{emptyText}</div>
             ) : (
               <ul
                 role="listbox"
@@ -284,27 +263,24 @@ export const TitleGuessField = forwardRef<
                       id={`${listboxId}-option-${index}`}
                       role="option"
                       aria-selected={isActive}
+                      onClick={() => {
+                        if (disabled) return;
+                        handleSubmitSelection({
+                          value: suggestion.title.trim(),
+                          suggestionId: suggestion.id,
+                        });
+                      }}
+                      onMouseEnter={() => setHighlightedIndex(index)}
                     >
-                      <button
-                        type="button"
+                      <div
                         className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm transition ${
                           isActive
-                            ? "bg-brand-500/20 text-white"
-                            : "text-neutral-200 hover:bg-white/5"
+                            ? "bg-hover text-paper"
+                            : "text-muted hover:bg-panel-raised"
                         }`}
-                        onMouseDown={(event: MouseEvent<HTMLButtonElement>) => {
-                          event.preventDefault();
-                          if (disabled) return;
-                          handleSubmitSelection({
-                            value: suggestion.title.trim(),
-                            suggestionId: suggestion.id,
-                          });
-                        }}
-                        onMouseEnter={() => setHighlightedIndex(index)}
-                        onFocus={() => setHighlightedIndex(index)}
                       >
                         <span>{suggestion.title}</span>
-                      </button>
+                      </div>
                     </li>
                   );
                 })}
@@ -316,4 +292,3 @@ export const TitleGuessField = forwardRef<
     </div>
   );
 });
-

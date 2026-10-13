@@ -1,6 +1,7 @@
 import type { AnidleGuessEvaluation } from "../types/anidle";
 import {
   normalizeAnidleEvaluation,
+  normalizeExtraEvaluationFields,
   normalizeListFeedback,
   normalizeScalarFeedback,
 } from "./normalizeAnidleEvaluation";
@@ -33,6 +34,7 @@ function parseEvaluation(
     tags: normalizeListFeedback(payload.tags),
     studios: normalizeListFeedback(payload.studios),
     source: normalizeListFeedback(payload.source),
+    ...normalizeExtraEvaluationFields(payload),
   };
 }
 

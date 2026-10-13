@@ -39,7 +39,9 @@ interface WeekColumn {
 const DEFAULT_WEEKS = 12;
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function classNames(...values: Array<string | null | undefined | false>): string {
+function classNames(
+  ...values: Array<string | null | undefined | false>
+): string {
   return values.filter(Boolean).join(" ");
 }
 
@@ -70,7 +72,8 @@ export default function StreakWidget({
   weeks = DEFAULT_WEEKS,
 }: Props) {
   const streakCount = streak.count;
-  const lastCompletedIso = streak.lastCompleted ?? (completed ? currentDateIso : null);
+  const lastCompletedIso =
+    streak.lastCompleted ?? (completed ? currentDateIso : null);
 
   const currentDate = safeParseIso(currentDateIso) ?? new Date();
   const lastCompletedDate = safeParseIso(lastCompletedIso);
@@ -135,8 +138,9 @@ export default function StreakWidget({
 
   const upcomingMilestone = useMemo(() => {
     return (
-      STREAK_MILESTONES.find((milestone) => milestone.threshold > streakCount) ??
-      null
+      STREAK_MILESTONES.find(
+        (milestone) => milestone.threshold > streakCount,
+      ) ?? null
     );
   }, [streakCount]);
 
@@ -173,38 +177,41 @@ export default function StreakWidget({
   return (
     <section
       className={classNames(
-        "relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/70 p-5 shadow-ambient backdrop-blur-2xl sm:p-7",
+        "relative overflow-hidden rounded-lg border border-line bg-surface-raised p-5 sm:p-7",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
       <div className="relative space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200/80">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-correct-ink">
               Current streak
             </p>
-            <p className="text-3xl font-display font-semibold text-white sm:text-4xl">
+            <p className="text-3xl font-display font-semibold text-paper sm:text-4xl">
               {streakCount}
-              <span className="ml-2 text-base font-sans font-normal text-neutral-300">
+              <span className="ml-2 text-base font-sans font-normal text-muted">
                 day{streakCount === 1 ? "" : "s"}
               </span>
             </p>
-            <p className="text-sm text-neutral-300/90">{supportingText}</p>
+            <p className="text-sm text-muted">{supportingText}</p>
           </div>
-          <div className="max-w-xs rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm font-medium text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+          <div className="max-w-xs rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm font-medium text-correct-ink">
             {milestoneMessage}
           </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-start gap-3">
-            <div className="flex flex-col justify-between py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-neutral-500">
+            <div className="flex flex-col justify-between py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-muted">
               {WEEKDAY_LABELS.map((label) => (
                 <span key={label}>{label}</span>
               ))}
             </div>
-            <div className="streak-heatmap" role="grid" aria-label="Calendar streak heatmap">
+            <div
+              className="streak-heatmap"
+              role="grid"
+              aria-label="Calendar streak heatmap"
+            >
               {weekColumns.map((week) => (
                 <div key={week.key} role="row" className="streak-heatmap__week">
                   {week.days.map((day) => (
@@ -223,7 +230,7 @@ export default function StreakWidget({
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-neutral-500">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-muted">
             <span>Less</span>
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4].map((level) => (

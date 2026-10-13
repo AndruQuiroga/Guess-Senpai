@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+import type { Metadata, Viewport } from "next";
 
 import SessionRefresher from "../components/SessionRefresher";
-import HeaderNavigation from "../components/HeaderNavigation";
+import PrimaryNav from "../components/PrimaryNav";
 import ServiceWorkerRegistrar from "../components/ServiceWorkerRegistrar";
 import "../styles/globals.css";
 import { DailyAvailabilityProvider } from "../hooks/useDailyAvailability";
 
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? "http://localhost:3000";
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  process.env.SITE_URL ??
+  "http://localhost:3000";
 
 const metadataBase = (() => {
   try {
@@ -25,11 +26,9 @@ export const metadata: Metadata = {
     template: "%s · GuessSenpai",
   },
   description:
-    "Glassy daily anime guessing challenges. Play Anidle, Poster Zoomed, Redacted Synopsis, and more with streak tracking and shareable cards.",
+    "Daily anime puzzles. Play Anidle, Poster, and more with GuessSenpai.",
   applicationName: "GuessSenpai",
   manifest: "/manifest.webmanifest",
-  themeColor: "#8b5cf6",
-  colorScheme: "dark",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -42,10 +41,14 @@ export const metadata: Metadata = {
     ],
     apple: "/icons/icon-192.svg",
     shortcut: "/icons/icon-192.svg",
-    other: [
-      { rel: "mask-icon", url: "/icons/maskable-icon.svg" },
-    ],
+    other: [{ rel: "mask-icon", url: "/icons/maskable-icon.svg" }],
   },
+};
+
+export const viewport: Viewport = {
+  // Browser chrome colour must be a literal; mirrors the --ink token.
+  themeColor: "#171819",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -57,37 +60,38 @@ export default function RootLayout({
 
   return (
     <html lang="en" className="dark">
-      <body className="relative min-h-screen text-neutral-100 antialiased selection:bg-brand-500/40 selection:text-white">
+      <body className="min-h-screen antialiased selection:bg-signal selection:text-signal-ink">
         <SessionRefresher />
         <ServiceWorkerRegistrar />
         <DailyAvailabilityProvider>
-          <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_-10%,rgba(59,130,246,0.25),transparent_60%),radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.18),transparent_60%),radial-gradient(circle_at_50%_100%,rgba(236,72,153,0.12),transparent_70%)] opacity-70 blur-[140px]" />
-          </div>
-          <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-10">
-            <header className="mb-10 flex items-center justify-between rounded-full border border-white/10 bg-white/5 px-6 py-4 text-sm text-neutral-300 shadow-glow backdrop-blur-xl">
-              <Link
-                href="/"
-                className="text-xl font-display font-semibold tracking-tight text-white transition hover:text-brand-300"
+          <a href="#main-content" className="skip-link">
+            Skip to content
+          </a>
+          <div className="min-h-screen md:flex">
+            <PrimaryNav archiveDate={today} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <main
+                id="main-content"
+                tabIndex={-1}
+                className="mx-auto w-full max-w-5xl flex-1 px-4 pb-10 pt-5 sm:px-6 md:pt-8 lg:px-10"
               >
-                Guess<span className="text-brand-300">Senpai</span>
-              </Link>
-              <HeaderNavigation archiveDate={today} />
-            </header>
-            <main className="flex-1 pb-16">{children}</main>
-            <footer className="mt-20 border-t border-white/10 pt-6 text-[11px] text-neutral-500">
-              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-neutral-500">
-                  © {new Date().getFullYear()} GuessSenpai · Built with AniList &amp; AnimeThemes data.
-                </span>
-                <a
-                  href="mailto:support@guessenpai.app"
-                  className="text-neutral-500 transition hover:text-neutral-300"
-                >
-                  support@guessenpai.app
-                </a>
-              </div>
-            </footer>
+                {children}
+              </main>
+              <footer className="mx-auto w-full max-w-5xl border-t border-line px-4 py-4 text-sm text-muted sm:px-6 lg:px-10">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    © {new Date().getFullYear()} GuessSenpai · Built with
+                    AniList &amp; AnimeThemes data.
+                  </span>
+                  <a
+                    href="mailto:support@guessenpai.app"
+                    className="inline-flex min-h-11 items-center hover:text-paper"
+                  >
+                    support@guessenpai.app
+                  </a>
+                </div>
+              </footer>
+            </div>
           </div>
         </DailyAvailabilityProvider>
       </body>
