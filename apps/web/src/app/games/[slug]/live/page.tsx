@@ -23,7 +23,7 @@ interface AccountState {
 }
 
 async function fetchWithSession(path: string) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const session = cookieStore.get("guesssenpai_session");
   const headers = new Headers();
   if (session) {
@@ -66,9 +66,10 @@ async function fetchAccount(): Promise<AccountState | null> {
 export default async function LiveGamePage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slugDefinition = findPuzzleSlug(params.slug);
+  const { slug } = await params;
+  const slugDefinition = findPuzzleSlug(slug);
   if (!slugDefinition) {
     notFound();
   }
@@ -81,17 +82,18 @@ export default async function LiveGamePage({
   const lobbyId = slugDefinition.slug;
   const matchId = `${slugDefinition.slug}-match`;
 
-  const playerProfile = account?.authenticated && account.user
-    ? {
-        id: String(account.user.id),
-        name: account.user.username ?? null,
-        avatar: account.user.avatar ?? null,
-      }
-    : {
-        id: randomUUID(),
-        name: null,
-        avatar: null,
-      };
+  const playerProfile =
+    account?.authenticated && account.user
+      ? {
+          id: String(account.user.id),
+          name: account.user.username ?? null,
+          avatar: account.user.avatar ?? null,
+        }
+      : {
+          id: randomUUID(),
+          name: null,
+          avatar: null,
+        };
 
   return (
     <LiveGameClient

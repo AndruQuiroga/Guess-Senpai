@@ -11,7 +11,7 @@ const API_BASE =
 
 async function fetchDailyPuzzles(): Promise<DailyPuzzleResponse | null> {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("guesssenpai_session");
     const headers = sessionCookie
       ? { cookie: `guesssenpai_session=${sessionCookie.value}` }

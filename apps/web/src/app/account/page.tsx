@@ -52,7 +52,7 @@ interface PuzzleStatsResponse {
 }
 
 async function fetchWithSession(path: string) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const session = cookieStore.get("guesssenpai_session");
   const headers = new Headers();
   if (session) {
