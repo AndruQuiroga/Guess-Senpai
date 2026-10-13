@@ -1482,6 +1482,23 @@ async def get_daily_puzzle(
             return _daily_response(published)
     if day < datetime.now(timezone.utc).date():
         raise LookupError(f"No published daily puzzle exists for {day.isoformat()}")
+    return await publish_daily_puzzle(day, include_guess_opening=include_guess_opening)
+
+
+async def publish_daily_puzzle(day: date, *, include_guess_opening: bool = False) -> DailyPuzzleResponse:
+    """Generate and store the set for `day` unless one is already published.
+
+    Used for today by `get_daily_puzzle` and for missing past days by the
+    archive backfill (`python -m app.puzzles.backfill`). An existing set is
+    never replaced: publication is immutable.
+    """
+    if day > datetime.now(timezone.utc).date():
+        raise ValueError("Daily puzzles cannot be published for a future UTC date")
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        published = await session.get(DailyPuzzleSet, day)
+        if published is not None:
+            return _daily_response(published)
 
     cache = await _get_cache()
     generated = await _assemble_daily_puzzle(

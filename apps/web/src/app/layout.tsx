@@ -73,7 +73,7 @@ export default function RootLayout({
               <main
                 id="main-content"
                 tabIndex={-1}
-                className="mx-auto w-full max-w-5xl flex-1 px-4 pb-10 pt-5 sm:px-6 md:pt-8 lg:px-10"
+                className="mx-auto w-full max-w-5xl flex-1 px-4 pb-10 pt-5 sm:px-6 md:pt-8 lg:px-10 has-[[data-layout=wide]]:max-w-[96rem]"
               >
                 {children}
               </main>

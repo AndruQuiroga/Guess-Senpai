@@ -172,12 +172,14 @@ describe("GuessGrid", () => {
     expect(screen.getByRole("list", { name: "Legend" })).toBeInTheDocument();
   });
 
-  it("lists every matched and missed genre and tag, one column each", () => {
+  it("lists genres in full and folds long tag lists, one column each", () => {
     render(<GuessGrid evaluations={[evaluation()]} />);
     const cells = within(bodyRows()[0]).getAllByRole("cell");
     // Year, Score, Popularity, Episodes, Format, Source, Genres, Tags, Studio.
     expect(chips(cells[6])).toEqual(["✓ Action", "✗ Drama"]);
-    expect(chips(cells[7])).toEqual(["✓ A", "✓ B", "✓ C", "✓ D", "✗ E"]);
+    // Tags show three and fold the rest; the sr-only sentence lists them all.
+    expect(chips(cells[7])).toEqual(["✓ A", "✓ B", "✓ C", "+2"]);
+    expect(cells[7]).toHaveTextContent("Tags: 4 of 5 match: A, B, C, D");
     expect(chips(cells[8])).toEqual(["✗ Bones"]);
   });
 

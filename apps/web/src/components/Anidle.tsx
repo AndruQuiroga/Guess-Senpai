@@ -51,7 +51,8 @@ export default function Anidle({
     null;
 
   return (
-    <div className="space-y-5 text-paper">
+    // Wide: the layout lets the main column grow so all ten columns fit.
+    <div data-layout="wide" className="space-y-5 text-paper">
       {!game.finished ? (
         <GuessInput
           value={game.guess}

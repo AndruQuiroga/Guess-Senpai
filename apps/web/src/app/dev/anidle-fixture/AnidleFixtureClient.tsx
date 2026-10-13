@@ -149,7 +149,7 @@ export default function AnidleFixtureClient({
     progressFor(state),
   );
   return (
-    <div className="mx-auto max-w-5xl space-y-3">
+    <div className="space-y-3">
       <p className="rounded-md border border-signal-deep bg-signal-soft px-3 py-2 text-sm font-semibold text-signal-text">
         LOCAL FIXTURE · NOT LIVE PUZZLE DATA ·
         ?state=empty|progress|solved|exhausted
