@@ -16,16 +16,16 @@ export function AnidlePreview({ bundle }: AnidlePreviewProps) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-[#ff7658] bg-[#3a2a25] px-3 py-2 text-left">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-200">
+      <div className="rounded-lg border border-signal bg-signal-soft px-3 py-2 text-left">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-signal-text">
           How Anidle works
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-[#f4f0e7]">
+        <p className="mt-2 text-sm leading-relaxed text-paper">
           {trimmedPreview}
         </p>
       </div>
 
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-muted">
         This preview does not show today&apos;s answer or clue text.
       </p>
     </div>

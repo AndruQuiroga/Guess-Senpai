@@ -53,7 +53,7 @@ export function GuessOpeningPreview({ bundle }: GuessOpeningPreviewProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[#f4f0e7]">
+      <p className="text-sm text-paper">
         Three openings per day. Clear all of them to lock in today&apos;s Guess
         the Opening win.
       </p>
@@ -62,22 +62,22 @@ export function GuessOpeningPreview({ bundle }: GuessOpeningPreviewProps) {
           const metadata = collectRoundMetadata(round);
           return (
             <li key={`${round.mediaId}-${index}`} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#c1c2bd]">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted">
                 Opening {index + 1}
               </p>
               {metadata.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-[#c1c2bd]">
+                <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-muted">
                   {metadata.map((entry) => (
                     <span
                       key={entry}
-                      className="rounded-md border border-[#484b4d] bg-[#2c2f31] px-3 py-1 font-semibold text-[#f4f0e7]"
+                      className="rounded-md border border-line bg-panel-raised px-3 py-1 font-semibold text-paper"
                     >
                       {entry}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-[0.72rem] text-neutral-400">
+                <p className="text-[0.72rem] text-muted">
                   Hints unlock as you progress.
                 </p>
               )}

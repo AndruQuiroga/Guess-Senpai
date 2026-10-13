@@ -7,10 +7,7 @@ import { PropsWithChildren, ReactNode } from "react";
 import { useCelebration } from "../../hooks/useCelebration";
 
 export type GameProgressStatus =
-  | "not-started"
-  | "in-progress"
-  | "completed"
-  | "exhausted";
+  "not-started" | "in-progress" | "completed" | "exhausted";
 
 interface GamePreviewCardProps {
   slug: string;
@@ -28,17 +25,17 @@ interface GamePreviewCardProps {
 }
 
 const STATUS_TONES: Record<GameProgressStatus, string> = {
-  "not-started": "text-[#c1c2bd]",
-  "in-progress": "text-[#f2c36b]",
-  completed: "text-[#9fd8b0]",
-  exhausted: "text-[#ff987f]",
+  "not-started": "text-muted",
+  "in-progress": "text-close-ink",
+  completed: "text-correct-ink",
+  exhausted: "text-signal-text",
 };
 
 const STATUS_OUTLINES: Record<GameProgressStatus, string> = {
-  "not-started": "border-[#686b6d] bg-[#2c2f31]",
-  "in-progress": "border-[#f2c36b] bg-[#2c2f31]",
-  completed: "border-[#9fd8b0] bg-[#2c2f31]",
-  exhausted: "border-[#ff987f] bg-[#2c2f31]",
+  "not-started": "border-line-strong bg-panel-raised",
+  "in-progress": "border-close-ink bg-panel-raised",
+  completed: "border-correct-ink bg-panel-raised",
+  exhausted: "border-signal-text bg-panel-raised",
 };
 
 const STATUS_FOOTNOTES: Record<GameProgressStatus, string> = {
@@ -51,13 +48,13 @@ const STATUS_FOOTNOTES: Record<GameProgressStatus, string> = {
 function PreviewPanel({ children }: PropsWithChildren) {
   if (!children) {
     return (
-      <p className="text-sm text-[#c1c2bd]">
+      <p className="text-sm text-muted">
         First-round hints unlock as soon as you start playing.
       </p>
     );
   }
 
-  return <div className="space-y-3 text-sm text-[#f4f0e7]">{children}</div>;
+  return <div className="space-y-3 text-sm text-paper">{children}</div>;
 }
 
 export function GamePreviewCard({
@@ -85,7 +82,7 @@ export function GamePreviewCard({
     >
       <motion.span
         layout
-        className={`absolute left-[0.35rem] top-6 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border text-base font-semibold text-[#f4f0e7] ${STATUS_OUTLINES[status]}`}
+        className={`absolute left-[0.35rem] top-6 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border text-base font-semibold text-paper ${STATUS_OUTLINES[status]}`}
         animate={isCelebrating ? { scale: [1, 1.12, 1] } : { scale: 1 }}
         transition={{
           duration: isCelebrating ? 0.8 : 0.3,
@@ -99,27 +96,27 @@ export function GamePreviewCard({
 
       <motion.div
         layout
-        className={`relative overflow-hidden rounded-lg border bg-[#242628] p-5 transition-colors focus-within:border-[#ff987f] sm:p-6 ${
+        className={`relative overflow-hidden rounded-lg border bg-panel p-5 transition-colors focus-within:border-signal-text sm:p-6 ${
           isCelebrating
-            ? "border-[#9fd8b0]"
-            : "border-[#484b4d] hover:border-[#686b6d]"
+            ? "border-correct-ink"
+            : "border-line hover:border-line-strong"
         }`}
       >
         <div className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#c1c2bd]">
-                <span className="rounded-md border border-[#484b4d] bg-[#2c2f31] px-2 py-1 text-[0.7rem] text-[#f4f0e7]">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+                <span className="rounded-md border border-line bg-panel-raised px-2 py-1 text-[0.7rem] text-paper">
                   Daily puzzle
                 </span>
                 <span className={STATUS_TONES[status]}>{statusLabel}</span>
               </div>
               <div className="space-y-2">
-                <h2 className="font-display text-xl font-semibold tracking-tight text-[#f4f0e7] sm:text-2xl">
+                <h2 className="font-display text-xl font-semibold tracking-tight text-paper sm:text-2xl">
                   {title}
                 </h2>
                 {description ? (
-                  <p className="text-sm leading-relaxed text-[#c1c2bd]">
+                  <p className="text-sm leading-relaxed text-muted">
                     {description}
                   </p>
                 ) : null}
@@ -134,7 +131,7 @@ export function GamePreviewCard({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.3 }}
-                  className="inline-flex items-center gap-2 rounded-md border border-[#9fd8b0] bg-[#2c2f31] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#9fd8b0]"
+                  className="inline-flex items-center gap-2 rounded-md border border-correct-ink bg-panel-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-correct-ink"
                 >
                   Streak saved
                 </motion.span>
@@ -145,7 +142,7 @@ export function GamePreviewCard({
           <PreviewPanel>{preview}</PreviewPanel>
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-[#c1c2bd]">{STATUS_FOOTNOTES[status]}</p>
+            <p className="text-sm text-muted">{STATUS_FOOTNOTES[status]}</p>
 
             <Link href={href} className="button button-primary">
               {ctaLabel}

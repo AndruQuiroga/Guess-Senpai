@@ -1,66 +1,44 @@
 "use client";
 
-import { DailyRolloverNotice } from "../components/DailyRolloverNotice";
 import Image from "next/image";
 import Link from "next/link";
-import { useDailyAvailability } from "../hooks/useDailyAvailability";
 
-import { Panel, Status } from "../components/ui/Primitives";
+import { DailyRolloverNotice } from "../components/DailyRolloverNotice";
+import { StatusMark } from "../components/nav/StatusMark";
 import { useAccount, useAccountStreak } from "../hooks/useAccount";
+import {
+  useDailyAvailability,
+  useRuntimeGamesDirectory,
+} from "../hooks/useDailyAvailability";
 import {
   PuzzleProgressProvider,
   usePuzzleProgress,
 } from "../hooks/usePuzzleProgress";
-import type { GameKey } from "../types/progress";
-import {
-  getGameAction,
-  getGameOutcome,
-  getGameStatusLabel,
-} from "../utils/gameAction";
-
-const featuredGames: {
-  slug: string;
-  key: GameKey;
-  title: string;
-  description: string;
-  art: string;
-}[] = [
-  {
-    slug: "anidle",
-    key: "anidle",
-    title: "Anidle",
-    description:
-      "Find the anime through metadata comparisons and synopsis clues.",
-    art: "/games/anidle.svg",
-  },
-  {
-    slug: "poster-zoomed",
-    key: "poster_zoomed",
-    title: "Poster",
-    description: "Recognize the anime as more of its poster comes into view.",
-    art: "/games/poster-zoomed.svg",
-  },
-];
+import { getGameStatus } from "../utils/gameAction";
 
 export default function HomePage() {
   const { daily, error, refresh } = useDailyAvailability();
   if (!daily)
     return (
-      <div className="today-page">
-        <h1>Your daily anime puzzles.</h1>
-        <p role="status">
+      <div className="space-y-4">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-paper">
+          Today
+        </h1>
+        <p role="status" className="text-base text-muted">
           {error
             ? "Couldn't load today's progress and availability."
             : "Loading today's puzzles…"}
         </p>
         {error && (
-          <button className="button" onClick={() => void refresh()}>
-            Retry
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button className="button" onClick={() => void refresh()}>
+              Retry
+            </button>
+            <Link className="button button-primary" href="/games/anidle">
+              Play Anidle
+            </Link>
+          </div>
         )}
-        <Link className="button button-primary" href="/games/anidle">
-          Play Anidle →
-        </Link>
       </div>
     );
   const date = daily.date;
@@ -80,159 +58,85 @@ function Today({ date }: { date: string }) {
   const { progress } = usePuzzleProgress(date);
   const { account, loading, error: accountError } = useAccount();
   const { streak, error: streakError } = useAccountStreak();
-  const { daily } = useDailyAvailability();
+  const games = useRuntimeGamesDirectory();
   const day = new Intl.DateTimeFormat("en", {
     weekday: "long",
     month: "long",
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${date}T00:00:00Z`));
-  const secondary = [
-    {
-      slug: "redacted-synopsis",
-      title: "Redacted Synopsis",
-      key: "redacted_synopsis" as GameKey,
-    },
-    {
-      slug: "character-silhouette",
-      title: "Character Silhouette",
-      key: "character_silhouette" as GameKey,
-    },
-  ];
-  if (daily?.available_modes.includes("guess_the_opening"))
-    secondary.push({
-      slug: "guess-the-opening",
-      title: "Guess the Opening",
-      key: "guess_the_opening",
-    });
+  const streakText =
+    streakError || accountError
+      ? "Streak unavailable"
+      : loading
+        ? "Loading streak…"
+        : !account.authenticated
+          ? null
+          : streak.count === 0
+            ? "No active streak"
+            : `${streak.count} day streak`;
 
   return (
-    <div className="today-page">
-      <section className="today-intro">
-        <div>
-          <p className="eyebrow">TODAY · {day}</p>
-          <h1>Your daily anime puzzles.</h1>
-          <p className="today-subtitle">A little anime knowledge, every day.</p>
-        </div>
-        <div className="today-meta">
-          <span>Daily reset · UTC</span>
-          <strong>
-            {streakError || accountError
-              ? "Streak unavailable"
-              : loading
-                ? "Loading streak…"
-                : !account.authenticated
-                  ? "Play at your pace"
-                  : streak.count === 0
-                    ? "No active streak"
-                    : `${streak.count} day streak`}
-          </strong>
-        </div>
-      </section>
+    <div className="space-y-5">
+      <header className="space-y-1">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-paper">
+          Today
+        </h1>
+        <p className="text-sm text-muted">
+          {day} · Resets 00:00 UTC
+          {streakText ? ` · ${streakText}` : ""}
+        </p>
+      </header>
 
-      <section aria-label="Featured daily puzzles" className="featured-puzzles">
-        {featuredGames.map((game) => {
-          const state = progress[game.key];
-          const action = getGameAction(state);
-          const outcome = getGameOutcome(state);
-          const label =
-            action === "resume"
-              ? "Resume"
-              : action === "results"
-                ? "Results"
-                : "Play";
-
+      <ul
+        aria-label="Daily puzzles"
+        className="grid list-none gap-3 p-0 sm:grid-cols-2 sm:gap-4"
+      >
+        {games.map((game) => {
+          const status = getGameStatus(
+            game.gameKey ? progress[game.gameKey] : undefined,
+          );
+          const art =
+            game.preview.media?.type === "image" ? game.preview.media : null;
           return (
-            <article className="featured-card panel" key={game.key}>
-              <div className="featured-art" aria-hidden="true">
-                <Image src={game.art} alt="" width={92} height={112} />
-              </div>
-              <div className="featured-copy">
-                <div className="card-heading">
-                  <div>
-                    <p className="eyebrow">DAILY PUZZLE</p>
-                    <h2>{game.title}</h2>
-                  </div>
-                  <Status
-                    aria-label={
-                      outcome === "exhausted"
-                        ? "Out of guesses"
-                        : action === "results"
-                          ? "Solved"
-                          : action === "resume"
-                            ? "In progress"
-                            : "New"
-                    }
-                  >
-                    {outcome === "exhausted"
-                      ? "● Out of guesses"
-                      : action === "results"
-                        ? "✓ Solved"
-                        : action === "resume"
-                          ? "↻ In progress"
-                          : "• New"}
-                  </Status>
-                </div>
-                <p>{game.description}</p>
-                <Link
-                  className="button button-primary play-link"
-                  href={`/games/${game.slug}`}
-                >
-                  {label}
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-            </article>
+            <li key={game.slug} className="flex">
+              <Link
+                href={`/games/${game.slug}`}
+                className="panel group flex w-full flex-row items-center gap-4 p-3 no-underline transition hover:border-line-strong hover:bg-hover sm:flex-col sm:items-stretch sm:gap-3 sm:p-4"
+              >
+                {art ? (
+                  <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-ink sm:h-36 sm:w-full">
+                    <Image
+                      src={art.src}
+                      alt=""
+                      width={144}
+                      height={144}
+                      className="h-full w-auto object-contain"
+                    />
+                  </span>
+                ) : null}
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="font-display text-xl font-bold leading-tight text-paper">
+                    {game.title}
+                  </span>
+                  <span className="text-base text-muted">{game.tagline}</span>
+                  <StatusMark status={status} className="mt-1" />
+                </span>
+              </Link>
+            </li>
           );
         })}
-      </section>
-
-      <Panel className="more-puzzles">
-        <div className="secondary-heading">
-          <div>
-            <p className="eyebrow">ALSO IN TODAY</p>
-            <h2>More puzzles</h2>
-          </div>
-          <span>Pick another challenge</span>
-        </div>
-        <ul>
-          {secondary.map((game) => {
-            const action = getGameAction(progress[game.key]);
-            const label =
-              action === "results"
-                ? "Results"
-                : action === "resume"
-                  ? "Resume"
-                  : "Play";
-            return (
-              <li key={game.key}>
-                <span>{game.title}</span>
-                <span className="muted-status">
-                  {getGameStatusLabel(progress[game.key])}
-                </span>
-                <Link
-                  href={`/games/${game.slug}`}
-                  aria-label={`${label} ${game.title}`}
-                >
-                  {label} →
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </Panel>
+      </ul>
 
       {!loading && !accountError && !account.authenticated && (
-        <p className="account-note">
-          Playing as a guest. <Link href="/login">Sign in</Link> to sync
-          progress across devices.
+        <p className="text-sm text-muted">
+          Playing as a guest.{" "}
+          <Link href="/login" className="font-semibold text-paper underline">
+            Sign in
+          </Link>{" "}
+          to sync progress across devices.
         </p>
       )}
-      <p className="today-help">
-        <Link href="/how-to-play">How to play</Link>
-        <span> · </span>
-        <Link href="/archive">Browse the archive</Link>
-      </p>
     </div>
   );
 }

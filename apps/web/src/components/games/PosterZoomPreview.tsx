@@ -24,9 +24,9 @@ const STATUS_LABELS: Record<RoundState, string> = {
 };
 
 const STATUS_TONES: Record<RoundState, string> = {
-  cleared: "text-emerald-200",
-  active: "text-amber-200",
-  locked: "text-neutral-400",
+  cleared: "text-correct-ink",
+  active: "text-close-ink",
+  locked: "text-muted",
 };
 
 function formatHintLabel(value: string) {
@@ -173,7 +173,7 @@ export function PosterZoomPreview({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-[#f4f0e7]">
+      <p className="text-sm text-paper">
         Three posters per day. Clear each round to reveal its release details.
       </p>
 
@@ -201,20 +201,20 @@ export function PosterZoomPreview({
                   ? `${round.mediaId}-${roundNumber}`
                   : `round-${roundNumber}`
               }
-              className="rounded-lg border border-[#484b4d] bg-[#242628] p-4"
+              className="rounded-lg border border-line bg-panel p-4"
             >
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.28em] text-[#c1c2bd]">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.28em] text-muted">
                 <span>Poster {roundNumber}</span>
                 <span className={STATUS_TONES[state]}>
                   {STATUS_LABELS[state]}
                 </span>
               </div>
 
-              <div className="mt-3 space-y-2 text-xs text-[#c1c2bd]">
+              <div className="mt-3 space-y-2 text-xs text-muted">
                 {releaseSummary ? (
-                  <p className="text-[#f4f0e7]">Release {releaseSummary}</p>
+                  <p className="text-paper">Release {releaseSummary}</p>
                 ) : (
-                  <p className="text-[#c1c2bd]">
+                  <p className="text-muted">
                     {state === "cleared"
                       ? "Release info unlocked."
                       : state === "active"
@@ -224,17 +224,17 @@ export function PosterZoomPreview({
                 )}
 
                 {attemptSummary ? (
-                  <p className="text-[0.7rem] uppercase tracking-[0.24em] text-[#c1c2bd]">
+                  <p className="text-[0.7rem] uppercase tracking-[0.24em] text-muted">
                     Attempts: {attemptSummary}
                   </p>
                 ) : null}
 
                 {hints.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-[#c1c2bd]">
+                  <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-muted">
                     {hints.map((hint) => (
                       <span
                         key={hint}
-                        className="rounded-md border border-[#484b4d] bg-[#2c2f31] px-3 py-1 font-semibold text-[#f4f0e7]"
+                        className="rounded-md border border-line bg-panel-raised px-3 py-1 font-semibold text-paper"
                       >
                         {formatHintLabel(hint)}
                       </span>

@@ -757,6 +757,14 @@ function readStoredState(date: string): PersistedDailyState {
   return cloneState(EMPTY_STATE);
 }
 
+/** Same-tab signal so read-only views (navigation) can follow progress writes. */
+export const PROGRESS_CHANGED_EVENT = "guesssenpai:progress-changed";
+
+function notifyStoredProgressChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(PROGRESS_CHANGED_EVENT));
+}
+
 function writeStoredState(date: string, value: PersistedDailyState) {
   if (!date) return;
   writeLocalStorageState(date, value);
@@ -831,6 +839,7 @@ function usePuzzleProgressController(
       stateRef.current = next;
       writeStoredState(storageKey, next);
       setState(next);
+      notifyStoredProgressChanged();
     },
     [storageKey],
   );
@@ -1042,6 +1051,41 @@ export function PuzzleProgressProvider(props: PuzzleProgressProviderProps) {
       key={`${props.date}:${props.puzzleId}:${props.rulesVersion}:${userId ?? "guest"}`}
     />
   );
+}
+
+/**
+ * Read-only view of the progress that provider-backed pages persist. Used by
+ * navigation, which lives outside any PuzzleProgressProvider and must not start
+ * its own sync. Returns null until the daily identity and account are known,
+ * so callers never claim "new" before they actually know.
+ */
+export function useStoredDailyProgress(
+  daily: { date: string; puzzle_id: string; rules_version: string } | null,
+): DailyProgress | null {
+  const { account, loading, resolved } = useAccount();
+  const userId = account.authenticated ? (account.user?.id ?? null) : null;
+  const ready = Boolean(daily) && (!loading || resolved);
+  const storageKey = daily
+    ? `${daily.date}:${daily.puzzle_id}:v${daily.rules_version}${userId === null ? "" : `:user:${userId}`}`
+    : "";
+  const [progress, setProgress] = useState<DailyProgress | null>(null);
+
+  useEffect(() => {
+    if (!ready || !storageKey) {
+      setProgress(null);
+      return;
+    }
+    const read = () => setProgress(readStoredState(storageKey).progress);
+    read();
+    window.addEventListener(PROGRESS_CHANGED_EVENT, read);
+    window.addEventListener("storage", read);
+    return () => {
+      window.removeEventListener(PROGRESS_CHANGED_EVENT, read);
+      window.removeEventListener("storage", read);
+    };
+  }, [ready, storageKey]);
+
+  return progress;
 }
 
 export function usePuzzleProgress(

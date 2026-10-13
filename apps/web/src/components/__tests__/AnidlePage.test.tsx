@@ -15,7 +15,23 @@ const payload = {
 } as AnidleGame;
 
 describe("AnidlePage header", () => {
-  it("counts guesses against the v2 budget instead of rounds", () => {
+  // Stage A2 removed the shell's round badge. Stage B re-adds "Guess n / 8" via
+  // GameShell's `status` slot and should un-skip these two tests.
+  it("renders no round badge in the shell header", () => {
+    render(
+      <AnidlePage
+        slug="anidle"
+        mediaId={1}
+        payload={payload}
+        progress={{ completed: false, round: 1, guesses: ["a"] }}
+        onProgressChange={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/Guess \d+ \/ 8/)).toBeNull();
+    expect(screen.queryByText(/Round \d/)).toBeNull();
+  });
+
+  it.skip("counts guesses against the v2 budget instead of rounds", () => {
     render(
       <AnidlePage
         slug="anidle"
@@ -34,7 +50,7 @@ describe("AnidlePage header", () => {
     expect(screen.queryByText(/Round/)).toBeNull();
   });
 
-  it("keeps the final count once the guesses are exhausted", () => {
+  it.skip("keeps the final count once the guesses are exhausted", () => {
     const history = Array.from({ length: 8 }, (_, i) => ({ guess: `g${i}` }));
     render(
       <AnidlePage

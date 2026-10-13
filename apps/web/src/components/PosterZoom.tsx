@@ -884,7 +884,7 @@ export default function PosterZoom({
 
   if (!currentRound || !currentState) {
     return (
-      <div className="rounded-lg border border-[#686b6d] bg-[#2c2f31] p-6 text-[#c1c2bd]">
+      <div className="rounded-lg border border-line-strong bg-panel-raised p-6 text-muted">
         Unable to load Poster Zoom right now. Please try again later.
       </div>
     );
@@ -910,14 +910,14 @@ export default function PosterZoom({
                   unlocked ? setActiveRoundIndex(index) : undefined
                 }
                 disabled={!unlocked}
-                className={`inline-flex items-center min-h-11 rounded-md border px-4 py-1.5 text-sm font-semibold uppercase tracking-wider transition  focus:ring-2 focus:ring-[#ff9b83] ${
+                className={`inline-flex items-center min-h-11 rounded-md border px-4 py-1.5 text-sm font-semibold uppercase tracking-wider transition  focus:ring-2 focus:ring-focus ${
                   isActive
-                    ? "border-[#ff7658] bg-[#352c28] text-white"
+                    ? "border-signal bg-signal-soft text-paper"
                     : completed
-                      ? "border-[#3f8a5f] bg-[#1f3a2c] text-emerald-100"
+                      ? "border-correct bg-correct-soft text-correct-ink"
                       : unlocked
-                        ? "border-[#686b6d] bg-[#2c2f31] text-[#c1c2bd] hover:border-[#ff7658] hover:text-white"
-                        : "border-[#686b6d] bg-[#2c2f31] text-[#c1c2bd] opacity-60"
+                        ? "border-line-strong bg-panel-raised text-muted hover:border-signal hover:text-paper"
+                        : "border-line-strong bg-panel-raised text-muted opacity-60"
                 }`}
               >
                 Round {index + 1}
@@ -927,7 +927,7 @@ export default function PosterZoom({
         </div>
       )}
 
-      <div className="group relative flex h-56 sm:h-72 items-center justify-center overflow-hidden rounded-lg border border-[#686b6d] bg-[#2c2f31] ">
+      <div className="group relative flex h-56 sm:h-72 items-center justify-center overflow-hidden rounded-lg border border-line-strong bg-panel-raised ">
         {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -938,15 +938,15 @@ export default function PosterZoom({
             className="h-full w-full object-contain"
           />
         ) : (
-          <div className="text-[#c1c2bd]">Poster unavailable</div>
+          <div className="text-muted">Poster unavailable</div>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-[#c1c2bd]">
+      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-muted">
         {activeHints.map((hint) => (
           <span
             key={hint}
-            className="rounded-full border border-[#686b6d] bg-[#2c2f31] px-3 py-1 font-semibold text-[#f4f0e7]"
+            className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 font-semibold text-paper"
           >
             {hint}
           </span>
@@ -956,7 +956,7 @@ export default function PosterZoom({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-lg border border-[#686b6d] bg-[#2c2f31] px-4 py-2 text-sm font-medium text-white transition hover:border-[#ff7658] hover:text-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-lg border border-line-strong bg-panel-raised px-4 py-2 text-sm font-medium text-paper transition hover:border-signal hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
           onClick={revealMore}
           disabled={
             currentState.completed || currentState.stage >= totalStagesForRound
@@ -992,7 +992,7 @@ export default function PosterZoom({
                 handleSeasonChange(event.target.value as SeasonValue)
               }
               disabled={currentState.completed || submitting || !currentRound}
-              className="w-full rounded-lg border border-[#686b6d] bg-[#2c2f31] px-3 py-2 text-base text-white placeholder:text-[#c1c2bd]  focus:ring-2 focus:ring-[#ff9b83] sm:w-32"
+              className="w-full rounded-lg border border-line-strong bg-panel-raised px-3 py-2 text-base text-paper placeholder:text-muted  focus:ring-2 focus:ring-focus sm:w-32"
               aria-label="Release season"
             >
               <option value="">Season</option>
@@ -1011,12 +1011,12 @@ export default function PosterZoom({
               disabled={currentState.completed || submitting || !currentRound}
               placeholder="Year"
               aria-label="Release year"
-              className="w-full rounded-lg border border-[#686b6d] bg-[#2c2f31] px-3 py-2 text-base text-white placeholder:text-[#c1c2bd]  focus:ring-2 focus:ring-[#ff9b83] sm:w-24"
+              className="w-full rounded-lg border border-line-strong bg-panel-raised px-3 py-2 text-base text-paper placeholder:text-muted  focus:ring-2 focus:ring-focus sm:w-24"
             />
           </div>
           <button
             type="submit"
-            className="inline-flex items-center justify-center rounded-lg bg-[#ff7658] !text-[#27110b] px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-lg bg-signal !text-signal-ink px-6 py-3 text-sm font-semibold uppercase tracking-wide text-paper  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={currentState.completed || submitting || !currentRound}
           >
             {submitting ? "Checking…" : "Submit Guess"}
@@ -1024,14 +1024,14 @@ export default function PosterZoom({
         </div>
       </form>
 
-      <div className="space-y-3 text-sm text-[#c1c2bd]" aria-live="polite">
+      <div className="space-y-3 text-sm text-muted" aria-live="polite">
         {guessesForRound.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-[#c1c2bd]">
+          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-muted">
             Attempts
             {guessesForRound.map((value, index) => (
               <span
                 key={`${value}-${index}`}
-                className="rounded-full border border-[#686b6d] bg-[#2c2f31] px-3 py-1 text-sm text-[#c1c2bd]"
+                className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 text-sm text-muted"
               >
                 {value}
               </span>
@@ -1039,18 +1039,18 @@ export default function PosterZoom({
           </div>
         )}
         {currentState.feedback?.type === "error" && (
-          <div className="rounded-lg border border-[#c0566a] bg-[#40242a] px-4 py-3 text-sm text-rose-200">
+          <div className="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger-ink">
             {currentState.feedback.message}
           </div>
         )}
         {currentState.feedback?.type === "partial" && (
-          <div className="rounded-lg border border-[#c9a13e] bg-[#3d3220] px-4 py-3 text-sm text-amber-100">
+          <div className="rounded-lg border border-close bg-close-soft px-4 py-3 text-sm text-close-ink">
             {currentState.feedback.message}
           </div>
         )}
         {currentState.feedback?.type === "success" && (
           <div
-            className="rounded-lg border border-[#3f8a5f] bg-[#1f3a2c] px-4 py-3 text-sm text-emerald-200"
+            className="rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm text-correct-ink"
             role="status"
             aria-label={`Poster solved! ${currentState.canonicalTitle}`}
           >

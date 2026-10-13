@@ -45,20 +45,20 @@ export function StreakHistoryCard({
   return (
     <PanelSection innerClassName="space-y-6" className="h-full">
       <header className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-brand-200">
+        <p className="text-xs uppercase tracking-wider text-signal-text">
           Current streak
         </p>
         <div className="flex items-end justify-between">
-          <span className="text-4xl font-display font-semibold text-[#f4f0e7]">
+          <span className="text-4xl font-display font-semibold text-paper">
             {streakCount}
           </span>
-          <span className="text-xs text-neutral-400">
+          <span className="text-xs text-muted">
             Last completed: {lastCompletedLabel}
           </span>
         </div>
       </header>
       <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs text-neutral-400">
+        <div className="flex items-center justify-between text-xs text-muted">
           <span>Recent progress</span>
           <span>
             {points.length} day{points.length === 1 ? "" : "s"}
@@ -66,7 +66,7 @@ export function StreakHistoryCard({
         </div>
         <div className="space-y-3">
           {points.length === 0 ? (
-            <p className="text-sm text-[#c1c2bd]">
+            <p className="text-sm text-muted">
               No history yet. Start solving puzzles to build a streak!
             </p>
           ) : (
@@ -78,15 +78,15 @@ export function StreakHistoryCard({
               const percent = Math.round(ratio * 100);
               return (
                 <div key={entry.date} className="space-y-1">
-                  <div className="flex items-center justify-between text-[0.7rem] uppercase tracking-wide text-neutral-400">
+                  <div className="flex items-center justify-between text-[0.7rem] uppercase tracking-wide text-muted">
                     <span>{formatDate(entry.date)}</span>
-                    <span className="font-semibold text-[#c1c2bd]">
+                    <span className="font-semibold text-muted">
                       {entry.completed}
                     </span>
                   </div>
-                  <div className="h-2 rounded-full bg-[#2c2f31]">
+                  <div className="h-2 rounded-full bg-panel-raised">
                     <div
-                      className="h-2 rounded-full bg-[#ff7658] transition-all"
+                      className="h-2 rounded-full bg-signal transition-all"
                       style={{ width: `${percent}%` }}
                     />
                   </div>

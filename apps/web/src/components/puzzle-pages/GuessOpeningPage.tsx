@@ -84,7 +84,7 @@ export function GuessOpeningPage({
 
   if (rounds.length === 0) {
     return (
-      <div className="rounded-lg border border-[#484b4d] bg-surface-raised p-6 text-[#f4f0e7]">
+      <div className="rounded-lg border border-line bg-surface-raised p-6 text-paper">
         Unable to load Guess the Opening for today. Please try again later.
       </div>
     );

@@ -55,3 +55,20 @@ export function getGameStatusLabel(
   if (outcome === "exhausted") return "Out of guesses";
   return getGameAction(progress) === "resume" ? "In progress" : "Available";
 }
+
+export type GameStatus = "new" | "in-progress" | "solved" | "out-of-guesses";
+
+/** Navigation/tile status for today's progress in one mode. */
+export function getGameStatus(progress?: ProgressForAction | null): GameStatus {
+  const outcome = getGameOutcome(progress);
+  if (outcome === "solved") return "solved";
+  if (outcome === "exhausted") return "out-of-guesses";
+  return getGameAction(progress) === "resume" ? "in-progress" : "new";
+}
+
+export const GAME_STATUS_TEXT: Record<GameStatus, string> = {
+  new: "New",
+  "in-progress": "In progress",
+  solved: "Solved",
+  "out-of-guesses": "Out of guesses",
+};

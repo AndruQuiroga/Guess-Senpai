@@ -50,13 +50,13 @@ function Avatar({ player }: { player?: LobbyPlayer | null }) {
       <img
         src={player.avatar}
         alt={player.name ?? "Lobby player"}
-        className="h-10 w-10 rounded-full border border-[#686b6d] object-cover shadow-black/30"
+        className="h-10 w-10 rounded-full border border-line-strong object-cover"
       />
     );
   }
   const fallback = player?.name?.slice(0, 2) ?? "GS";
   return (
-    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#484b4d] bg-[#2c2f31] text-sm font-semibold uppercase text-[#f4f0e7]">
+    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-panel-raised text-sm font-semibold uppercase text-paper">
       {fallback}
     </div>
   );
@@ -71,9 +71,7 @@ function ReactionFeed({
 }) {
   if (!reactions.length) {
     return (
-      <p className="text-sm text-neutral-400">
-        No reactions yet. Fire up the hype!
-      </p>
+      <p className="text-sm text-muted">No reactions yet. Fire up the hype!</p>
     );
   }
   return (
@@ -87,13 +85,13 @@ function ReactionFeed({
           return (
             <li
               key={reaction.id}
-              className="flex items-center justify-between rounded-lg border border-[#484b4d] bg-[#242628] px-3 py-2 text-sm text-[#f4f0e7]"
+              className="flex items-center justify-between rounded-lg border border-line bg-panel px-3 py-2 text-sm text-paper"
             >
               <div className="flex items-center gap-3">
                 <span className="text-lg">{reaction.emoji}</span>
                 <span>{getPlayerLabel(player, reaction.playerId)}</span>
               </div>
-              <span className="text-xs text-neutral-400">{timestamp}</span>
+              <span className="text-xs text-muted">{timestamp}</span>
             </li>
           );
         })}
@@ -209,25 +207,25 @@ export function LiveGameClient({
 
   return (
     <div className="space-y-8">
-      <header className="relative overflow-hidden rounded-lg border border-[#484b4d] bg-surface-raised p-6">
+      <header className="relative overflow-hidden rounded-lg border border-line bg-surface-raised p-6">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.35em] text-brand-300">
+            <p className="text-xs uppercase tracking-[0.35em] text-signal-text">
               Live puzzle arena
             </p>
-            <h1 className="text-3xl font-display font-semibold tracking-tight text-white drop-">
+            <h1 className="text-3xl font-display font-semibold tracking-tight text-paper drop-">
               {slugDefinition.title}
             </h1>
-            <p className="text-sm text-[#c1c2bd]">
+            <p className="text-sm text-muted">
               Coordinate guesses in real-time or drop back to solo play if
               things go quiet.
             </p>
           </div>
-          <div className="flex flex-col items-start gap-3 text-sm text-[#c1c2bd] lg:items-end">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#484b4d] bg-[#2c2f31] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#f4f0e7]">
+          <div className="flex flex-col items-start gap-3 text-sm text-muted lg:items-end">
+            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-panel-raised px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-paper">
               <span
                 className={`h-2 w-2 rounded-full ${
-                  offlineMode ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
+                  offlineMode ? "bg-close animate-pulse" : "bg-correct"
                 }`}
                 aria-hidden
               />
@@ -236,13 +234,13 @@ export function LiveGameClient({
             <button
               type="button"
               onClick={reconnect}
-              className="inline-flex items-center gap-2 rounded-full border border-[#484b4d] px-3 py-1 text-xs font-medium text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-paper transition hover:border-line-strong hover:text-paper"
             >
               ↻ Refresh connection
             </button>
             <Link
               href={`/games/${slugDefinition.slug}`}
-              className="inline-flex items-center gap-2 rounded-full border border-[#484b4d] px-3 py-1 text-xs font-medium text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-paper transition hover:border-line-strong hover:text-paper"
             >
               ↩ Back to daily mode
             </Link>
@@ -251,7 +249,7 @@ export function LiveGameClient({
       </header>
 
       {offlineMode && (
-        <div className="rounded-lg border border-[#c9a13e] bg-[#3d3220] p-5 text-amber-100">
+        <div className="rounded-lg border border-close bg-close-soft p-5 text-close-ink">
           <p className="text-sm font-medium">
             We&apos;re keeping your actions queued while we reconnect. You can
             keep guessing or jump into solo mode.
@@ -260,14 +258,14 @@ export function LiveGameClient({
             <button
               type="button"
               onClick={() => setShowFallback(true)}
-              className="inline-flex items-center gap-2 rounded-full border border-[#686b6d] bg-[#2c2f31] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#f4f0e7] transition hover:border-[#686b6d] hover:bg-[#383a3c]"
+              className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-panel-raised px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-paper transition hover:border-line-strong hover:bg-hover"
             >
               Launch solo fallback
             </button>
             <button
               type="button"
               onClick={() => handleCountdown(null)}
-              className="inline-flex items-center gap-2 rounded-full border border-[#686b6d] bg-[#242628] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#f4f0e7] transition hover:border-[#686b6d] hover:bg-[#2c2f31]"
+              className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-panel px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-paper transition hover:border-line-strong hover:bg-panel-raised"
             >
               Clear lobby countdown
             </button>
@@ -276,13 +274,13 @@ export function LiveGameClient({
       )}
 
       <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
-        <section className="space-y-6 rounded-lg border border-[#484b4d] bg-surface-raised p-6">
+        <section className="space-y-6 rounded-lg border border-line bg-surface-raised p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Lobby</h2>
+            <h2 className="text-lg font-semibold text-paper">Lobby</h2>
             <button
               type="button"
               onClick={() => toggleReady()}
-              className="rounded-full border border-[#686b6d] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+              className="rounded-full border border-line-strong px-3 py-1 text-xs font-semibold uppercase tracking-wide text-paper transition hover:border-line-strong hover:text-paper"
             >
               {lobby?.players.find((entry) => entry.id === playerId)?.ready
                 ? "Set not ready"
@@ -297,22 +295,22 @@ export function LiveGameClient({
                     key={player.id}
                     className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
                       player.ready
-                        ? "border-[#3f8a5f] bg-[#1f3a2c]"
-                        : "border-[#484b4d] bg-[#242628]"
+                        ? "border-correct bg-correct-soft"
+                        : "border-line bg-panel"
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <Avatar player={player} />
                       <div>
-                        <p className="text-sm font-medium text-[#f4f0e7]">
+                        <p className="text-sm font-medium text-paper">
                           {getPlayerLabel(player, player.id)}
                         </p>
-                        <p className="text-xs text-neutral-400">
+                        <p className="text-xs text-muted">
                           {player.ready ? "Ready" : "Waiting"}
                         </p>
                       </div>
                     </div>
-                    <span className="text-xs text-neutral-400">
+                    <span className="text-xs text-muted">
                       {player.lastActive
                         ? new Date(player.lastActive).toLocaleTimeString()
                         : "--"}
@@ -321,18 +319,18 @@ export function LiveGameClient({
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-muted">
                 No one&apos;s here yet—share the room link to rally teammates.
               </p>
             )}
           </div>
-          <div className="rounded-lg border border-[#484b4d] bg-[#242628] p-4 text-sm text-[#c1c2bd]">
+          <div className="rounded-lg border border-line bg-panel p-4 text-sm text-muted">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wide text-[#c1c2bd]">
+                <p className="text-xs uppercase tracking-wide text-muted">
                   Lobby countdown
                 </p>
-                <p className="text-2xl font-semibold text-white">
+                <p className="text-2xl font-semibold text-paper">
                   {lobby?.countdown ?? "∞"}
                 </p>
               </div>
@@ -342,7 +340,7 @@ export function LiveGameClient({
                     key={seconds}
                     type="button"
                     onClick={() => handleCountdown(seconds)}
-                    className="rounded-full border border-[#484b4d] px-3 py-1 text-xs font-medium text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+                    className="rounded-full border border-line px-3 py-1 text-xs font-medium text-paper transition hover:border-line-strong hover:text-paper"
                   >
                     {seconds}s
                   </button>
@@ -350,7 +348,7 @@ export function LiveGameClient({
                 <button
                   type="button"
                   onClick={() => handleCountdown(null)}
-                  className="rounded-full border border-[#484b4d] px-3 py-1 text-xs font-medium text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+                  className="rounded-full border border-line px-3 py-1 text-xs font-medium text-paper transition hover:border-line-strong hover:text-paper"
                 >
                   Clear
                 </button>
@@ -358,7 +356,7 @@ export function LiveGameClient({
             </div>
           </div>
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-wide text-[#c1c2bd]">
+            <p className="text-xs uppercase tracking-wide text-muted">
               Send a reaction
             </p>
             <div className="flex flex-wrap gap-2">
@@ -367,53 +365,53 @@ export function LiveGameClient({
                   key={emoji}
                   type="button"
                   onClick={() => sendReaction(emoji)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-[#484b4d] bg-[#2c2f31] text-xl transition hover:border-[#ff7658] hover:bg-[#3a2a25]"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-panel-raised text-xl transition hover:border-signal hover:bg-signal-soft"
                 >
                   {emoji}
                 </button>
               ))}
             </div>
-            <div className="rounded-lg border border-[#484b4d] bg-[#242628] p-4">
+            <div className="rounded-lg border border-line bg-panel p-4">
               <ReactionFeed reactions={reactions} players={playersById} />
             </div>
           </div>
         </section>
 
-        <section className="space-y-6 rounded-lg border border-[#484b4d] bg-surface-raised p-6">
+        <section className="space-y-6 rounded-lg border border-line bg-surface-raised p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">Match room</h2>
-              <p className="text-sm text-neutral-400">
+              <h2 className="text-lg font-semibold text-paper">Match room</h2>
+              <p className="text-sm text-muted">
                 Share your best guess and track the hype. Timers stay in sync
                 for everyone connected.
               </p>
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-[#484b4d] bg-[#242628] px-4 py-2">
-              <span className="text-xs uppercase tracking-wide text-[#c1c2bd]">
+            <div className="flex items-center gap-3 rounded-lg border border-line bg-panel px-4 py-2">
+              <span className="text-xs uppercase tracking-wide text-muted">
                 Countdown
               </span>
-              <span className="text-2xl font-semibold text-white">
+              <span className="text-2xl font-semibold text-paper">
                 {formatTimer(displayTimer)}
               </span>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setTimer(timerRemaining ?? 60, true)}
-                  className="rounded-full border border-[#484b4d] px-3 py-1 text-xs font-medium text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+                  className="rounded-full border border-line px-3 py-1 text-xs font-medium text-paper transition hover:border-line-strong hover:text-paper"
                 >
                   Start
                 </button>
                 <button
                   type="button"
                   onClick={() => setTimer(timerRemaining, false)}
-                  className="rounded-full border border-[#484b4d] px-3 py-1 text-xs font-medium text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+                  className="rounded-full border border-line px-3 py-1 text-xs font-medium text-paper transition hover:border-line-strong hover:text-paper"
                 >
                   Pause
                 </button>
                 <button
                   type="button"
                   onClick={() => setTimer(60, true)}
-                  className="rounded-full border border-[#484b4d] px-3 py-1 text-xs font-medium text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+                  className="rounded-full border border-line px-3 py-1 text-xs font-medium text-paper transition hover:border-line-strong hover:text-paper"
                 >
                   60s
                 </button>
@@ -423,11 +421,11 @@ export function LiveGameClient({
 
           <form
             onSubmit={handleGuessSubmit}
-            className="flex flex-col gap-3 rounded-lg border border-[#484b4d] bg-[#242628] p-4"
+            className="flex flex-col gap-3 rounded-lg border border-line bg-panel p-4"
           >
             <label
               htmlFor="live-guess"
-              className="text-xs uppercase tracking-wide text-[#c1c2bd]"
+              className="text-xs uppercase tracking-wide text-muted"
             >
               Drop a guess
             </label>
@@ -437,27 +435,25 @@ export function LiveGameClient({
                 value={guess}
                 onChange={(event) => setGuess(event.target.value)}
                 placeholder="Type your answer and press enter"
-                className="flex-1 rounded-xl border border-[#484b4d] bg-[#171819] px-4 py-2 text-sm text-white placeholder:text-neutral-500 focus:border-brand-400 focus:outline-none"
+                className="flex-1 rounded-xl border border-line bg-ink px-4 py-2 text-sm text-paper placeholder:text-muted focus:border-signal-text focus:outline-none"
               />
               <button
                 type="submit"
-                className="rounded-xl border border-[#ff7658] bg-[#3a2a25] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3a2a25]"
+                className="rounded-xl border border-signal bg-signal-soft px-4 py-2 text-sm font-semibold text-paper transition hover:bg-signal-soft"
               >
                 Send
               </button>
             </div>
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-muted">
               Your guesses sync instantly across the room
               {offlineMode ? ", even while offline." : "."}
             </p>
           </form>
 
-          <div className="rounded-lg border border-[#484b4d] bg-[#242628] p-4">
-            <h3 className="text-sm font-semibold text-[#f4f0e7]">
-              Recent guesses
-            </h3>
+          <div className="rounded-lg border border-line bg-panel p-4">
+            <h3 className="text-sm font-semibold text-paper">Recent guesses</h3>
             {recentGuesses.length ? (
-              <ul className="mt-3 space-y-2 text-sm text-[#f4f0e7]">
+              <ul className="mt-3 space-y-2 text-sm text-paper">
                 {recentGuesses.map((entry: GuessEvent) => {
                   const player = playersById.get(entry.playerId);
                   const timestamp = new Date(
@@ -468,17 +464,17 @@ export function LiveGameClient({
                       key={entry.id}
                       className={`flex items-center justify-between rounded-xl border px-3 py-2 ${
                         entry.optimistic
-                          ? "border-[#ff7658] bg-[#3a2a25]"
-                          : "border-[#484b4d] bg-[#171819]"
+                          ? "border-signal bg-signal-soft"
+                          : "border-line bg-ink"
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <Avatar player={player ?? null} />
                         <div>
-                          <p className="font-medium text-white">
+                          <p className="font-medium text-paper">
                             {entry.guess}
                           </p>
-                          <p className="text-xs text-neutral-400">
+                          <p className="text-xs text-muted">
                             {getPlayerLabel(
                               player ?? undefined,
                               entry.playerId,
@@ -486,15 +482,13 @@ export function LiveGameClient({
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs text-neutral-400">
-                        {timestamp}
-                      </span>
+                      <span className="text-xs text-muted">{timestamp}</span>
                     </li>
                   );
                 })}
               </ul>
             ) : (
-              <p className="mt-3 text-sm text-neutral-400">
+              <p className="mt-3 text-sm text-muted">
                 No guesses yet. Be the first to spark the chain!
               </p>
             )}
@@ -503,13 +497,13 @@ export function LiveGameClient({
       </div>
 
       {showFallback && (
-        <div className="space-y-4 rounded-lg border border-[#484b4d] bg-surface-raised p-6">
+        <div className="space-y-4 rounded-lg border border-line bg-surface-raised p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-paper">
                 Solo fallback
               </h2>
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-muted">
                 Continue asynchronously—your progress stays saved even without
                 the live room.
               </p>
@@ -517,7 +511,7 @@ export function LiveGameClient({
             <button
               type="button"
               onClick={() => setShowFallback(false)}
-              className="rounded-full border border-[#686b6d] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white"
+              className="rounded-full border border-line-strong px-3 py-1 text-xs font-semibold uppercase tracking-wide text-paper transition hover:border-line-strong hover:text-paper"
             >
               Hide
             </button>

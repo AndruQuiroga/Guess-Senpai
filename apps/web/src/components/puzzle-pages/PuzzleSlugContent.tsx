@@ -96,7 +96,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
   if (!data) {
     return (
       <div className="panel flex min-h-[40vh] flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="max-w-md text-sm text-[#c1c2bd]">
+        <p className="max-w-md text-sm text-muted">
           Couldn&apos;t load today&apos;s puzzles. Your saved progress is kept.
         </p>
         <button

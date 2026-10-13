@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { PuzzleSlugContent } from "../../../components/puzzle-pages";
 import type { DailyPuzzleResponse } from "../../../types/puzzles";
 import { findPuzzleSlug } from "./slugs";
+import { findGameConfig } from "../../../config/games";
+import { GameUnavailable } from "../../../components/GameUnavailable";
 import { PuzzleProgressProvider } from "../../../hooks/usePuzzleProgress";
 
 import { DailyRolloverNotice } from "../../../components/DailyRolloverNotice";
@@ -38,19 +39,6 @@ async function fetchDailyPuzzles(): Promise<DailyPuzzleResponse | null> {
   }
 }
 
-function formatDate(value: string) {
-  const [year, month, day] = value
-    .split("-")
-    .map((part) => Number.parseInt(part, 10));
-  const date = new Date(Date.UTC(year, (month ?? 1) - 1, day));
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
 export default async function PuzzleGamePage({
   params,
 }: {
@@ -59,30 +47,24 @@ export default async function PuzzleGamePage({
   const slugDefinition = findPuzzleSlug(params.slug);
 
   if (!slugDefinition) {
+    // Known but unplayable modes (e.g. coming soon) get a friendly page;
+    // anything else is a real 404.
+    const known = findGameConfig(params.slug);
+    if (known) {
+      return <GameUnavailable title={known.title} />;
+    }
     notFound();
   }
 
   const data = await fetchDailyPuzzles();
-  const formattedDate = data ? formatDate(data.date) : null;
 
   const pageContent = (
     <div className="space-y-4">
-      <header className="border-b border-[#484b4d] pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-display font-semibold tracking-tight">
-              {slugDefinition.title}
-            </h1>
-            <p className="text-sm text-[#c1c2bd]">
-              Part of GuessSenpai Daily
-              {formattedDate ? ` — ${formattedDate}` : ""}
-            </p>
-          </div>
-          <Link href="/" className="button shrink-0 whitespace-nowrap">
-            ← Today
-          </Link>
-        </div>
-      </header>
+      {data ? null : (
+        <h1 className="font-display text-3xl font-bold tracking-tight text-paper">
+          {slugDefinition.title}
+        </h1>
+      )}
 
       {data && <DailyRolloverNotice date={data.date} />}
       <PuzzleSlugContent data={data} slug={slugDefinition} />

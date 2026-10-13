@@ -5,11 +5,11 @@ export default function DailyLoading() {
       aria-live="polite"
       aria-busy="true"
     >
-      <h1 className="text-2xl font-semibold text-white">
+      <h1 className="text-2xl font-semibold text-paper">
         Loading today&apos;s puzzles…
       </h1>
-      <div className="h-40 animate-pulse rounded-lg border border-[#484b4d] bg-[#242628]" />
-      <div className="h-64 animate-pulse rounded-lg border border-[#484b4d] bg-[#242628]" />
+      <div className="h-40 animate-pulse rounded-lg border border-line bg-panel" />
+      <div className="h-64 animate-pulse rounded-lg border border-line bg-panel" />
     </main>
   );
 }

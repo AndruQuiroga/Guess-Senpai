@@ -21,11 +21,11 @@ function ensureToastRoot(): HTMLElement | null {
 function getVariantClasses(variant: ToastVariant): string {
   switch (variant) {
     case "success":
-      return "border-[#3f8a5f] bg-[#1f3a2c] text-emerald-50";
+      return "border-correct bg-correct-soft text-correct-ink";
     case "error":
-      return "border-[#c0566a] bg-[#40242a] text-rose-50";
+      return "border-danger bg-danger-soft text-danger-ink";
     default:
-      return "border-[#686b6d] bg-[#2c2f31] text-white";
+      return "border-line-strong bg-panel-raised text-paper";
   }
 }
 

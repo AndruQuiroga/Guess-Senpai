@@ -10,7 +10,7 @@ export default function AccountBadge() {
 
   if (loading) {
     return (
-      <div className="flex min-h-11 items-center gap-2 rounded-md border border-[#484b4d] bg-[#242628] px-3 py-1.5 text-sm text-[#c1c2bd]">
+      <div className="flex min-h-11 items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm text-muted">
         Loading…
       </div>
     );
@@ -27,7 +27,7 @@ export default function AccountBadge() {
     return (
       <Link
         href="/login"
-        className="inline-flex min-h-11 items-center rounded-md border border-[#686b6d] bg-[#2c2f31] px-4 py-2 text-sm font-semibold text-[#f4f0e7] transition hover:border-[#ff987f]"
+        className="inline-flex min-h-11 items-center rounded-md border border-line-strong bg-panel-raised px-4 py-2 text-sm font-semibold text-paper transition hover:border-signal-text"
       >
         AniList Login
       </Link>
@@ -35,7 +35,7 @@ export default function AccountBadge() {
   }
 
   return (
-    <div className="flex min-h-11 items-center gap-3 rounded-md border border-[#484b4d] bg-[#242628] px-3 py-1.5 text-sm text-[#f4f0e7]">
+    <div className="flex min-h-11 items-center gap-3 rounded-md border border-line bg-panel px-3 py-1.5 text-sm text-paper">
       <Link
         href="/account"
         className="group flex items-center gap-3"
@@ -50,14 +50,14 @@ export default function AccountBadge() {
           <img
             src={account.user.avatar}
             alt={account.user?.username ?? "AniList user"}
-            className="h-8 w-8 rounded-full border border-[#686b6d] object-cover shadow-black/40 transition group-hover:border-brand-300"
+            className="h-8 w-8 rounded-full border border-line-strong object-cover transition group-hover:border-signal-text"
           />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#686b6d] bg-[#3a2a25] font-semibold uppercase transition group-hover:border-brand-300 group-hover:text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-signal-soft font-semibold uppercase transition group-hover:border-signal-text group-hover:text-paper">
             {(account.user?.username ?? "GS").slice(0, 2)}
           </div>
         )}
-        <span className="max-w-[120px] truncate font-semibold text-[#f4f0e7] group-hover:text-white">
+        <span className="max-w-[120px] truncate font-semibold text-paper group-hover:text-paper">
           {account.user?.username ?? "AniList user"}
         </span>
       </Link>
@@ -66,7 +66,7 @@ export default function AccountBadge() {
         onClick={() => {
           void logout();
         }}
-        className="button min-h-11 border border-[#686b6d] bg-[#2c2f31] text-sm text-[#f4f0e7] transition hover:border-[#ff987f]"
+        className="button min-h-11 border border-line-strong bg-panel-raised text-sm text-paper transition hover:border-signal-text"
       >
         Logout
       </button>

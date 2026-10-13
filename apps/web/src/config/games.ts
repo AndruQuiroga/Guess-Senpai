@@ -29,12 +29,25 @@ export interface GamePreviewContent {
   placeholder?: GamePreviewPlaceholder;
 }
 
+/**
+ * How a mode becomes playable:
+ * - "always": a normal daily mode, always in the user-facing lists.
+ * - "daily": optional; playable only when today's availability payload says so
+ *   (the single source of truth). Hidden from lists otherwise.
+ * - "unreleased": not built yet. Never shown in user-facing lists and has no
+ *   playable route; direct visits get a friendly "not available yet" page.
+ */
+export type GameRelease = "always" | "daily" | "unreleased";
+
 export interface GameDirectoryEntry {
   slug: string;
   title: string;
   tagline: string;
   accentColor: string;
+  release: GameRelease;
+  /** Resolved at runtime for "daily" modes; static for the others. */
   playable: boolean;
+  /** Legacy flag; only true for "unreleased" modes. */
   comingSoon: boolean;
   gameKey?: GameKey;
   description?: string;
@@ -47,6 +60,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     title: "Anidle",
     tagline: "Identify the anime using metadata feedback and synopsis hints.",
     accentColor: "from-amber-400 via-orange-500 to-rose-500",
+    release: "always",
     playable: true,
     comingSoon: false,
     gameKey: "anidle",
@@ -79,6 +93,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     tagline:
       "Sharpen the view across three rounds to name the anime and its release.",
     accentColor: "from-emerald-400 via-teal-400 to-sky-500",
+    release: "always",
     playable: true,
     comingSoon: false,
     gameKey: "poster_zoomed",
@@ -110,6 +125,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     title: "Character Silhouette",
     tagline: "Spot every member of the lineup as the lights turn up.",
     accentColor: "from-purple-400 via-indigo-400 to-sky-500",
+    release: "always",
     playable: true,
     comingSoon: false,
     gameKey: "character_silhouette",
@@ -141,6 +157,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     title: "Redacted Synopsis",
     tagline: "Fill in the blanks of a censored story summary.",
     accentColor: "from-fuchsia-500 via-purple-500 to-indigo-500",
+    release: "always",
     playable: true,
     comingSoon: false,
     gameKey: "redacted_synopsis",
@@ -171,8 +188,9 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     title: "Guess the Opening",
     tagline: "Hear a few beats and lock in the correct anime opening.",
     accentColor: "from-blue-400 via-indigo-400 to-purple-500",
+    release: "daily",
     playable: false,
-    comingSoon: true,
+    comingSoon: false,
     gameKey: "guess_the_opening",
     description:
       "Match a short music clip to the right series before time runs out.",
@@ -202,6 +220,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     title: "Mystery Voice",
     tagline: "Recognize the character from a fleeting voice line.",
     accentColor: "from-rose-400 via-amber-400 to-yellow-400",
+    release: "unreleased",
     playable: false,
     comingSoon: true,
     description:
@@ -232,6 +251,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     title: "Emoji Synopsis",
     tagline: "Decode a plot retold through nothing but emojis.",
     accentColor: "from-violet-400 via-purple-400 to-pink-500",
+    release: "unreleased",
     playable: false,
     comingSoon: true,
     description: "Translate emoji clues into the anime they reference.",
@@ -261,6 +281,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     title: "Quote Quiz",
     tagline: "Match iconic anime quotes with the right series.",
     accentColor: "from-cyan-400 via-emerald-400 to-lime-400",
+    release: "unreleased",
     playable: false,
     comingSoon: true,
     description:
@@ -287,6 +308,21 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
   },
 ];
 
+/** Games a visitor may ever see (everything except unreleased modes). */
+export function isUserFacingGame(game: GameDirectoryEntry): boolean {
+  return game.release !== "unreleased";
+}
+
+/**
+ * User-facing games that are playable right now. Daily-gated modes are
+ * included only when availability resolved them as playable.
+ */
+export function getPlayableGames(
+  games: GameDirectoryEntry[],
+): GameDirectoryEntry[] {
+  return games.filter((game) => isUserFacingGame(game) && game.playable);
+}
+
 export function findGameConfig(slug: string): GameDirectoryEntry | undefined {
   return GAMES_DIRECTORY.find((entry) => entry.slug === slug);
 }
@@ -299,22 +335,16 @@ export function resolveGameAvailability(
   game: GameDirectoryEntry,
   availability: RuntimeGameAvailability,
 ): GameDirectoryEntry {
-  if (game.slug !== "guess-the-opening") {
+  if (game.release !== "daily") {
     return game;
   }
 
   const playable = availability.guessTheOpeningEnabled;
-  const comingSoon = !playable;
-
-  if (game.playable === playable && game.comingSoon === comingSoon) {
+  if (game.playable === playable && !game.comingSoon) {
     return game;
   }
 
-  return {
-    ...game,
-    playable,
-    comingSoon,
-  };
+  return { ...game, playable, comingSoon: false };
 }
 
 export function buildRuntimeGamesDirectory(

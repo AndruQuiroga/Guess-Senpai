@@ -13,7 +13,7 @@ export const STREAK_MILESTONES: StreakMilestone[] = [
     rewardName: "Ember Loop Frame",
     rewardDescription:
       "A warm amber glow that wraps your avatar to celebrate getting started.",
-    frameGradient: "bg-amber-400",
+    frameGradient: "bg-close",
   },
   {
     threshold: 7,
@@ -37,7 +37,7 @@ export const STREAK_MILESTONES: StreakMilestone[] = [
     rewardName: "Starlit Horizon Frame",
     rewardDescription:
       "Shimmering starlight arcs that mark a full month of perfect attendance.",
-    frameGradient: "bg-emerald-400",
+    frameGradient: "bg-correct",
   },
   {
     threshold: 50,
@@ -53,6 +53,6 @@ export const STREAK_MILESTONES: StreakMilestone[] = [
     rewardName: "Celestial Crown Frame",
     rewardDescription:
       "A radiant crown reserved for those who never miss a day.",
-    frameGradient: "bg-yellow-300",
+    frameGradient: "bg-close-ink",
   },
 ];

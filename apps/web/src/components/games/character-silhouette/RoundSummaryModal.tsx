@@ -66,10 +66,10 @@ export function RoundSummaryModal({
         aria-modal="true"
         aria-labelledby="round-summary-heading"
         tabIndex={-1}
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto overscroll-contain space-y-6 rounded-lg border border-[#686b6d] bg-[#242628] px-5 py-6 text-white"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto overscroll-contain space-y-6 rounded-lg border border-line-strong bg-panel px-5 py-6 text-paper"
       >
         <div className="space-y-3">
-          <p className="text-sm uppercase tracking-[0.28em] text-[#c1c2bd]">
+          <p className="text-sm uppercase tracking-[0.28em] text-muted">
             Round {roundIndex + 1} complete
           </p>
           <h2
@@ -80,43 +80,43 @@ export function RoundSummaryModal({
               "Silhouette reveal cleared"}
           </h2>
           {roundData?.entries?.[0]?.reveal?.description ? (
-            <p className="text-sm text-[#f4f0e7]">
+            <p className="text-sm text-paper">
               {roundData.entries[0].reveal.description}
             </p>
           ) : null}
         </div>
 
-        <div className="rounded-lg border border-[#686b6d] bg-[#2c2f31] p-4 text-sm text-[#f4f0e7]">
+        <div className="rounded-lg border border-line-strong bg-panel-raised p-4 text-sm text-paper">
           <ul className="grid gap-3 sm:grid-cols-2">
             <li className="space-y-1">
-              <p className="text-sm uppercase tracking-[0.2em] text-[#c1c2bd]">
+              <p className="text-sm uppercase tracking-[0.2em] text-muted">
                 Characters revealed
               </p>
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-paper">
                 {roundState.entries.length}
               </p>
             </li>
             <li className="space-y-1">
-              <p className="text-sm uppercase tracking-[0.2em] text-[#c1c2bd]">
+              <p className="text-sm uppercase tracking-[0.2em] text-muted">
                 Attempts this round
               </p>
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-paper">
                 {attemptsForRound}
               </p>
             </li>
             <li className="space-y-1">
-              <p className="text-sm uppercase tracking-[0.2em] text-[#c1c2bd]">
+              <p className="text-sm uppercase tracking-[0.2em] text-muted">
                 Total solved
               </p>
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-paper">
                 {totalSolved} / {totalEntries}
               </p>
             </li>
             <li className="space-y-1">
-              <p className="text-sm uppercase tracking-[0.2em] text-[#c1c2bd]">
+              <p className="text-sm uppercase tracking-[0.2em] text-muted">
                 Rounds remaining
               </p>
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-paper">
                 {Math.max(totalRounds - (roundIndex + 1), 0)}
               </p>
             </li>
@@ -124,7 +124,7 @@ export function RoundSummaryModal({
         </div>
 
         <div className="space-y-4">
-          <p className="text-sm text-[#f4f0e7]">
+          <p className="text-sm text-paper">
             {isFinalRound
               ? "You cleared every silhouette in the lineup!"
               : "Ready for a brighter reveal? The next lineup is waiting."}
@@ -133,7 +133,7 @@ export function RoundSummaryModal({
           <button
             type="button"
             onClick={onContinue}
-            className="w-full rounded-lg bg-[#ff7658] px-4 py-3 text-base font-semibold text-[#27110b]  transition hover:bg-[#ff8a70]  focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-black"
+            className="w-full rounded-lg bg-signal px-4 py-3 text-base font-semibold text-signal-ink  transition hover:bg-signal-hover  focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-ink"
           >
             {isFinalRound ? "View results" : "Advance to the next round"}
           </button>

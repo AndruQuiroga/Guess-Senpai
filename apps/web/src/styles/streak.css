@@ -2,7 +2,7 @@
 
 @layer components {
   .streak-heatmap {
-    @apply grid grid-flow-col auto-cols-[0.95rem] gap-[3px] overflow-hidden rounded-lg border border-[#484b4d] bg-[#171819] p-3;
+    @apply grid grid-flow-col auto-cols-[0.95rem] gap-[3px] overflow-hidden rounded-lg border border-line bg-ink p-3;
   }
 
   .streak-heatmap__week {
@@ -10,31 +10,31 @@
   }
 
   .streak-heatmap__day {
-    @apply h-[0.95rem] w-[0.95rem] rounded-[3px] bg-[#2c2f31];
+    @apply h-[0.95rem] w-[0.95rem] rounded-[3px] bg-panel-raised;
   }
 
   .streak-heatmap__day--level-0 {
-    @apply bg-[#2c2f31];
+    @apply bg-panel-raised;
   }
 
   .streak-heatmap__day--level-1 {
-    @apply bg-[#2f5a43];
+    @apply bg-correct-soft;
   }
 
   .streak-heatmap__day--level-2 {
-    @apply bg-[#3f8a5f];
+    @apply bg-correct;
   }
 
   .streak-heatmap__day--level-3 {
-    @apply bg-[#6cc08a];
+    @apply bg-correct-ink;
   }
 
   .streak-heatmap__day--level-4 {
-    @apply bg-[#b9ecc9];
+    @apply bg-paper;
   }
 
   .streak-heatmap__day--today {
-    @apply ring-2 ring-[#f4f0e7] ring-offset-2 ring-offset-[#171819];
+    @apply ring-2 ring-paper ring-offset-2 ring-offset-ink;
   }
 
   .streak-heatmap__legend {

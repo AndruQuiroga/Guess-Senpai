@@ -107,10 +107,10 @@ export default function SolutionReveal({ solutions, streak }: Props) {
   return (
     <section className="space-y-4">
       <div className="space-y-1">
-        <span className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-200">
+        <span className="text-sm font-semibold uppercase tracking-[0.2em] text-correct-ink">
           All Solutions
         </span>
-        <h2 className="text-2xl font-display font-semibold text-white">
+        <h2 className="text-2xl font-display font-semibold text-paper">
           Revealed Anime
         </h2>
       </div>
@@ -134,11 +134,11 @@ export default function SolutionReveal({ solutions, streak }: Props) {
           return (
             <article
               key={aniListUrl}
-              className="relative overflow-hidden rounded-lg border border-[#3f8a5f] bg-surface-raised p-6 text-[#f4f0e7]"
+              className="relative overflow-hidden rounded-lg border border-correct bg-surface-raised p-6 text-paper"
             >
               <div className="flex flex-col gap-6 md:flex-row md:items-start">
                 {coverImage && (
-                  <div className="aspect-[3/4] w-full max-w-[180px] overflow-hidden rounded-lg border border-[#484b4d] md:w-auto">
+                  <div className="aspect-[3/4] w-full max-w-[180px] overflow-hidden rounded-lg border border-line md:w-auto">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={coverImage}
@@ -150,14 +150,14 @@ export default function SolutionReveal({ solutions, streak }: Props) {
                 )}
                 <div className="flex-1 space-y-4">
                   <div>
-                    <h3 className="text-xl font-display font-semibold text-white">
+                    <h3 className="text-xl font-display font-semibold text-paper">
                       {primaryTitle}
                     </h3>
                     {secondaryTitles.length > 0 && (
-                      <ul className="mt-2 space-y-1 text-sm text-[#c1c2bd]">
+                      <ul className="mt-2 space-y-1 text-sm text-muted">
                         {secondaryTitles.map(({ label, value }) => (
                           <li key={label}>
-                            <span className="font-medium text-[#c1c2bd]">
+                            <span className="font-medium text-muted">
                               {label}:
                             </span>{" "}
                             {value}
@@ -168,7 +168,7 @@ export default function SolutionReveal({ solutions, streak }: Props) {
                   </div>
 
                   {synopsis && (
-                    <p className="text-sm leading-relaxed text-[#c1c2bd]">
+                    <p className="text-sm leading-relaxed text-muted">
                       {synopsis}
                     </p>
                   )}
@@ -178,7 +178,7 @@ export default function SolutionReveal({ solutions, streak }: Props) {
                       href={aniListUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-[#3f8a5f] bg-[#1f3a2c] px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:bg-[#1f3a2c]"
+                      className="inline-flex items-center gap-2 rounded-full border border-correct bg-correct-soft px-4 py-2 text-sm font-semibold text-correct-ink transition hover:bg-correct-soft"
                     >
                       View on AniList
                     </Link>
@@ -188,7 +188,7 @@ export default function SolutionReveal({ solutions, streak }: Props) {
                         href={link.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-full border border-[#686b6d] bg-[#2c2f31] px-4 py-2 text-sm font-medium text-[#f4f0e7] transition hover:bg-[#383a3c]"
+                        className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-panel-raised px-4 py-2 text-sm font-medium text-paper transition hover:bg-hover"
                       >
                         {link.site}
                       </Link>
@@ -203,7 +203,7 @@ export default function SolutionReveal({ solutions, streak }: Props) {
 
       {activeMilestone && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/75 px-4 py-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-6"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               handleCloseMilestone();
@@ -214,45 +214,45 @@ export default function SolutionReveal({ solutions, streak }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="streak-milestone-title"
-            className="relative w-full max-w-lg overflow-hidden rounded-lg border border-[#3f8a5f] bg-surface-raised p-6 text-left sm:p-8"
+            className="relative w-full max-w-lg overflow-hidden rounded-lg border border-correct bg-surface-raised p-6 text-left sm:p-8"
           >
             <button
               type="button"
               onClick={handleCloseMilestone}
-              className="absolute right-4 top-4 rounded-full border border-[#686b6d] bg-[#2c2f31] p-2 text-sm text-[#f4f0e7] transition hover:bg-[#383a3c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              className="absolute right-4 top-4 rounded-full border border-line-strong bg-panel-raised p-2 text-sm text-paper transition hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
               aria-label="Close milestone dialog"
             >
               ✕
             </button>
             <div className="space-y-6">
               <div className="space-y-3 text-center">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-correct-ink">
                   Streak milestone unlocked
                 </p>
                 <h3
                   id="streak-milestone-title"
-                  className="text-2xl font-display font-semibold text-white sm:text-3xl"
+                  className="text-2xl font-display font-semibold text-paper sm:text-3xl"
                 >
                   {activeMilestone.title}
                 </h3>
-                <p className="text-sm text-[#c1c2bd]">
+                <p className="text-sm text-muted">
                   {activeMilestone.rewardDescription}
                 </p>
               </div>
-              <div className="relative mx-auto flex h-36 w-36 items-center justify-center rounded-full border border-[#686b6d] bg-[#171819]">
+              <div className="relative mx-auto flex h-36 w-36 items-center justify-center rounded-full border border-line-strong bg-ink">
                 <div
-                  className={`h-32 w-32 rounded-full border-2 border-[#686b6d] ${activeMilestone.frameGradient}`}
+                  className={`h-32 w-32 rounded-full border-2 border-line-strong ${activeMilestone.frameGradient}`}
                   aria-hidden="true"
                 />
               </div>
               <div className="space-y-3 text-center">
-                <p className="text-lg font-semibold text-white">
+                <p className="text-lg font-semibold text-paper">
                   {activeMilestone.rewardName}
                 </p>
                 <button
                   type="button"
                   onClick={handleCloseMilestone}
-                  className="inline-flex items-center justify-center rounded-lg border border-[#ff7658] bg-[#ff7658] hover:bg-[#ff8a70] px-5 py-2 text-sm font-semibold text-[#27110b] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                  className="inline-flex items-center justify-center rounded-lg border border-signal bg-signal hover:bg-signal-hover px-5 py-2 text-sm font-semibold text-signal-ink transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                 >
                   Continue celebrating
                 </button>

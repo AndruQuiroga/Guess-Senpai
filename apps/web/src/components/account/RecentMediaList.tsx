@@ -32,15 +32,15 @@ export function RecentMediaList({ items }: RecentMediaListProps) {
   return (
     <PanelSection innerClassName="space-y-4" className="h-full">
       <header className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-brand-200">
+        <p className="text-xs uppercase tracking-wider text-signal-text">
           Recent puzzles
         </p>
-        <h2 className="text-lg font-semibold text-[#f4f0e7]">
+        <h2 className="text-lg font-semibold text-paper">
           Recently featured titles
         </h2>
       </header>
       {items.length === 0 ? (
-        <p className="text-sm text-[#c1c2bd]">
+        <p className="text-sm text-muted">
           Play a few rounds to start building your personal anime timeline.
         </p>
       ) : (
@@ -48,9 +48,9 @@ export function RecentMediaList({ items }: RecentMediaListProps) {
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-lg border border-[#484b4d] bg-[#242628] p-3 text-sm text-[#c1c2bd] transition hover:border-[#ff7658]"
+              className="flex items-center gap-3 rounded-lg border border-line bg-panel p-3 text-sm text-muted transition hover:border-signal"
             >
-              <div className="h-16 w-12 overflow-hidden rounded-lg border border-[#484b4d] bg-[#171819]">
+              <div className="h-16 w-12 overflow-hidden rounded-lg border border-line bg-ink">
                 {item.coverImage ? (
                   <img
                     src={item.coverImage}
@@ -59,16 +59,16 @@ export function RecentMediaList({ items }: RecentMediaListProps) {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[0.65rem] uppercase tracking-wide text-neutral-400">
+                  <div className="flex h-full w-full items-center justify-center text-[0.65rem] uppercase tracking-wide text-muted">
                     No art
                   </div>
                 )}
               </div>
               <div className="space-y-1">
-                <p className="font-semibold text-[#f4f0e7]">
+                <p className="font-semibold text-paper">
                   {resolveTitle(item.title)}
                 </p>
-                <p className="text-xs text-neutral-400">AniList #{item.id}</p>
+                <p className="text-xs text-muted">AniList #{item.id}</p>
               </div>
             </li>
           ))}

@@ -14,13 +14,13 @@ export function LoginCallout({ className }: LoginCalloutProps): JSX.Element {
   return (
     <div
       className={classNames(
-        "w-full max-w-sm rounded-lg border border-[#686b6d] bg-[#242628] p-5 text-[#f4f0e7]",
+        "w-full max-w-sm rounded-lg border border-line-strong bg-panel p-5 text-paper",
         "flex flex-col gap-4",
         className,
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2c2f31] text-lg text-white">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-panel-raised text-lg text-paper">
           <svg
             aria-hidden
             viewBox="0 0 24 24"
@@ -30,19 +30,17 @@ export function LoginCallout({ className }: LoginCalloutProps): JSX.Element {
           >
             <path
               d="M12 2.75a4.25 4.25 0 0 1 4.25 4.25c0 2.347-1.903 4.25-4.25 4.25S7.75 9.347 7.75 7a4.25 4.25 0 0 1 4.25-4.25Z"
-              className="fill-white/95"
+              className="fill-paper"
             />
             <path
               d="M5.5 19.25c0-2.9 2.462-5.25 5.5-5.25h2c3.038 0 5.5 2.35 5.5 5.25 0 .966-.784 1.75-1.75 1.75h-9.5c-.966 0-1.75-.784-1.75-1.75Z"
-              className="fill-white/70"
+              className="fill-muted"
             />
           </svg>
         </span>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-[#f4f0e7]">
-            Sync your streaks
-          </p>
-          <p className="text-xs leading-relaxed text-[#f4f0e7]">
+          <p className="text-sm font-semibold text-paper">Sync your streaks</p>
+          <p className="text-xs leading-relaxed text-paper">
             Sign in with AniList to save completions and pick up right where you
             left off on any device.
           </p>
@@ -50,7 +48,7 @@ export function LoginCallout({ className }: LoginCalloutProps): JSX.Element {
       </div>
       <Link
         href="/login"
-        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#ff7658] bg-[#ff7658] hover:bg-[#ff8a70] px-4 py-2 text-sm font-semibold text-[#27110b] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+        className="inline-flex items-center justify-center gap-2 rounded-lg border border-signal bg-signal hover:bg-signal-hover px-4 py-2 text-sm font-semibold text-signal-ink transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
       >
         <span>Log in with AniList</span>
         <svg

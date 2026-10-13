@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -8,14 +8,59 @@
 
 :root {
   color-scheme: dark;
-  --ink: #171819;
-  --panel: #242628;
-  --panel-raised: #2c2f31;
-  --line: #484b4d;
-  --paper: #f4f0e7;
-  --muted: #c1c2bd;
-  --signal: #ff7658;
-  --signal-ink: #27110b;
+
+  /* Surfaces */
+  --ink: #171819; /* page background */
+  --panel: #242628; /* cards, fields */
+  --panel-raised: #2c2f31; /* raised cards, buttons, menus */
+  --hover: #34373a; /* hover surface on panels */
+
+  /* Lines */
+  --line: #484b4d; /* default 1px border */
+  --line-subtle: #383a3c; /* dividers inside a panel */
+  --line-strong: #686b6d; /* interactive borders, hover borders */
+
+  /* Text */
+  --paper: #f4f0e7; /* primary text */
+  --muted: #c1c2bd; /* secondary text */
+
+  /* Brand */
+  --signal: #ff7658; /* vermilion accent, primary button fill */
+  --signal-hover: #ff8a70;
+  --signal-text: #ff987f; /* accent used as text/links */
+  --signal-soft: #3a2a25; /* accent-tinted opaque surface */
+  --signal-deep: #a44b38; /* accent border on soft surface */
+  --signal-ink: #27110b; /* text on --signal */
+  --focus: #ff9b83; /* focus ring */
+
+  /* Puzzle feedback. DEFAULT = fill/border/text, -soft = surface, -ink = text on -soft */
+  --correct: #5aa97c;
+  --correct-soft: #1f3a2c;
+  --correct-ink: #9fd8b0;
+  --close: #c9a13e;
+  --close-soft: #3d3220;
+  --close-ink: #f2c36b;
+  --wrong: #8f9293;
+  --wrong-soft: #2c2f31;
+  --wrong-ink: #b4b6b1;
+
+  /* Status */
+  --danger: #e07a8d;
+  --danger-soft: #40242a;
+  --danger-ink: #ffb3bf;
+  --info: #4b87a6;
+  --info-soft: #22343f;
+  --info-ink: #a9d8ef;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius: 10px;
+
+  /* Type */
+  --font-display:
+    "Bricolage Grotesque", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 html {
@@ -31,11 +76,11 @@ body {
 }
 
 * {
-  scrollbar-color: #686b6d #242628;
+  scrollbar-color: var(--line-strong) var(--panel);
 }
 
 *:focus-visible {
-  outline: 3px solid #ff9b83;
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 
@@ -56,7 +101,7 @@ textarea {
   top: 0.5rem;
   left: 0.5rem;
   transform: translateY(-160%);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--paper);
   color: var(--ink);
   padding: 0.75rem 1rem;
@@ -69,7 +114,7 @@ textarea {
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .game-shell input {
@@ -82,7 +127,7 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 0.8rem;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 0.7rem 1.15rem;
   font-size: 1rem;
   font-weight: 700;
@@ -99,7 +144,7 @@ textarea {
 }
 
 .button-primary:hover {
-  background: #ff8a70;
+  background: var(--signal-hover);
 }
 
 .today-page {
@@ -118,9 +163,10 @@ textarea {
 
 .today-intro h1 {
   margin: 0.25rem 0 0;
-  font:
-    700 clamp(2rem, 5vw, 3rem) / 1.04 "Space Grotesk",
-    sans-serif;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.04;
   letter-spacing: -0.045em;
 }
 
@@ -168,12 +214,12 @@ textarea {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #302c2a;
+  background: var(--signal-soft);
   border-right: 1px solid var(--line);
   color: var(--signal);
-  font:
-    700 2rem "Space Grotesk",
-    sans-serif;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
 }
 
 .featured-art img {
@@ -184,8 +230,8 @@ textarea {
 }
 
 .featured-card:nth-child(2) .featured-art {
-  background: #2b3030;
-  color: #b5d5d0;
+  background: var(--info-soft);
+  color: var(--info-ink);
 }
 
 .featured-copy {
@@ -204,9 +250,10 @@ textarea {
 .card-heading h2,
 .secondary-heading h2 {
   margin: 0.15rem 0 0;
-  font:
-    700 1.45rem / 1.15 "Space Grotesk",
-    sans-serif;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1.15;
 }
 
 .status-pill {
@@ -263,7 +310,7 @@ textarea {
 }
 
 .more-puzzles li a {
-  color: #ff987f;
+  color: var(--signal-text);
   font-weight: 700;
   text-decoration: none;
   padding: 0.5rem;
@@ -278,7 +325,7 @@ textarea {
 
 .account-note a,
 .today-help a {
-  color: #ff987f;
+  color: var(--signal-text);
 }
 
 @media (max-width: 640px) {

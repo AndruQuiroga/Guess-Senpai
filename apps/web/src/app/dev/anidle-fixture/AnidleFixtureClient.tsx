@@ -52,11 +52,7 @@ function evaluation(
   };
 }
 
-export default function AnidleFixtureClient({
-  solved,
-}: {
-  solved: boolean;
-}) {
+export default function AnidleFixtureClient({ solved }: { solved: boolean }) {
   const initialProgress: GameProgress | undefined = solved
     ? {
         completed: true,
@@ -81,7 +77,7 @@ export default function AnidleFixtureClient({
 
   return (
     <div className="mx-auto max-w-4xl space-y-3">
-      <p className="rounded-md border border-[#a44b38] bg-[#382521] px-3 py-2 text-sm font-semibold text-[#ffb7a6]">
+      <p className="rounded-md border border-signal-deep bg-signal-soft px-3 py-2 text-sm font-semibold text-signal-text">
         LOCAL FIXTURE · NOT LIVE PUZZLE DATA
       </p>
       <GameShell

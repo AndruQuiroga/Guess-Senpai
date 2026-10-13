@@ -59,19 +59,19 @@ export default async function ArchivePage({ params }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex items-center gap-2 text-sm text-[#c1c2bd]">
+        <nav className="flex items-center gap-2 text-sm text-muted">
           <Link
             href={archiveHref}
-            className="font-medium text-[#c1c2bd] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300"
+            className="font-medium text-muted transition hover:text-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             Archive
           </Link>
-          <span className="text-[#c1c2bd]">/</span>
-          <span className="font-semibold text-white">{formattedDate}</span>
+          <span className="text-muted">/</span>
+          <span className="font-semibold text-paper">{formattedDate}</span>
         </nav>
         <Link
           href={archiveHref}
-          className="inline-flex items-center gap-2 rounded-full border border-[#686b6d] bg-[#2c2f31] px-4 py-2 text-sm font-medium text-[#c1c2bd] transition hover:border-[#ff7658] hover:bg-[#3a2a25] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300"
+          className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-panel-raised px-4 py-2 text-sm font-medium text-muted transition hover:border-signal hover:bg-signal-soft hover:text-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           ← Back to archive index
         </Link>

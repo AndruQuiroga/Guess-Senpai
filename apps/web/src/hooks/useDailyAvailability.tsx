@@ -13,6 +13,7 @@ import {
 
 import {
   buildRuntimeGamesDirectory,
+  getPlayableGames,
   type GameDirectoryEntry,
 } from "../config/games";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
@@ -165,13 +166,20 @@ export function useDailyAvailability(): DailyAvailabilityContextValue {
   return context;
 }
 
+/**
+ * User-facing game list: only modes that are playable right now. Unreleased
+ * modes never appear, and the optional opening mode appears only when today's
+ * availability enables it (hidden while availability is pending or failed).
+ */
 export function useRuntimeGamesDirectory(): GameDirectoryEntry[] {
   const { guessTheOpeningEnabled } = useDailyAvailability();
   return useMemo(
     () =>
-      buildRuntimeGamesDirectory({
-        guessTheOpeningEnabled,
-      }),
+      getPlayableGames(
+        buildRuntimeGamesDirectory({
+          guessTheOpeningEnabled,
+        }),
+      ),
     [guessTheOpeningEnabled],
   );
 }

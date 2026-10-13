@@ -11,6 +11,11 @@ interface GameSwitcherProps {
   progress?: DailyProgress;
 }
 
+/**
+ * @deprecated Superseded by the persistent sidebar and mobile chip row
+ * (PrimaryNav). GameShell no longer renders it; retained only for the dev
+ * fixture and legacy tests. Safe to delete once those are migrated.
+ */
 export function GameSwitcher({ currentSlug, progress }: GameSwitcherProps) {
   const games = useRuntimeGamesDirectory().filter((game) => game.playable);
   if (games.length === 0) return null;

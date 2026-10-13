@@ -78,13 +78,11 @@ export default function ArchiveIndexContent({
   return (
     <>
       <header className="space-y-3">
-        <p className="text-sm uppercase tracking-wider text-[#c1c2bd]">
-          Archive
-        </p>
-        <h1 className="text-3xl sm:text-4xl font-display font-semibold text-white">
+        <p className="text-sm uppercase tracking-wider text-muted">Archive</p>
+        <h1 className="text-3xl sm:text-4xl font-display font-semibold text-paper">
           Pick a published puzzle
         </h1>
-        <p className="text-sm text-[#c1c2bd]">
+        <p className="text-sm text-muted">
           Choose a published day to replay its puzzle set. Dates follow UTC.
         </p>
         <div className="pt-2">
@@ -92,25 +90,25 @@ export default function ArchiveIndexContent({
             className="flex flex-col gap-1 text-sm"
             htmlFor="archive-search"
           >
-            <span className="text-[#c1c2bd]">Search by day or month</span>
+            <span className="text-muted">Search by day or month</span>
             <input
               id="archive-search"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder='Try "March" or 2024-03-14'
-              className="w-full rounded-lg border border-[#686b6d] bg-[#2c2f31] px-4 py-2 text-base text-white placeholder:text-[#c1c2bd] focus:border-[#ff7658] focus:outline-none focus:ring-2 focus:ring-brand-400/50"
+              className="w-full rounded-lg border border-line-strong bg-panel-raised px-4 py-2 text-base text-paper placeholder:text-muted focus:border-signal focus:outline-none focus:ring-2 focus:ring-focus"
             />
           </label>
         </div>
       </header>
 
       {filteredDates.length === 0 ? (
-        <div className="rounded-lg border border-[#686b6d] bg-[#2c2f31] px-6 py-10 text-center text-[#c1c2bd]">
-          <p className="text-base font-medium text-white">
+        <div className="rounded-lg border border-line-strong bg-panel-raised px-6 py-10 text-center text-muted">
+          <p className="text-base font-medium text-paper">
             {query ? "No matches found" : "No published puzzles yet"}
           </p>
-          <p className="mt-2 text-sm text-[#c1c2bd]">
+          <p className="mt-2 text-sm text-muted">
             Try searching for a different date or month to find archived
             challenges.
           </p>
@@ -119,9 +117,7 @@ export default function ArchiveIndexContent({
         <div className="space-y-6" aria-live="polite">
           {monthEntries.map(([monthLabel, { dates: monthDates }]) => (
             <section key={monthLabel} className="space-y-3">
-              <h2 className="text-lg font-semibold text-[#f4f0e7]">
-                {monthLabel}
-              </h2>
+              <h2 className="text-lg font-semibold text-paper">{monthLabel}</h2>
               <ul className="grid gap-2 sm:grid-cols-2">
                 {monthDates.map((isoDate) => {
                   const isSelected = selectedDate === isoDate;
@@ -132,17 +128,15 @@ export default function ArchiveIndexContent({
                         href={`/archive/${isoDate}`}
                         className={`flex h-full flex-col justify-center rounded-lg border px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300 ${
                           isSelected
-                            ? "border-[#ff7658] bg-[#352c28] text-white "
-                            : "border-[#686b6d] bg-[#2c2f31] text-[#c1c2bd] hover:border-[#ff7658] hover:bg-[#3a2a25] hover:text-white"
+                            ? "border-signal bg-signal-soft text-paper "
+                            : "border-line-strong bg-panel-raised text-muted hover:border-signal hover:bg-signal-soft hover:text-paper"
                         }`}
                         aria-current={isSelected ? "date" : undefined}
                       >
                         <span className="text-sm font-medium">
                           {formattedLabel}
                         </span>
-                        <span className="text-sm text-[#c1c2bd]">
-                          View puzzles
-                        </span>
+                        <span className="text-sm text-muted">View puzzles</span>
                       </Link>
                     </li>
                   );

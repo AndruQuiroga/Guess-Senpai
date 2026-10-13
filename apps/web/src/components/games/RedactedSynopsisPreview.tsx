@@ -30,12 +30,12 @@ export function RedactedSynopsisPreview({
 
   return (
     <div className="space-y-3">
-      <p className="rounded-lg border border-[#484b4d] bg-[#242628] p-3 text-sm font-medium leading-relaxed text-[#f4f0e7]">
+      <p className="rounded-lg border border-line bg-panel p-3 text-sm font-medium leading-relaxed text-paper">
         {snippet}
       </p>
 
       {roundHints.length > 0 ? (
-        <ul className="space-y-1 text-sm text-[#f4f0e7]">
+        <ul className="space-y-1 text-sm text-paper">
           {roundHints.slice(0, 2).map((hint) => (
             <li key={hint} className="flex items-start gap-2">
               <span aria-hidden className="mt-1 text-fuchsia-200">

@@ -34,16 +34,11 @@ export function Field({
 }) {
   return (
     <div className={`space-y-2 ${className}`}>
-      <label
-        htmlFor={id}
-        className="block text-sm font-semibold text-[#f4f0e7]"
-      >
+      <label htmlFor={id} className="block text-sm font-semibold text-paper">
         {label}
       </label>
       {children}
-      {description ? (
-        <p className="text-sm text-[#c1c2bd]">{description}</p>
-      ) : null}
+      {description ? <p className="text-sm text-muted">{description}</p> : null}
     </div>
   );
 }

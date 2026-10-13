@@ -7,42 +7,40 @@ import { ComponentProps } from "react";
 interface NavLinkProps extends ComponentProps<typeof Link> {
   exact?: boolean;
   isActive?(pathname: string): boolean;
+  /** Classes applied while active / inactive; defaults suit the sidebar. */
+  activeClassName?: string;
+  inactiveClassName?: string;
+}
+
+export function matchesPath(
+  pathname: string,
+  href: string,
+  exact: boolean,
+): boolean {
+  const target = href.split(/[?#]/)[0] || "/";
+  if (exact || target === "/") return pathname === target;
+  return pathname === target || pathname.startsWith(`${target}/`);
 }
 
 export default function NavLink({
   href,
   exact = false,
   isActive: isActiveOverride,
+  activeClassName = "bg-panel-raised text-paper shadow-[inset_3px_0_0_var(--signal)]",
+  inactiveClassName = "text-muted hover:bg-hover hover:text-paper",
   className,
   children,
   ...rest
 }: NavLinkProps) {
-  const pathname = usePathname();
-  const normalizedHref = typeof href === "string" ? href : href.toString();
-
-  let isActive = false;
-  if (isActiveOverride) {
-    isActive = isActiveOverride(pathname ?? "");
-  } else {
-    const currentPath = pathname ?? "";
-    if (exact) {
-      isActive = currentPath === normalizedHref;
-    } else {
-      isActive =
-        currentPath === normalizedHref ||
-        (normalizedHref !== "/" &&
-          currentPath.startsWith(`${normalizedHref}/`));
-    }
-  }
-
-  const baseClasses =
-    "inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-semibold transition";
-  const activeClasses = "bg-[#383a3c] text-[#f4f0e7]";
-  const inactiveClasses = "text-[#c1c2bd] hover:bg-[#2c2f31] hover:text-white";
+  const pathname = usePathname() ?? "";
+  const hrefString = typeof href === "string" ? href : (href.pathname ?? "/");
+  const isActive = isActiveOverride
+    ? isActiveOverride(pathname)
+    : matchesPath(pathname, hrefString, exact);
 
   const combinedClasses = [
-    baseClasses,
-    isActive ? activeClasses : inactiveClasses,
+    "inline-flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition",
+    isActive ? activeClassName : inactiveClassName,
     className,
   ]
     .filter(Boolean)

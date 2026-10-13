@@ -46,9 +46,9 @@ export default async function ArchiveIndexPage({
   if (!archiveIndex) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="rounded-lg border border-[#c0566a] bg-[#40242a] px-6 py-5 text-[#f4f0e7]">
+        <div className="rounded-lg border border-danger bg-danger-soft px-6 py-5 text-paper">
           <h1 className="text-2xl font-semibold">Archive Unavailable</h1>
-          <p className="mt-2 text-sm text-red-100/80">
+          <p className="mt-2 text-sm text-danger-ink">
             We couldn&apos;t load the archive dates right now. You can retry
             without leaving the archive.
           </p>
@@ -69,13 +69,11 @@ export default async function ArchiveIndexPage({
     return (
       <div className="mx-auto max-w-3xl space-y-8">
         <header className="space-y-3">
-          <p className="text-sm uppercase tracking-wider text-[#c1c2bd]">
-            Archive
-          </p>
-          <h1 className="text-4xl font-semibold text-white">
+          <p className="text-sm uppercase tracking-wider text-muted">Archive</p>
+          <h1 className="text-4xl font-semibold text-paper">
             No published puzzles yet
           </h1>
-          <p className="text-sm text-[#c1c2bd]">
+          <p className="text-sm text-muted">
             Published daily puzzles will appear here after they become
             available.
           </p>

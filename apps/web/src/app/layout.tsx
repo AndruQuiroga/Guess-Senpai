@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 
 import SessionRefresher from "../components/SessionRefresher";
-import HeaderNavigation from "../components/HeaderNavigation";
+import PrimaryNav from "../components/PrimaryNav";
 import ServiceWorkerRegistrar from "../components/ServiceWorkerRegistrar";
 import "../styles/globals.css";
 import { DailyAvailabilityProvider } from "../hooks/useDailyAvailability";
@@ -60,60 +59,38 @@ export default function RootLayout({
 
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen antialiased selection:bg-[#ff7658] selection:text-[#27110b]">
+      <body className="min-h-screen antialiased selection:bg-signal selection:text-signal-ink">
         <SessionRefresher />
         <ServiceWorkerRegistrar />
         <DailyAvailabilityProvider>
-          <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-4 sm:px-6 lg:px-10">
-            <a href="#main-content" className="skip-link">
-              Skip to content
-            </a>
-            <header className="mb-5 flex items-center justify-between border-b border-[#484b4d] py-3 text-sm text-[#c1c2bd]">
-              <Link
-                href="/"
-                className="text-xl font-display font-bold tracking-tight text-[#f4f0e7] transition hover:text-[#ff987f]"
+          <a href="#main-content" className="skip-link">
+            Skip to content
+          </a>
+          <div className="min-h-screen md:flex">
+            <PrimaryNav archiveDate={today} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <main
+                id="main-content"
+                tabIndex={-1}
+                className="mx-auto w-full max-w-5xl flex-1 px-4 pb-10 pt-5 sm:px-6 md:pt-8 lg:px-10"
               >
-                Guess<span className="text-brand-300">Senpai</span>
-              </Link>
-              <HeaderNavigation archiveDate={today} />
-            </header>
-            <main id="main-content" tabIndex={-1} className="flex-1 pb-10">
-              {children}
-            </main>
-            <footer className="mt-8 border-t border-[#484b4d] pt-4 text-xs text-[#b8bbb7]">
-              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-neutral-500">
-                  © {new Date().getFullYear()} GuessSenpai · Built with AniList
-                  &amp; AnimeThemes data.
-                </span>
-                <a
-                  href="mailto:support@guessenpai.app"
-                  className="text-neutral-500 transition hover:text-[#c1c2bd]"
-                >
-                  support@guessenpai.app
-                </a>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <Link
-                    href="/games"
-                    className="text-neutral-400 hover:text-white"
+                {children}
+              </main>
+              <footer className="mx-auto w-full max-w-5xl border-t border-line px-4 py-4 text-sm text-muted sm:px-6 lg:px-10">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    © {new Date().getFullYear()} GuessSenpai · Built with
+                    AniList &amp; AnimeThemes data.
+                  </span>
+                  <a
+                    href="mailto:support@guessenpai.app"
+                    className="inline-flex min-h-11 items-center hover:text-paper"
                   >
-                    All games
-                  </Link>
-                  <Link
-                    href="/how-to-play"
-                    className="text-neutral-400 hover:text-white"
-                  >
-                    How to play
-                  </Link>
-                  <Link
-                    href="/account"
-                    className="text-neutral-400 hover:text-white"
-                  >
-                    Account
-                  </Link>
+                    support@guessenpai.app
+                  </a>
                 </div>
-              </div>
-            </footer>
+              </footer>
+            </div>
           </div>
         </DailyAvailabilityProvider>
       </body>

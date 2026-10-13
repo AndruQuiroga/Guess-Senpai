@@ -45,13 +45,13 @@ export default function GamesDirectorySection() {
               onClick={() => setActiveFilter(value)}
               className={`inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${
                 isActive
-                  ? "border-[#686b6d] bg-[#2c2f31] text-white"
-                  : "border-[#484b4d] bg-[#242628] text-[#c1c2bd] hover:border-[#686b6d] hover:bg-[#2c2f31]"
+                  ? "border-line-strong bg-panel-raised text-paper"
+                  : "border-line bg-panel text-muted hover:border-line-strong hover:bg-panel-raised"
               }`}
             >
               <span className="flex items-center gap-1 uppercase tracking-[0.18em]">
                 {label}
-                <span className="text-xs text-[#c1c2bd]">({count})</span>
+                <span className="text-xs text-muted">({count})</span>
               </span>
             </button>
           );

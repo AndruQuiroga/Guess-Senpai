@@ -204,7 +204,7 @@ export default function CharacterSilhouette({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-lg border border-[#686b6d] bg-[#2c2f31] p-5  ">
+      <div className="flex flex-col gap-4 rounded-lg border border-line-strong bg-panel-raised p-5  ">
         <div className="flex flex-wrap items-center gap-3">
           {rounds.map((round, index) => {
             const isActive = index === activeRoundIndex;
@@ -220,10 +220,10 @@ export default function CharacterSilhouette({
                 className={[
                   "inline-flex items-center gap-2 min-h-11 rounded-md border px-3 py-1.5 text-sm font-semibold transition",
                   isActive
-                    ? "border-[#ff7658] bg-[#352c28] text-[#f4f0e7] "
+                    ? "border-signal bg-signal-soft text-paper "
                     : isCompleted
-                      ? "border-[#3f8a5f] bg-[#1f3a2c] text-emerald-100"
-                      : "border-[#686b6d] bg-[#2c2f31] text-[#f4f0e7] hover:border-[#ff7658] hover:text-white",
+                      ? "border-correct bg-correct-soft text-correct-ink"
+                      : "border-line-strong bg-panel-raised text-paper hover:border-signal hover:text-paper",
                   isDisabled ? "cursor-not-allowed opacity-50" : "",
                 ].join(" ")}
               >
@@ -238,9 +238,9 @@ export default function CharacterSilhouette({
           })}
         </div>
 
-        <div className="grid gap-4 text-white sm:grid-cols-2">
+        <div className="grid gap-4 text-paper sm:grid-cols-2">
           <div className="space-y-1">
-            <p className="text-sm uppercase tracking-[0.24em] text-[#c1c2bd]">
+            <p className="text-sm uppercase tracking-[0.24em] text-muted">
               Characters solved
             </p>
             <p className="text-2xl font-display font-semibold">
@@ -248,25 +248,25 @@ export default function CharacterSilhouette({
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-sm uppercase tracking-[0.24em] text-[#c1c2bd]">
+            <p className="text-sm uppercase tracking-[0.24em] text-muted">
               Current stage
             </p>
-            <p className="text-sm text-[#f4f0e7]">
+            <p className="text-sm text-paper">
               Round {activeRoundIndex + 1} of {totalRounds}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-[#686b6d] bg-[#2c2f31] p-6  ">
+      <div className="rounded-lg border border-line-strong bg-panel-raised p-6  ">
         <div className="mb-6 space-y-2">
-          <h3 className="text-xl font-display font-semibold text-white">
+          <h3 className="text-xl font-display font-semibold text-paper">
             {roundHeadline}
           </h3>
           {roundDescription ? (
-            <p className="text-sm text-[#f4f0e7]">{roundDescription}</p>
+            <p className="text-sm text-paper">{roundDescription}</p>
           ) : (
-            <p className="text-sm text-[#f4f0e7]">
+            <p className="text-sm text-paper">
               Match each silhouette to the correct character and anime to reveal
               the lineup.
             </p>

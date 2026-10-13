@@ -93,11 +93,11 @@ export default async function AccountPage() {
     <div className="mx-auto max-w-5xl space-y-10">
       <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-3">
-          <h1 className="text-3xl font-display font-semibold tracking-tight text-[#f4f0e7] sm:text-4xl">
+          <h1 className="text-3xl font-display font-semibold tracking-tight text-paper sm:text-4xl">
             Welcome back
             {account.user?.username ? `, ${account.user.username}` : ""}
           </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-[#c1c2bd]">
+          <p className="max-w-2xl text-sm leading-relaxed text-muted">
             Track your GuessSenpai journey: monitor streaks, revisit recent
             puzzles, and share your achievements with friends.
           </p>
@@ -110,21 +110,21 @@ export default async function AccountPage() {
             <img
               src={account.user.avatar}
               alt={account.user.username ?? "AniList user"}
-              className="h-16 w-16 rounded-full border border-[#686b6d] object-cover shadow-black/40"
+              className="h-16 w-16 rounded-full border border-line-strong object-cover"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[#686b6d] bg-[#3a2a25] text-lg font-semibold uppercase text-[#f4f0e7]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-line-strong bg-signal-soft text-lg font-semibold uppercase text-paper">
               {(account.user?.username ?? "GS").slice(0, 2)}
             </div>
           )}
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-[#f4f0e7]">
+            <p className="text-sm font-semibold text-paper">
               {account.user?.username ?? "AniList user"}
             </p>
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-muted">
               {stats.active_days} active day{stats.active_days === 1 ? "" : "s"}
             </p>
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-muted">
               {completionRatePercent}% completion rate
             </p>
           </div>

@@ -177,32 +177,32 @@ export default function StreakWidget({
   return (
     <section
       className={classNames(
-        "relative overflow-hidden rounded-lg border border-[#484b4d] bg-surface-raised p-5 sm:p-7",
+        "relative overflow-hidden rounded-lg border border-line bg-surface-raised p-5 sm:p-7",
         className,
       )}
     >
       <div className="relative space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-correct-ink">
               Current streak
             </p>
-            <p className="text-3xl font-display font-semibold text-white sm:text-4xl">
+            <p className="text-3xl font-display font-semibold text-paper sm:text-4xl">
               {streakCount}
-              <span className="ml-2 text-base font-sans font-normal text-[#c1c2bd]">
+              <span className="ml-2 text-base font-sans font-normal text-muted">
                 day{streakCount === 1 ? "" : "s"}
               </span>
             </p>
-            <p className="text-sm text-[#c1c2bd]">{supportingText}</p>
+            <p className="text-sm text-muted">{supportingText}</p>
           </div>
-          <div className="max-w-xs rounded-lg border border-[#3f8a5f] bg-[#1f3a2c] px-4 py-3 text-sm font-medium text-emerald-50">
+          <div className="max-w-xs rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm font-medium text-correct-ink">
             {milestoneMessage}
           </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-start gap-3">
-            <div className="flex flex-col justify-between py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-neutral-500">
+            <div className="flex flex-col justify-between py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-muted">
               {WEEKDAY_LABELS.map((label) => (
                 <span key={label}>{label}</span>
               ))}
@@ -230,7 +230,7 @@ export default function StreakWidget({
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-neutral-500">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-muted">
             <span>Less</span>
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4].map((level) => (

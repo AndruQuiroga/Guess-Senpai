@@ -111,9 +111,9 @@ export function CharacterCard({
   return (
     <form
       onSubmit={handleFormSubmit}
-      className="flex h-full flex-col overflow-hidden rounded-lg border border-[#686b6d] bg-[#2c2f31]  "
+      className="flex h-full flex-col overflow-hidden rounded-lg border border-line-strong bg-panel-raised  "
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#2c2f31]">
+      <div className="relative aspect-[4/5] w-full overflow-hidden bg-panel-raised">
         <Image
           src={entry.character.image}
           alt={entry.character.name}
@@ -123,8 +123,8 @@ export function CharacterCard({
           sizes="(max-width: 768px) 100vw, 25vw"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/30" />
-        <div className="absolute inset-x-0 bottom-0 space-y-2 p-4 text-white">
-          <div className="text-sm uppercase tracking-[0.28em] text-[#f4f0e7]">
+        <div className="absolute inset-x-0 bottom-0 space-y-2 p-4 text-paper">
+          <div className="text-sm uppercase tracking-[0.28em] text-paper">
             Card {index + 1}
           </div>
           <div className="space-y-1">
@@ -132,7 +132,7 @@ export function CharacterCard({
               {entry.reveal.label}
             </p>
             {revealDescription ? (
-              <p className="text-sm text-[#f4f0e7]">{revealDescription}</p>
+              <p className="text-sm text-paper">{revealDescription}</p>
             ) : null}
           </div>
         </div>
@@ -140,7 +140,7 @@ export function CharacterCard({
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         {roleLabel ? (
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#c1c2bd]">
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted">
             {roleLabel}
           </p>
         ) : null}
@@ -148,7 +148,7 @@ export function CharacterCard({
         <div className="space-y-2">
           <label
             htmlFor={`${characterId}-anime`}
-            className="text-sm font-semibold text-[#f4f0e7]"
+            className="text-sm font-semibold text-paper"
           >
             Anime
           </label>
@@ -168,7 +168,7 @@ export function CharacterCard({
         <div className="space-y-2">
           <label
             htmlFor={`${characterId}-character`}
-            className="text-sm font-semibold text-[#f4f0e7]"
+            className="text-sm font-semibold text-paper"
           >
             Character
           </label>
@@ -179,15 +179,15 @@ export function CharacterCard({
             onChange={(event) => onCharacterChange(event.target.value)}
             disabled={cardDisabled || state.completed}
             placeholder="Enter the character name"
-            className="w-full rounded-xl border border-[#686b6d] bg-[#2c2f31] px-3 py-2 text-base text-white  focus:border-[#ff7658]  focus:ring-2 focus:ring-[#ff9b83] disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full rounded-xl border border-line-strong bg-panel-raised px-3 py-2 text-base text-paper  focus:border-signal  focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-70"
           />
         </div>
 
         <div className="mt-auto space-y-3">
-          <div className="flex items-center justify-between text-sm text-[#f4f0e7]">
+          <div className="flex items-center justify-between text-sm text-paper">
             <span>{attemptsLabel}</span>
             {state.completed ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#1f3a2c] px-2 py-1 text-sm font-semibold text-emerald-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-correct-soft px-2 py-1 text-sm font-semibold text-correct-ink">
                 ✓ Solved
               </span>
             ) : null}
@@ -198,10 +198,10 @@ export function CharacterCard({
               className={[
                 "rounded-xl border px-3 py-2 text-sm leading-snug",
                 displayFeedback.type === "success"
-                  ? "border-[#3f8a5f] bg-[#1f3a2c] text-emerald-100"
+                  ? "border-correct bg-correct-soft text-correct-ink"
                   : displayFeedback.type === "partial"
-                    ? "border-[#c9a13e] bg-[#3d3220] text-amber-100"
-                    : "border-[#c0566a] bg-[#40242a] text-rose-100",
+                    ? "border-close bg-close-soft text-close-ink"
+                    : "border-danger bg-danger-soft text-danger-ink",
               ].join(" ")}
             >
               {displayFeedback.message}
@@ -211,7 +211,7 @@ export function CharacterCard({
           <button
             type="submit"
             disabled={cardDisabled || state.completed}
-            className="w-full rounded-xl bg-[#ff7658] px-3 py-2 text-base font-semibold text-[#27110b]  transition hover:bg-[#ff8a70]  focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-black disabled:cursor-not-allowed disabled:bg-[#383a3c]"
+            className="w-full rounded-xl bg-signal px-3 py-2 text-base font-semibold text-signal-ink  transition hover:bg-signal-hover  focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-ink disabled:cursor-not-allowed disabled:bg-hover"
           >
             {state.completed
               ? "Solved"

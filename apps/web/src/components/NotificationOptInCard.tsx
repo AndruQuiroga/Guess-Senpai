@@ -43,26 +43,26 @@ export default function NotificationOptInCard(): JSX.Element | null {
   return (
     <PanelSection innerClassName="space-y-4">
       <div className="space-y-1">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-signal-text">
           Notifications
         </p>
-        <h2 className="text-lg font-display font-semibold tracking-tight text-[#f4f0e7]">
+        <h2 className="text-lg font-display font-semibold tracking-tight text-paper">
           Notification settings
         </h2>
-        <p className="text-sm text-[#c1c2bd]">{description}</p>
-        {error && <p className="text-xs text-rose-200">{error}</p>}
+        <p className="text-sm text-muted">{description}</p>
+        {error && <p className="text-xs text-danger-ink">{error}</p>}
       </div>
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={handleClick}
           disabled={isLoading || permissionDenied}
-          className="inline-flex items-center justify-center rounded-lg border border-[#686b6d] bg-[#2c2f31] px-5 py-2 text-sm font-semibold text-[#f4f0e7] transition hover:bg-[#2c2f31] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-lg border border-line-strong bg-panel-raised px-5 py-2 text-sm font-semibold text-paper transition hover:bg-panel-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? "Saving…" : buttonLabel}
         </button>
         {permissionDenied && (
-          <span className="text-xs text-amber-200">
+          <span className="text-xs text-close-ink">
             Allow notifications for guesssenpai.com in your browser to turn this
             on.
           </span>

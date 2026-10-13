@@ -258,12 +258,12 @@ export default function SynopsisRedacted({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-[#686b6d] bg-[#2c2f31] p-5 text-base leading-relaxed text-[#f4f0e7]   whitespace-pre-wrap">
+      <div className="rounded-lg border border-line-strong bg-panel-raised p-5 text-base leading-relaxed text-paper   whitespace-pre-wrap">
         {renderedSynopsis}
       </div>
-      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-[#c1c2bd]">
+      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-muted">
         {revealedWordCount > 0 && (
-          <span className="rounded-full border border-[#686b6d] bg-[#2c2f31] px-3 py-1 font-semibold text-[#f4f0e7]">
+          <span className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 font-semibold text-paper">
             Revealed words: {revealedWordCount}
           </span>
         )}
@@ -282,20 +282,20 @@ export default function SynopsisRedacted({
         />
         <button
           type="submit"
-          className="inline-flex items-center justify-center rounded-lg bg-[#ff7658] !text-[#27110b] px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-lg bg-signal !text-signal-ink px-6 py-3 text-sm font-semibold uppercase tracking-wide text-paper  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={completed}
         >
           Submit
         </button>
       </form>
-      <div className="space-y-3 text-sm text-[#c1c2bd]" aria-live="polite">
+      <div className="space-y-3 text-sm text-muted" aria-live="polite">
         {guesses.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-[#c1c2bd]">
+          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-muted">
             Attempts
             {guesses.map((value, index) => (
               <span
                 key={`${value}-${index}`}
-                className="rounded-full border border-[#686b6d] bg-[#2c2f31] px-3 py-1 text-sm text-[#c1c2bd]"
+                className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 text-sm text-muted"
               >
                 {value}
               </span>
@@ -303,12 +303,12 @@ export default function SynopsisRedacted({
           </div>
         )}
         {feedback?.type === "error" && (
-          <div className="rounded-lg border border-[#c0566a] bg-[#40242a] px-4 py-3 text-sm text-rose-200">
+          <div className="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger-ink">
             {feedback.message}
           </div>
         )}
         {feedback?.type === "success" && (
-          <div className="rounded-lg border border-[#3f8a5f] bg-[#1f3a2c] px-4 py-3 text-sm text-emerald-200">
+          <div className="rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm text-correct-ink">
             {feedback.message}
           </div>
         )}

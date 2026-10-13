@@ -219,7 +219,7 @@ export const TitleGuessField = forwardRef<
         <input
           ref={inputRef}
           id={id}
-          className="w-full rounded-md border border-[#686b6d] bg-[#202223] px-4 py-3 text-base text-[#f4f0e7] outline-none transition focus:border-[#ff987f] focus:ring-2 focus:ring-[#ff7658]/30 disabled:cursor-not-allowed disabled:opacity-70"
+          className="w-full rounded-md border border-line-strong bg-ink px-4 py-3 text-base text-paper outline-none transition focus:border-signal-text focus:ring-2 focus:ring-signal/30 disabled:cursor-not-allowed disabled:opacity-70"
           placeholder={placeholder}
           value={value}
           onChange={handleChange}
@@ -241,17 +241,13 @@ export const TitleGuessField = forwardRef<
           }
         />
         {suggestionsVisible && (
-          <div className="absolute left-0 right-0 z-20 mt-2 max-h-[min(18rem,45dvh)] overflow-hidden rounded-md border border-[#686b6d] bg-[#242628]">
+          <div className="absolute left-0 right-0 z-20 mt-2 max-h-[min(18rem,45dvh)] overflow-hidden rounded-md border border-line-strong bg-panel">
             {loading ? (
-              <div className="px-4 py-3 text-sm text-[#c1c2bd]">
-                {loadingText}
-              </div>
+              <div className="px-4 py-3 text-sm text-muted">{loadingText}</div>
             ) : error ? (
-              <div className="px-4 py-3 text-sm text-rose-300">{errorText}</div>
+              <div className="px-4 py-3 text-sm text-danger">{errorText}</div>
             ) : suggestions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-neutral-400">
-                {emptyText}
-              </div>
+              <div className="px-4 py-3 text-sm text-muted">{emptyText}</div>
             ) : (
               <ul
                 role="listbox"
@@ -279,8 +275,8 @@ export const TitleGuessField = forwardRef<
                       <div
                         className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm transition ${
                           isActive
-                            ? "bg-[#383a3c] text-white"
-                            : "text-[#c1c2bd] hover:bg-[#2c2f31]"
+                            ? "bg-hover text-paper"
+                            : "text-muted hover:bg-panel-raised"
                         }`}
                       >
                         <span>{suggestion.title}</span>

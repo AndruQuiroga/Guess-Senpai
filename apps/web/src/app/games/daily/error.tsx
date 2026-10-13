@@ -7,18 +7,18 @@ export default function DailyError({
   reset: () => void;
 }) {
   return (
-    <main className="mx-auto max-w-xl space-y-4 rounded-lg border border-[#484b4d] bg-[#242628] p-8 text-white">
+    <main className="mx-auto max-w-xl space-y-4 rounded-lg border border-line bg-panel p-8 text-paper">
       <h1 className="text-2xl font-semibold">
         Today&apos;s puzzles could not load
       </h1>
-      <p className="text-sm text-[#c1c2bd]">
+      <p className="text-sm text-muted">
         Your saved progress on this device remains available. Try loading the
         puzzle again.
       </p>
       <button
         type="button"
         onClick={reset}
-        className="rounded-xl border border-[#686b6d] bg-[#2c2f31] px-4 py-2 text-sm font-semibold hover:bg-[#2c2f31] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        className="rounded-xl border border-line-strong bg-panel-raised px-4 py-2 text-sm font-semibold hover:bg-panel-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       >
         Retry
       </button>
