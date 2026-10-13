@@ -19,7 +19,7 @@ const API_BASE =
 
 async function fetchDailyPuzzles(): Promise<DailyPuzzleResponse | null> {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("guesssenpai_session");
     const headers = sessionCookie
       ? { cookie: `guesssenpai_session=${sessionCookie.value}` }
@@ -42,14 +42,15 @@ async function fetchDailyPuzzles(): Promise<DailyPuzzleResponse | null> {
 export default async function PuzzleGamePage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slugDefinition = findPuzzleSlug(params.slug);
+  const { slug } = await params;
+  const slugDefinition = findPuzzleSlug(slug);
 
   if (!slugDefinition) {
     // Known but unplayable modes (e.g. coming soon) get a friendly page;
     // anything else is a real 404.
-    const known = findGameConfig(params.slug);
+    const known = findGameConfig(slug);
     if (known) {
       return <GameUnavailable title={known.title} />;
     }

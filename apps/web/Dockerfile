@@ -27,6 +27,8 @@ COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 ARG NEXT_PUBLIC_API_BASE=http://localhost:8000
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+ARG SITE_URL=http://localhost:3000
+ENV SITE_URL=$SITE_URL
 # in case public/ is empty, make it exist so COPY doesn't fail later
 RUN mkdir -p apps/web/public
 RUN pnpm -C apps/web build

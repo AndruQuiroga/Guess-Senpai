@@ -78,7 +78,7 @@ async def callback(code: str, state: str) -> RedirectResponse:
     response.set_cookie(
         "guesssenpai_session",
         signed_session,
-        secure=False,
+        secure=settings.session_cookie_secure,
         httponly=True,
         samesite="lax",
         max_age=token_response.expires_in,
@@ -148,7 +148,7 @@ async def refresh(request: Request) -> JSONResponse:
     response.set_cookie(
         "guesssenpai_session",
         session_cookie,
-        secure=False,
+        secure=settings.session_cookie_secure,
         httponly=True,
         samesite="lax",
         max_age=max_age,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import List, Optional
 
 from pydantic import Field, HttpUrl, field_validator
@@ -25,6 +26,7 @@ class Settings(BaseSettings):
     guess_opening_pool_enabled: bool = Field(default=True, alias="GUESS_OPENING_POOL_ENABLED")
 
     session_secret: str = Field(default="dev-insecure-session-secret", alias="SESSION_SECRET")
+    session_cookie_secure: bool = Field(default=False, alias="SESSION_COOKIE_SECURE")
 
     redis_url: Optional[str] = Field(default=None, alias="REDIS_URL")
 
@@ -42,7 +44,10 @@ class Settings(BaseSettings):
         default=3.0, alias="DATABASE_CONNECT_RETRY_INTERVAL_SECONDS"
     )
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore",
+        secrets_dir="/run/secrets" if Path("/run/secrets").is_dir() else None,
+    )
 
 
 @lru_cache

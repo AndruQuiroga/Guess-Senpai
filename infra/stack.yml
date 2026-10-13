@@ -1,0 +1,205 @@
+version: "3.8"
+
+services:
+  web:
+    image: ghcr.io/andruquiroga/guesssenpai-web:${IMAGE_TAG}
+    environment:
+      API_BASE_URL: http://guesssenpai_api:8000
+      SITE_URL: https://guesssenpai.mustache.network
+      NODE_ENV: production
+    networks: [traefik-public, data]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.hostname == docker-1"]
+      resources:
+        limits: { memory: 512M }
+        reservations: { memory: 128M }
+      update_config: { order: start-first, failure_action: rollback }
+      labels:
+        traefik.enable: "true"
+        traefik.swarm.network: traefik-public
+        traefik.http.routers.guesssenpai-web.rule: Host(`guesssenpai.mustache.network`)
+        traefik.http.routers.guesssenpai-web.entrypoints: web
+        traefik.http.services.guesssenpai-web.loadbalancer.server.port: "3000"
+    logging: &logging
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+  api:
+    image: ghcr.io/andruquiroga/guesssenpai-api:${IMAGE_TAG}
+    command: ["python", "-m", "app.core.production"]
+    environment:
+      FRONTEND_BASE_URL: https://guesssenpai.mustache.network
+      CORS_ORIGINS: '["https://guesssenpai.mustache.network"]'
+      ANILIST_REDIRECT_URI: https://guesssenpai.mustache.network/api/auth/anilist/callback
+      SESSION_COOKIE_SECURE: "true"
+      REDIS_URL: redis://guesssenpai_redis:6379/0
+      DATABASE_CONNECT_RETRIES: "30"
+      DATABASE_CONNECT_RETRY_INTERVAL_SECONDS: "3"
+    secrets:
+      - source: database_url
+        target: DATABASE_URL
+      - source: session_secret
+        target: SESSION_SECRET
+      - source: anilist_client_id
+        target: ANILIST_CLIENT_ID
+      - source: anilist_client_secret
+        target: ANILIST_CLIENT_SECRET
+    networks: [traefik-public, data]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.hostname == docker-1"]
+      resources:
+        limits: { memory: 1024M }
+        reservations: { memory: 256M }
+      update_config: { order: stop-first, failure_action: rollback }
+      labels:
+        traefik.enable: "true"
+        traefik.swarm.network: traefik-public
+        traefik.http.routers.guesssenpai-api.rule: Host(`guesssenpai.mustache.network`) && (Path(`/api`) || PathPrefix(`/api/`))
+        traefik.http.routers.guesssenpai-api.entrypoints: web
+        traefik.http.routers.guesssenpai-api.priority: "100"
+        traefik.http.routers.guesssenpai-api.middlewares: guesssenpai-api-strip
+        traefik.http.middlewares.guesssenpai-api-strip.stripprefix.prefixes: /api
+        traefik.http.services.guesssenpai-api.loadbalancer.server.port: "8000"
+        traefik.http.services.guesssenpai-api.loadbalancer.healthcheck.path: /health/ready
+        traefik.http.services.guesssenpai-api.loadbalancer.healthcheck.interval: 30s
+    logging: *logging
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: guesssenpai
+      POSTGRES_USER: guesssenpai
+      POSTGRES_PASSWORD_FILE: /run/secrets/POSTGRES_PASSWORD
+    secrets:
+      - source: postgres_password
+        target: POSTGRES_PASSWORD
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guesssenpai -d guesssenpai"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.hostname == docker-1"]
+      resources:
+        limits: { memory: 512M }
+        reservations: { memory: 128M }
+      update_config: { order: stop-first }
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    volumes: [redis-data:/data]
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.hostname == docker-1"]
+      resources:
+        limits: { memory: 128M }
+        reservations: { memory: 32M }
+    logging: *logging
+
+  backup:
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        mkdir -p /backups
+        chmod 700 /backups
+        export PGPASSWORD="$$(cat /run/secrets/POSTGRES_PASSWORD)"
+        while true; do
+          if pg_isready -h guesssenpai_postgres -U guesssenpai -d guesssenpai; then
+            stamp=$$(date -u +%Y%m%dT%H%M%SZ)
+            pg_dump -h guesssenpai_postgres -U guesssenpai -d guesssenpai -Fc -f /backups/guesssenpai-$$stamp.dump.tmp
+            mv /backups/guesssenpai-$$stamp.dump.tmp /backups/guesssenpai-$$stamp.dump
+            chmod 600 /backups/guesssenpai-$$stamp.dump
+            find /backups -type f -name '*.dump' -mtime +7 -delete
+            echo "Database backup completed"
+            sleep 86400
+          else
+            sleep 10
+          fi
+        done
+    secrets:
+      - source: postgres_password
+        target: POSTGRES_PASSWORD
+    volumes: [backups:/backups]
+    networks: [data]
+    deploy:
+      replicas: 1
+      placement:
+        constraints: ["node.hostname == docker-1"]
+      resources:
+        limits: { memory: 128M }
+      update_config: { order: stop-first }
+    logging: *logging
+
+networks:
+  traefik-public:
+    external: true
+  data:
+    driver: overlay
+
+volumes:
+  postgres-data:
+  redis-data:
+  backups:
+
+secrets:
+  postgres_password:
+    external: true
+    name: guesssenpai_postgres_password_v1
+  database_url:
+    external: true
+    name: guesssenpai_database_url_v1
+  session_secret:
+    external: true
+    name: guesssenpai_session_secret_v1
+  anilist_client_id:
+    external: true
+    name: guesssenpai_anilist_client_id_v1
+  anilist_client_secret:
+    external: true
+    name: guesssenpai_anilist_client_secret_v1

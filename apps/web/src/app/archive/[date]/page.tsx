@@ -10,7 +10,7 @@ const API_BASE =
   "http://localhost:8000";
 
 interface Props {
-  params: { date: string };
+  params: Promise<{ date: string }>;
 }
 
 function formatDate(date: string): string {
@@ -31,7 +31,7 @@ async function fetchArchivedPuzzle(
   date: string,
 ): Promise<DailyPuzzleResponse | null> {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("guesssenpai_session");
     const headers = sessionCookie
       ? { cookie: `guesssenpai_session=${sessionCookie.value}` }
@@ -51,7 +51,7 @@ async function fetchArchivedPuzzle(
 }
 
 export default async function ArchivePage({ params }: Props) {
-  const { date } = params;
+  const { date } = await params;
   const data = await fetchArchivedPuzzle(date);
   const formattedDate = formatDate(date);
   const archiveHref = `/archive?selected=${encodeURIComponent(date)}`;
