@@ -6,7 +6,11 @@ import { PropsWithChildren, ReactNode } from "react";
 
 import { useCelebration } from "../../hooks/useCelebration";
 
-export type GameProgressStatus = "not-started" | "in-progress" | "completed";
+export type GameProgressStatus =
+  | "not-started"
+  | "in-progress"
+  | "completed"
+  | "exhausted";
 
 interface GamePreviewCardProps {
   slug: string;
@@ -15,7 +19,8 @@ interface GamePreviewCardProps {
   status: GameProgressStatus;
   statusLabel: string;
   statusIcon: string;
-  accentColor: string;
+  /** Retained for API compatibility; matte cards no longer render accent glows. */
+  accentColor?: string;
   ctaLabel: string;
   href: string;
   index: number;
@@ -23,27 +28,36 @@ interface GamePreviewCardProps {
 }
 
 const STATUS_TONES: Record<GameProgressStatus, string> = {
-  "not-started": "text-neutral-300",
-  "in-progress": "text-amber-200",
-  completed: "text-emerald-200",
+  "not-started": "text-[#c1c2bd]",
+  "in-progress": "text-[#f2c36b]",
+  completed: "text-[#9fd8b0]",
+  exhausted: "text-[#ff987f]",
 };
 
 const STATUS_OUTLINES: Record<GameProgressStatus, string> = {
-  "not-started": "border-white/15 bg-white/5",
-  "in-progress": "border-amber-300/40 bg-amber-500/15",
-  completed: "border-emerald-300/50 bg-emerald-500/15",
+  "not-started": "border-[#686b6d] bg-[#2c2f31]",
+  "in-progress": "border-[#f2c36b] bg-[#2c2f31]",
+  completed: "border-[#9fd8b0] bg-[#2c2f31]",
+  exhausted: "border-[#ff987f] bg-[#2c2f31]",
+};
+
+const STATUS_FOOTNOTES: Record<GameProgressStatus, string> = {
+  completed: "You cleared every round.",
+  exhausted: "Out of guesses. The answer is revealed.",
+  "in-progress": "We saved your latest hint.",
+  "not-started": "Open the puzzle to reveal the first clue.",
 };
 
 function PreviewPanel({ children }: PropsWithChildren) {
   if (!children) {
     return (
-      <p className="text-sm text-neutral-300/90">
+      <p className="text-sm text-[#c1c2bd]">
         First-round hints unlock as soon as you start playing.
       </p>
     );
   }
 
-  return <div className="space-y-3 text-sm text-neutral-100/90">{children}</div>;
+  return <div className="space-y-3 text-sm text-[#f4f0e7]">{children}</div>;
 }
 
 export function GamePreviewCard({
@@ -53,7 +67,6 @@ export function GamePreviewCard({
   status,
   statusLabel,
   statusIcon,
-  accentColor,
   ctaLabel,
   href,
   index,
@@ -64,23 +77,19 @@ export function GamePreviewCard({
   return (
     <motion.li
       layout
-      initial={{ opacity: 0, y: 28 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -24 }}
-      transition={{ duration: 0.45, delay: index * 0.06, ease: [0.25, 0.1, 0.25, 1] }}
+      exit={{ opacity: 0, y: -12 }}
+      transition={{ duration: 0.25, delay: index * 0.04, ease: "easeOut" }}
       className="relative pl-10 sm:pl-14"
     >
       <motion.span
         layout
-        className={`absolute left-[0.35rem] top-6 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full text-base font-semibold text-white shadow-[0_0_12px_rgba(59,130,246,0.4)] ${STATUS_OUTLINES[status]}`}
-        animate={
-          isCelebrating
-            ? { scale: [1, 1.18, 1], rotate: [0, -3, 3, 0] }
-            : { scale: 1, rotate: 0 }
-        }
+        className={`absolute left-[0.35rem] top-6 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border text-base font-semibold text-[#f4f0e7] ${STATUS_OUTLINES[status]}`}
+        animate={isCelebrating ? { scale: [1, 1.12, 1] } : { scale: 1 }}
         transition={{
-          duration: isCelebrating ? 1.2 : 0.4,
-          repeat: isCelebrating ? 2 : 0,
+          duration: isCelebrating ? 0.8 : 0.3,
+          repeat: isCelebrating ? 1 : 0,
           ease: "easeInOut",
         }}
         aria-hidden
@@ -90,32 +99,29 @@ export function GamePreviewCard({
 
       <motion.div
         layout
-        className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-5 shadow-ambient transition focus-within:border-white/30 focus-within:shadow-glow sm:p-6 ${
-          isCelebrating ? "border-emerald-300/60 shadow-glow" : "hover:border-white/20"
+        className={`relative overflow-hidden rounded-lg border bg-[#242628] p-5 transition-colors focus-within:border-[#ff987f] sm:p-6 ${
+          isCelebrating
+            ? "border-[#9fd8b0]"
+            : "border-[#484b4d] hover:border-[#686b6d]"
         }`}
       >
-        <div
-          aria-hidden
-          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentColor} opacity-0 transition duration-500 ${
-            isCelebrating ? "opacity-40" : "group-hover:opacity-25"
-          }`}
-        />
-
-        <div className="relative z-10 space-y-4">
+        <div className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.28em] text-neutral-300">
-                <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[0.6rem] text-neutral-200/90">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#c1c2bd]">
+                <span className="rounded-md border border-[#484b4d] bg-[#2c2f31] px-2 py-1 text-[0.7rem] text-[#f4f0e7]">
                   Daily puzzle
                 </span>
                 <span className={STATUS_TONES[status]}>{statusLabel}</span>
               </div>
               <div className="space-y-2">
-                <h2 className="text-xl font-display font-semibold tracking-tight text-white sm:text-2xl">
+                <h2 className="font-display text-xl font-semibold tracking-tight text-[#f4f0e7] sm:text-2xl">
                   {title}
                 </h2>
                 {description ? (
-                  <p className="text-sm leading-relaxed text-neutral-200/90">{description}</p>
+                  <p className="text-sm leading-relaxed text-[#c1c2bd]">
+                    {description}
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -127,10 +133,10 @@ export function GamePreviewCard({
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.4 }}
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-300/50 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                  transition={{ duration: 0.3 }}
+                  className="inline-flex items-center gap-2 rounded-md border border-[#9fd8b0] bg-[#2c2f31] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#9fd8b0]"
                 >
-                  🎉 Streak saved!
+                  Streak saved
                 </motion.span>
               ) : null}
             </AnimatePresence>
@@ -139,18 +145,9 @@ export function GamePreviewCard({
           <PreviewPanel>{preview}</PreviewPanel>
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs uppercase tracking-[0.3em] text-neutral-400">
-              {status === "completed"
-                ? "You cleared every round."
-                : status === "in-progress"
-                  ? "We saved your latest hint."
-                  : "Tap in to reveal the first clue."}
-            </p>
+            <p className="text-sm text-[#c1c2bd]">{STATUS_FOOTNOTES[status]}</p>
 
-            <Link
-              href={href}
-              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-            >
+            <Link href={href} className="button button-primary">
               {ctaLabel}
             </Link>
           </div>
@@ -159,4 +156,3 @@ export function GamePreviewCard({
     </motion.li>
   );
 }
-

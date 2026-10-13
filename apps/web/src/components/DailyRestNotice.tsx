@@ -7,29 +7,30 @@ export function DailyRestNotice(): JSX.Element {
         <h3 className="text-lg font-semibold text-white">
           Today's lineup is complete
         </h3>
-        <p className="text-sm text-neutral-300/90">
+        <p className="text-sm text-[#c1c2bd]">
           Fresh rounds unlock with the daily reset—check back tomorrow for more.
         </p>
       </div>
       <article className="relative flex">
-        <div className="relative flex h-full w-full flex-col gap-6 overflow-hidden rounded-4xl border border-white/10 bg-surface-raised/70 p-8 text-white shadow-ambient backdrop-blur-2xl">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/5 via-brand-500/10 to-purple-500/10 mix-blend-screen" aria-hidden />
+        <div className="relative flex h-full w-full flex-col gap-6 overflow-hidden rounded-lg border border-[#484b4d] bg-surface-raised p-8 text-white">
           <div className="relative z-10 flex min-h-[18rem] flex-col gap-6">
             <div className="space-y-4">
-              <span className="inline-flex w-fit items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white/80">
+              <span className="inline-flex w-fit items-center gap-2 rounded-lg border border-[#686b6d] bg-[#2c2f31] px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#f4f0e7]">
                 Daily rest
               </span>
               <h4 className="text-2xl font-display font-semibold tracking-tight text-white">
                 We're buttoning up today's show
               </h4>
-              <p className="max-w-xl text-sm leading-relaxed text-neutral-100/85 sm:text-base">
-                Every puzzle in today's schedule has wrapped. Swing back tomorrow for a brand-new lineup, or keep the momentum going by replaying past challenges in the archive.
+              <p className="max-w-xl text-sm leading-relaxed text-[#f4f0e7] sm:text-base">
+                Every puzzle in today's schedule has wrapped. Swing back
+                tomorrow for a brand-new lineup, or keep the momentum going by
+                replaying past challenges in the archive.
               </p>
             </div>
             <div className="mt-auto">
               <Link
                 href="/archive"
-                className="group inline-flex items-center gap-2 rounded-3xl border border-white/15 bg-white/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.24em] text-white/85 transition hover:border-white/25 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+                className="group inline-flex items-center gap-2 rounded-lg border border-[#686b6d] bg-[#2c2f31] px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.24em] text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
               >
                 Browse the archive
                 <svg

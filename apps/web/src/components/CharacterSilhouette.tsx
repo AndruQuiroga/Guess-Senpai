@@ -122,7 +122,8 @@ export default function CharacterSilhouette({
       if (!animeGuess || !characterGuess) {
         setEntryFeedback(roundIndex, entryIndex, {
           type: "error",
-          message: "Provide both the anime title and character name to continue.",
+          message:
+            "Provide both the anime title and character name to continue.",
         });
         return;
       }
@@ -131,10 +132,15 @@ export default function CharacterSilhouette({
       setEntryFeedback(roundIndex, entryIndex, null);
 
       try {
-        const result = await verifyGuess(mediaId, animeGuess, selection.suggestionId, {
-          characterGuess,
-          characterId: entryData.character.id,
-        });
+        const result = await verifyGuess(
+          mediaId,
+          animeGuess,
+          selection.suggestionId,
+          {
+            characterGuess,
+            characterId: entryData.character.id,
+          },
+        );
 
         applyGuessResult(roundIndex, entryIndex, {
           anime: animeGuess,
@@ -147,11 +153,13 @@ export default function CharacterSilhouette({
                 ? null
                 : false,
           resolvedAnime: result.animeMatch
-            ? result.match ?? entryData.animeAnswer ?? animeGuess
+            ? (result.match ?? entryData.animeAnswer ?? animeGuess)
             : undefined,
           resolvedCharacter:
             result.characterMatch === true
-              ? result.characterName ?? entryData.characterAnswer ?? characterGuess
+              ? (result.characterName ??
+                entryData.characterAnswer ??
+                characterGuess)
               : undefined,
         });
       } catch (error) {
@@ -166,7 +174,14 @@ export default function CharacterSilhouette({
         setEntrySubmitting(roundIndex, entryIndex, false);
       }
     },
-    [applyGuessResult, mediaId, rounds, roundsData, setEntryFeedback, setEntrySubmitting],
+    [
+      applyGuessResult,
+      mediaId,
+      rounds,
+      roundsData,
+      setEntryFeedback,
+      setEntrySubmitting,
+    ],
   );
 
   const handleRoundSummaryContinue = useCallback(() => {
@@ -176,14 +191,20 @@ export default function CharacterSilhouette({
     if (summaryRoundIndex < totalRounds - 1) {
       setActiveRoundIndex(nextIndex);
     }
-  }, [setActiveRoundIndex, setSummaryRoundIndex, summaryRoundIndex, totalRounds]);
+  }, [
+    setActiveRoundIndex,
+    setSummaryRoundIndex,
+    summaryRoundIndex,
+    totalRounds,
+  ]);
 
-  const roundHeadline = activeRoundState?.label ?? `Round ${activeRoundIndex + 1}`;
+  const roundHeadline =
+    activeRoundState?.label ?? `Round ${activeRoundIndex + 1}`;
   const roundDescription = activeRoundState?.description ?? null;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/6 p-5 shadow-[0_12px_40px_rgba(13,14,29,0.35)] backdrop-blur-xl">
+      <div className="flex flex-col gap-4 rounded-lg border border-[#686b6d] bg-[#2c2f31] p-5  ">
         <div className="flex flex-wrap items-center gap-3">
           {rounds.map((round, index) => {
             const isActive = index === activeRoundIndex;
@@ -197,18 +218,20 @@ export default function CharacterSilhouette({
                 onClick={() => !isDisabled && setActiveRoundIndex(index)}
                 disabled={isDisabled}
                 className={[
-                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                  "inline-flex items-center gap-2 min-h-11 rounded-md border px-3 py-1.5 text-sm font-semibold transition",
                   isActive
-                    ? "border-brand-300 bg-brand-500/20 text-brand-100 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
+                    ? "border-[#ff7658] bg-[#352c28] text-[#f4f0e7] "
                     : isCompleted
-                      ? "border-emerald-300/60 bg-emerald-500/15 text-emerald-100"
-                      : "border-white/15 bg-white/10 text-white/80 hover:border-brand-300/60 hover:text-white",
+                      ? "border-[#3f8a5f] bg-[#1f3a2c] text-emerald-100"
+                      : "border-[#686b6d] bg-[#2c2f31] text-[#f4f0e7] hover:border-[#ff7658] hover:text-white",
                   isDisabled ? "cursor-not-allowed opacity-50" : "",
                 ].join(" ")}
               >
                 <span>{label}</span>
                 {isCompleted ? (
-                  <span aria-hidden className="text-[0.65rem]">✓</span>
+                  <span aria-hidden className="text-sm">
+                    ✓
+                  </span>
                 ) : null}
               </button>
             );
@@ -217,28 +240,35 @@ export default function CharacterSilhouette({
 
         <div className="grid gap-4 text-white sm:grid-cols-2">
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/60">Characters solved</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-[#c1c2bd]">
+              Characters solved
+            </p>
             <p className="text-2xl font-display font-semibold">
               {totalSolved} / {totalEntries}
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.24em] text-white/60">Current stage</p>
-            <p className="text-sm text-white/80">
+            <p className="text-sm uppercase tracking-[0.24em] text-[#c1c2bd]">
+              Current stage
+            </p>
+            <p className="text-sm text-[#f4f0e7]">
               Round {activeRoundIndex + 1} of {totalRounds}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/10 bg-white/4 p-6 shadow-ambient backdrop-blur-xl">
+      <div className="rounded-lg border border-[#686b6d] bg-[#2c2f31] p-6  ">
         <div className="mb-6 space-y-2">
-          <h3 className="text-xl font-display font-semibold text-white">{roundHeadline}</h3>
+          <h3 className="text-xl font-display font-semibold text-white">
+            {roundHeadline}
+          </h3>
           {roundDescription ? (
-            <p className="text-sm text-white/75">{roundDescription}</p>
+            <p className="text-sm text-[#f4f0e7]">{roundDescription}</p>
           ) : (
-            <p className="text-sm text-white/70">
-              Match each silhouette to the correct character and anime to reveal the lineup.
+            <p className="text-sm text-[#f4f0e7]">
+              Match each silhouette to the correct character and anime to reveal
+              the lineup.
             </p>
           )}
         </div>
@@ -254,10 +284,19 @@ export default function CharacterSilhouette({
                 roundIndex={activeRoundIndex}
                 entry={entry}
                 state={state}
-                onAnimeChange={(value) => handleAnimeChange(activeRoundIndex, index, value)}
-                onCharacterChange={(value) => handleCharacterChange(activeRoundIndex, index, value)}
+                onAnimeChange={(value) =>
+                  handleAnimeChange(activeRoundIndex, index, value)
+                }
+                onCharacterChange={(value) =>
+                  handleCharacterChange(activeRoundIndex, index, value)
+                }
                 onSubmit={(selection, characterValue) =>
-                  handleSubmitGuess(activeRoundIndex, index, selection, characterValue)
+                  handleSubmitGuess(
+                    activeRoundIndex,
+                    index,
+                    selection,
+                    characterValue,
+                  )
                 }
                 onValidationError={(feedback) =>
                   handleValidationError(activeRoundIndex, index, feedback)
@@ -288,4 +327,3 @@ export default function CharacterSilhouette({
     </div>
   );
 }
-

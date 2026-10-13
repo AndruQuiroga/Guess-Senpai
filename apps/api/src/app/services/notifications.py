@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -177,7 +177,7 @@ async def dispatch_daily_notifications(puzzle_date: Optional[date] = None) -> No
         return result
 
     cache = await get_cache(settings.redis_url)
-    target_date = puzzle_date or date.today()
+    target_date = puzzle_date or datetime.now(timezone.utc).date()
     last_dispatched = await cache.get(LAST_DISPATCH_KEY)
     if isinstance(last_dispatched, str) and last_dispatched == target_date.isoformat():
         result.skipped = True

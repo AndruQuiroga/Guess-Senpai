@@ -38,7 +38,7 @@ describe("GuessOpening autocomplete", () => {
     vi.clearAllMocks();
   });
 
-  it("submits the highlighted suggestion when confirming with enter", async () => {
+  it("selects the highlighted suggestion, then submits with Enter", async () => {
     const payload: GuessOpeningRound = {
       order: 1,
       mediaId: 84,
@@ -78,6 +78,9 @@ describe("GuessOpening autocomplete", () => {
     });
     expect(option).toHaveAttribute("aria-selected", "true");
 
+    await user.keyboard("{Enter}");
+    expect(input).toHaveValue("Neon Genesis Evangelion");
+    expect(verifyGuessMock).not.toHaveBeenCalled();
     await user.keyboard("{Enter}");
 
     await waitFor(() => {

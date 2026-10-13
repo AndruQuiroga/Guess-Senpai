@@ -27,28 +27,28 @@ export function UpcomingTimeline({
     <section className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.32em] text-neutral-200">
+          <span className="text-xs font-semibold uppercase tracking-[0.32em] text-[#c1c2bd]">
             Upcoming lineup
           </span>
           <span aria-hidden className="hidden text-neutral-500 sm:inline">
             •
           </span>
-          <span className="text-sm text-neutral-300/90">
-            Stay ahead with what unlocks next.
+          <span className="text-sm text-[#c1c2bd]">
+            Other modes and their current availability.
           </span>
         </div>
         {statusUnavailable ? (
           <div className="flex items-center gap-3 text-xs text-amber-100">
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-500/10 px-3 py-1 font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#c9a13e] bg-[#3d3220] px-3 py-1 font-medium">
               <span aria-hidden>⚠️</span>
-              Status unavailable
+              Opening mode status unavailable
             </span>
             {onRetry ? (
               <button
                 type="button"
                 onClick={onRetry}
                 disabled={availabilityLoading}
-                className="inline-flex items-center gap-2 rounded-full border border-amber-300/60 bg-transparent px-3 py-1 font-semibold uppercase tracking-[0.18em] text-amber-100 transition hover:border-amber-200/70 hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+                className="inline-flex items-center gap-2 rounded-full border border-[#c9a13e] bg-transparent px-3 py-1 font-semibold uppercase tracking-[0.18em] text-amber-100 transition hover:border-[#c9a13e] hover:text-amber-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
               >
                 Retry
               </button>
@@ -72,11 +72,11 @@ export function UpcomingTimeline({
             : undefined;
 
           const content = (
-            <div className="flex min-w-[200px] shrink-0 flex-col gap-1 rounded-2xl border border-white/15 bg-white/[0.07] px-4 py-3 text-left shadow-[0_20px_35px_-24px_rgba(15,118,110,0.6)] transition hover:border-white/25 hover:bg-white/[0.12] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70">
-              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
+            <div className="flex min-w-[200px] shrink-0 flex-col gap-1 rounded-lg border border-[#686b6d] bg-[#2c2f31] px-4 py-3 text-left transition hover:border-[#686b6d] hover:bg-white/[0.12] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70">
+              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f4f0e7]">
                 {game.title}
               </span>
-              <span className="text-sm text-neutral-200">{unlockNote}</span>
+              <span className="text-sm text-[#c1c2bd]">{unlockNote}</span>
             </div>
           );
 

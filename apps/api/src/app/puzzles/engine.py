@@ -10,14 +10,17 @@ import math
 import random
 import re
 from dataclasses import asdict, dataclass
-from datetime import date
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, List, Optional, Sequence, Tuple
 
 import httpx
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
+from ..db.models import DailyPuzzleSet
 from ..services import animethemes, anilist, character_index, character_pool, title_index
 from ..services.anilist import CoverImage, Media, MediaCharacterEdge, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
@@ -29,6 +32,7 @@ from ..services.preferences import load_user_preferences
 from .models import (
     AnidleGame,
     AnidleHints,
+    AnidleRules,
     AnidlePuzzleBundle,
     CharacterGuessEntry,
     CharacterGuessReveal,
@@ -263,7 +267,10 @@ def _build_anidle(media: Media) -> AnidleGame:
         average_score=media.averageScore,
         synopsis=_build_anidle_synopsis(media),
     )
-    return AnidleGame(spec=ANIDLE_ROUNDS, answer=_choose_answer(media), hints=hints)
+    return AnidleGame(
+        spec=[RoundSpec(difficulty=1, hints=["synopsis"])],
+        answer=_choose_answer(media), hints=hints, rules=AnidleRules(),
+    )
 
 
 def _offset_from_digest(digest: bytes, index: int, margin: float) -> tuple[float, float]:
@@ -1104,7 +1111,7 @@ async def _assemble_daily_puzzle(
 
     poster_candidates = _select_poster_candidates(
         day=day,
-        pool=pool,
+        pool=[media for media in pool if media.id not in selected_ids] or pool,
         required=max(1, len(POSTER_ROUNDS))
         if POSTER_ROUNDS
         else 1,
@@ -1292,6 +1299,10 @@ async def _assemble_daily_puzzle(
 
     return DailyPuzzleResponse(
         date=day,
+        puzzle_id=f"daily:{day.isoformat()}",
+        rules_version="2",
+        reset_at=datetime.combine(day + timedelta(days=1), time.min, tzinfo=timezone.utc),
+        available_modes=["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"] + (["guess_the_opening"] if guess_opening_enabled else []),
         games=games,
         guess_the_opening_enabled=guess_opening_enabled,
     )
@@ -1303,17 +1314,55 @@ async def get_daily_puzzle(
     user: Optional[UserContext] = None,
     include_guess_opening: bool = False,
 ) -> DailyPuzzleResponse:
+    if day > datetime.now(timezone.utc).date():
+        raise ValueError("Daily puzzles cannot be published for a future UTC date")
+    # The date is the publication key. Personal lists and account identity are
+    # deliberately excluded so every player sees the same immutable set.
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        published = await session.get(DailyPuzzleSet, day)
+        if published is not None:
+            return _daily_response(published)
+    if day < datetime.now(timezone.utc).date():
+        raise LookupError(f"No published daily puzzle exists for {day.isoformat()}")
+
     cache = await _get_cache()
-    cache_key = _puzzle_cache_key(day, user, include_guess_opening)
+    generated = await _assemble_daily_puzzle(
+        day, user=None, include_guess_opening=include_guess_opening, cache=cache
+    )
+    modes = ["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"]
+    if generated.guess_the_opening_enabled:
+        modes.append("guess_the_opening")
+    reset_at = datetime.combine(day + timedelta(days=1), time.min, tzinfo=timezone.utc)
+    stored = DailyPuzzleSet(
+        puzzle_date=day,
+        reset_at=reset_at,
+        rules_version="2",
+        content=generated.model_dump(mode="json", exclude={"puzzle_id", "rules_version", "reset_at", "available_modes", "mode_puzzle_ids"}),
+        available_modes=modes,
+    )
+    async with session_factory() as session:
+        session.add(stored)
+        try:
+            await session.commit()
+        except IntegrityError:
+            # A parallel request published first; use its winning snapshot.
+            await session.rollback()
+    async with session_factory() as session:
+        published = await session.get(DailyPuzzleSet, day)
+        if published is None:
+            raise RuntimeError("Daily puzzle publication did not persist")
+        return _daily_response(published)
 
-    async def creator() -> dict:
-        puzzle = await _assemble_daily_puzzle(
-            day,
-            user=user,
-            include_guess_opening=include_guess_opening,
-            cache=cache,
-        )
-        return puzzle.model_dump(mode="json")
 
-    payload = await cache.remember(cache_key, settings.puzzle_cache_ttl_seconds, creator)
-    return DailyPuzzleResponse.model_validate(payload)
+def _daily_response(row: DailyPuzzleSet) -> DailyPuzzleResponse:
+    content = dict(row.content)
+    modes = list(row.available_modes)
+    return DailyPuzzleResponse.model_validate({
+        **content,
+        "puzzle_id": f"daily:{row.puzzle_date.isoformat()}",
+        "rules_version": row.rules_version,
+        "reset_at": row.reset_at,
+        "available_modes": modes,
+        "mode_puzzle_ids": {mode: f"daily:{row.puzzle_date.isoformat()}:{mode}:v{row.rules_version}" for mode in modes},
+    })

@@ -32,7 +32,7 @@ export function DailyResetTimer({
             return (
               <span
                 key={`separator-${index}`}
-                className="px-1 text-3xl font-bold text-white/80 sm:text-4xl md:text-5xl"
+                className="px-1 text-3xl font-bold text-[#f4f0e7] sm:text-4xl md:text-5xl"
                 aria-hidden
               >
                 {char}
@@ -43,14 +43,14 @@ export function DailyResetTimer({
           return (
             <span
               key={`segment-${index}`}
-              className="inline-flex min-w-[2.25rem] items-center justify-center rounded-xl bg-white/10 px-2 py-3 font-mono text-3xl font-semibold tracking-[0.2em] text-white shadow-inner transition sm:min-w-[2.75rem] sm:text-4xl md:min-w-[3rem] md:text-5xl"
+              className="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg bg-[#2c2f31] px-2 py-3 font-mono text-3xl font-semibold tracking-[0.2em] text-white transition sm:min-w-[2.75rem] sm:text-4xl md:min-w-[3rem] md:text-5xl"
             >
               {char}
             </span>
           );
         })}
       </div>
-      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-white/60">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#c1c2bd]">
         Resets at 00:00 UTC
       </p>
     </div>

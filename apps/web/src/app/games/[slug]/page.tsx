@@ -4,8 +4,12 @@ import { notFound } from "next/navigation";
 
 import { PuzzleSlugContent } from "../../../components/puzzle-pages";
 import type { DailyPuzzleResponse } from "../../../types/puzzles";
-import { findPuzzleSlug, PUZZLE_SLUGS } from "./slugs";
+import { findPuzzleSlug } from "./slugs";
 import { PuzzleProgressProvider } from "../../../hooks/usePuzzleProgress";
+
+import { DailyRolloverNotice } from "../../../components/DailyRolloverNotice";
+
+export const dynamic = "force-dynamic";
 
 const API_BASE =
   process.env.API_BASE_URL ||
@@ -43,11 +47,8 @@ function formatDate(value: string) {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
-}
-
-export function generateStaticParams(): { slug: string }[] {
-  return PUZZLE_SLUGS.map(({ slug }) => ({ slug }));
 }
 
 export default async function PuzzleGamePage({
@@ -65,31 +66,25 @@ export default async function PuzzleGamePage({
   const formattedDate = data ? formatDate(data.date) : null;
 
   const pageContent = (
-    <div className="space-y-8">
-      <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl">
-        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-4">
+      <header className="border-b border-[#484b4d] pb-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <h1 className="text-2xl font-display font-semibold tracking-tight text-white drop-shadow-[0_0_12px_rgba(59,130,246,0.35)]">
+            <h1 className="text-2xl font-display font-semibold tracking-tight">
               {slugDefinition.title}
             </h1>
-            <p className="text-sm text-neutral-300">
+            <p className="text-sm text-[#c1c2bd]">
               Part of GuessSenpai Daily
               {formattedDate ? ` — ${formattedDate}` : ""}
             </p>
-            {slugDefinition.description ? (
-              <p className="text-sm text-neutral-200/90">{slugDefinition.description}</p>
-            ) : null}
           </div>
-          <Link
-            href="/games/daily"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm transition hover:bg-white/20"
-          >
-            ← Back to Daily
+          <Link href="/" className="button shrink-0 whitespace-nowrap">
+            ← Today
           </Link>
         </div>
       </header>
 
+      {data && <DailyRolloverNotice date={data.date} />}
       <PuzzleSlugContent data={data} slug={slugDefinition} />
     </div>
   );
@@ -99,7 +94,11 @@ export default async function PuzzleGamePage({
   }
 
   return (
-    <PuzzleProgressProvider date={data.date}>
+    <PuzzleProgressProvider
+      date={data.date}
+      puzzleId={data.puzzle_id}
+      rulesVersion={data.rules_version}
+    >
       {pageContent}
     </PuzzleProgressProvider>
   );

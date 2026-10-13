@@ -46,6 +46,8 @@ export interface ShareEventGame {
 export interface ShareEventData {
   schema: "guesssenpai.share.v1";
   date: string;
+  puzzleId?: string;
+  rulesVersion?: string;
   formattedDate: string;
   includeGuessTheOpening: boolean;
   games: ShareEventGame[];
@@ -62,6 +64,7 @@ export function formatShareDate(value: string): string {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -356,6 +359,7 @@ export function buildShareEvent(
 export function formatShareEventMessage(event: ShareEventData): string {
   const lines: string[] = [];
   lines.push(`GuessSenpai — ${event.formattedDate}`);
+  if (event.puzzleId) lines.push(`Puzzle ${event.puzzleId} · rules ${event.rulesVersion ?? "1"}`);
 
   event.games.forEach((game) => {
     lines.push(game.summary);

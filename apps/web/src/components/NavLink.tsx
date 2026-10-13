@@ -30,16 +30,21 @@ export default function NavLink({
     } else {
       isActive =
         currentPath === normalizedHref ||
-        (normalizedHref !== "/" && currentPath.startsWith(`${normalizedHref}/`));
+        (normalizedHref !== "/" &&
+          currentPath.startsWith(`${normalizedHref}/`));
     }
   }
 
   const baseClasses =
-    "inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300";
-  const activeClasses = "bg-white/20 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.18)]";
-  const inactiveClasses = "text-neutral-300 hover:bg-white/10 hover:text-white";
+    "inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-semibold transition";
+  const activeClasses = "bg-[#383a3c] text-[#f4f0e7]";
+  const inactiveClasses = "text-[#c1c2bd] hover:bg-[#2c2f31] hover:text-white";
 
-  const combinedClasses = [baseClasses, isActive ? activeClasses : inactiveClasses, className]
+  const combinedClasses = [
+    baseClasses,
+    isActive ? activeClasses : inactiveClasses,
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
 

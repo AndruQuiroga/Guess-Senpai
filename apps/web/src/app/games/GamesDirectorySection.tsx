@@ -22,7 +22,7 @@ export default function GamesDirectorySection() {
   const games = useRuntimeGamesDirectory();
   const [activeFilter, setActiveFilter] = useState<GameFilter>("all");
 
-  const counts = useMemo<Record<GameFilter, number>>( 
+  const counts = useMemo<Record<GameFilter, number>>(
     () => ({
       all: games.length,
       available: games.filter((game) => game.playable).length,
@@ -45,13 +45,13 @@ export default function GamesDirectorySection() {
               onClick={() => setActiveFilter(value)}
               className={`inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${
                 isActive
-                  ? "border-white/40 bg-white/15 text-white shadow-glow"
-                  : "border-white/10 bg-white/5 text-neutral-300 hover:border-white/20 hover:bg-white/10"
+                  ? "border-[#686b6d] bg-[#2c2f31] text-white"
+                  : "border-[#484b4d] bg-[#242628] text-[#c1c2bd] hover:border-[#686b6d] hover:bg-[#2c2f31]"
               }`}
             >
               <span className="flex items-center gap-1 uppercase tracking-[0.18em]">
                 {label}
-                <span className="text-xs text-neutral-200/80">({count})</span>
+                <span className="text-xs text-[#c1c2bd]">({count})</span>
               </span>
             </button>
           );

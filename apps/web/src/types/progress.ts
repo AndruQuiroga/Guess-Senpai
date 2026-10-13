@@ -35,6 +35,8 @@ export interface GameProgress {
   guesses: string[];
   rounds?: GameRoundProgress[];
   anidleHistory?: AnidleGuessHistoryEntry[];
+  /** Accepted-attempt budget (rules v2 Anidle); lets non-game views detect exhaustion. */
+  attemptLimit?: number;
 }
 
 export type DailyProgress = Partial<Record<GameKey, GameProgress>>;

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 import PosterZoom from "../PosterZoom";
+import type { GameProgress } from "../../hooks/usePuzzleProgress";
 import type { PosterZoomGame } from "../../types/puzzles";
 
 const useTitleSuggestionsMock = vi.hoisted(() => vi.fn());
@@ -39,9 +40,17 @@ describe("PosterZoom rounds", () => {
 
   it("steps through every round and submits combined season/year guesses", async () => {
     verifyGuessMock
-      .mockResolvedValueOnce({ correct: true, anime_match: true, match: "Naruto" })
+      .mockResolvedValueOnce({
+        correct: true,
+        anime_match: true,
+        match: "Naruto",
+      })
       .mockResolvedValueOnce({ correct: false, anime_match: false })
-      .mockResolvedValueOnce({ correct: true, anime_match: true, match: "Bleach" })
+      .mockResolvedValueOnce({
+        correct: true,
+        anime_match: true,
+        match: "Bleach",
+      })
       .mockResolvedValueOnce({
         correct: true,
         anime_match: true,
@@ -62,7 +71,12 @@ describe("PosterZoom rounds", () => {
           difficulty: 1,
           mediaId: 11,
           answer: "Naruto",
-          meta: { genres: ["Action"], year: 2002, season: "Spring", format: "TV" },
+          meta: {
+            genres: ["Action"],
+            year: 2002,
+            season: "Spring",
+            format: "TV",
+          },
           cropStages: [],
         },
         {
@@ -70,7 +84,12 @@ describe("PosterZoom rounds", () => {
           difficulty: 2,
           mediaId: 22,
           answer: "Bleach",
-          meta: { genres: ["Action"], year: 2004, season: "Fall", format: "TV" },
+          meta: {
+            genres: ["Action"],
+            year: 2004,
+            season: "Fall",
+            format: "TV",
+          },
           cropStages: [],
         },
         {
@@ -78,7 +97,12 @@ describe("PosterZoom rounds", () => {
           difficulty: 3,
           mediaId: 33,
           answer: "One Piece",
-          meta: { genres: ["Adventure"], year: 2010, season: "Spring", format: "TV" },
+          meta: {
+            genres: ["Adventure"],
+            year: 2010,
+            season: "Spring",
+            format: "TV",
+          },
           cropStages: [],
         },
       ],
@@ -88,10 +112,7 @@ describe("PosterZoom rounds", () => {
     const user = userEvent.setup();
 
     render(
-      <PosterZoom
-        payload={payload}
-        onProgressChange={onProgressChange}
-      />,
+      <PosterZoom payload={payload} onProgressChange={onProgressChange} />,
     );
 
     const input = screen.getByLabelText("Poster Zoom guess");
@@ -218,7 +239,12 @@ describe("PosterZoom rounds", () => {
           difficulty: 1,
           mediaId: 11,
           answer: "Naruto",
-          meta: { genres: ["Action"], year: 2002, season: "Spring", format: "TV" },
+          meta: {
+            genres: ["Action"],
+            year: 2002,
+            season: "Spring",
+            format: "TV",
+          },
           cropStages: [],
         },
         {
@@ -226,7 +252,12 @@ describe("PosterZoom rounds", () => {
           difficulty: 2,
           mediaId: 22,
           answer: "Bleach",
-          meta: { genres: ["Action"], year: 2004, season: "Fall", format: "TV" },
+          meta: {
+            genres: ["Action"],
+            year: 2004,
+            season: "Fall",
+            format: "TV",
+          },
           cropStages: [],
         },
         {
@@ -234,13 +265,18 @@ describe("PosterZoom rounds", () => {
           difficulty: 3,
           mediaId: 33,
           answer: "One Piece",
-          meta: { genres: ["Adventure"], year: 2010, season: "Spring", format: "TV" },
+          meta: {
+            genres: ["Adventure"],
+            year: 2010,
+            season: "Spring",
+            format: "TV",
+          },
           cropStages: [],
         },
       ],
     };
 
-    const initialProgress = {
+    const initialProgress: GameProgress = {
       completed: false,
       round: 3,
       guesses: ["Naruto", "Bleach"],
@@ -259,7 +295,8 @@ describe("PosterZoom rounds", () => {
           seasonYearGuess: 2002,
           mediaId: 11,
           posterImageBase: "http://localhost:8000/puzzles/poster/11/image",
-          posterImageUrl: "http://localhost:8000/puzzles/poster/11/image?hints=2",
+          posterImageUrl:
+            "http://localhost:8000/puzzles/poster/11/image?hints=2",
           feedbackType: "success",
           feedbackMessage: "Poster solved! Naruto",
         },
@@ -273,7 +310,8 @@ describe("PosterZoom rounds", () => {
           resolvedTitle: "Bleach",
           mediaId: 22,
           posterImageBase: "http://localhost:8000/puzzles/poster/22/image",
-          posterImageUrl: "http://localhost:8000/puzzles/poster/22/image?hints=2",
+          posterImageUrl:
+            "http://localhost:8000/puzzles/poster/22/image?hints=2",
           feedbackType: "success",
           feedbackMessage: "Poster solved! Bleach",
         },
@@ -287,12 +325,13 @@ describe("PosterZoom rounds", () => {
           hintUsed: true,
           seasonGuess: "SPRING",
           seasonYearGuess: 2010,
-          feedbackType: "partial",
+          feedbackType: "partial" as const,
           feedbackMessage: "Title correct! Check the release year.",
           resolvedTitle: "One Piece",
           mediaId: 33,
           posterImageBase: "http://localhost:8000/puzzles/poster/33/image",
-          posterImageUrl: "http://localhost:8000/puzzles/poster/33/image?hints=1",
+          posterImageUrl:
+            "http://localhost:8000/puzzles/poster/33/image?hints=1",
         },
       ],
     };

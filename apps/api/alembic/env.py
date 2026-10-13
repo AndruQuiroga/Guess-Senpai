@@ -4,7 +4,7 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import Column, MetaData, String, Table, pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -35,6 +35,14 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    # A historical revision ID exceeds Alembic's default VARCHAR(32). Preserve
+    # deployed revision IDs and widen the bookkeeping column before traversing it.
+    if connection.dialect.name == "postgresql":
+        version_table = Table("alembic_version", MetaData(),
+                              Column("version_num", String(128), primary_key=True))
+        version_table.create(connection, checkfirst=True)
+        connection.execute(text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)"))
+        connection.commit()
     context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
 
     with context.begin_transaction():

@@ -30,7 +30,10 @@ const STATUS_TONES: Record<RoundState, string> = {
 };
 
 function formatHintLabel(value: string) {
-  return HINT_LABELS[value] ?? value.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
+  return (
+    HINT_LABELS[value] ??
+    value.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase())
+  );
 }
 
 function normalizeSeason(value?: string | null): string | null {
@@ -45,7 +48,9 @@ function formatReleaseSummary(
   roundProgress: GameRoundProgress | undefined,
   round: PosterRound | undefined,
 ): string | null {
-  const season = normalizeSeason(roundProgress?.seasonGuess ?? round?.meta?.season ?? null);
+  const season = normalizeSeason(
+    roundProgress?.seasonGuess ?? round?.meta?.season ?? null,
+  );
   const resolvedYear =
     roundProgress?.resolvedYear ??
     roundProgress?.seasonYearGuess ??
@@ -66,7 +71,9 @@ function formatReleaseSummary(
   return null;
 }
 
-function formatAttemptSummary(roundProgress: GameRoundProgress | undefined): string | null {
+function formatAttemptSummary(
+  roundProgress: GameRoundProgress | undefined,
+): string | null {
   if (!roundProgress) return null;
   const titleAttemptsSource = Array.isArray(roundProgress.titleGuesses)
     ? roundProgress.titleGuesses
@@ -76,10 +83,14 @@ function formatAttemptSummary(roundProgress: GameRoundProgress | undefined): str
 
   const parts: string[] = [];
   if (titleAttempts > 0) {
-    parts.push(`${titleAttempts} title ${titleAttempts === 1 ? "guess" : "guesses"}`);
+    parts.push(
+      `${titleAttempts} title ${titleAttempts === 1 ? "guess" : "guesses"}`,
+    );
   }
   if (yearAttempts > 0) {
-    parts.push(`${yearAttempts} year ${yearAttempts === 1 ? "guess" : "guesses"}`);
+    parts.push(
+      `${yearAttempts} year ${yearAttempts === 1 ? "guess" : "guesses"}`,
+    );
   }
 
   return parts.length > 0 ? parts.join(" · ") : null;
@@ -137,7 +148,10 @@ function resolveRoundState(
   return "locked";
 }
 
-export function PosterZoomPreview({ bundle, progress }: PosterZoomPreviewProps) {
+export function PosterZoomPreview({
+  bundle,
+  progress,
+}: PosterZoomPreviewProps) {
   if (!bundle) return null;
 
   const puzzleRounds = bundle.puzzle.rounds ?? [];
@@ -151,11 +165,15 @@ export function PosterZoomPreview({ bundle, progress }: PosterZoomPreviewProps) 
     }
   });
 
-  const activeRound = determineActiveRound(totalRounds, progress, completedRounds);
+  const activeRound = determineActiveRound(
+    totalRounds,
+    progress,
+    completedRounds,
+  );
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-neutral-100/90">
+      <p className="text-sm text-[#f4f0e7]">
         Three posters per day. Clear each round to reveal its release details.
       </p>
 
@@ -165,26 +183,38 @@ export function PosterZoomPreview({ bundle, progress }: PosterZoomPreviewProps) 
           const roundProgress = roundProgressMap.get(roundNumber);
           const round = puzzleRounds[index];
           const hints = specRounds[index]?.hints ?? [];
-          const state = resolveRoundState(roundNumber, activeRound, completedRounds);
+          const state = resolveRoundState(
+            roundNumber,
+            activeRound,
+            completedRounds,
+          );
           const releaseSummary =
-            state === "cleared" ? formatReleaseSummary(roundProgress, round) : null;
+            state === "cleared"
+              ? formatReleaseSummary(roundProgress, round)
+              : null;
           const attemptSummary = formatAttemptSummary(roundProgress);
 
           return (
             <li
-              key={round ? `${round.mediaId}-${roundNumber}` : `round-${roundNumber}`}
-              className="rounded-2xl border border-white/10 bg-white/5 p-4"
+              key={
+                round
+                  ? `${round.mediaId}-${roundNumber}`
+                  : `round-${roundNumber}`
+              }
+              className="rounded-lg border border-[#484b4d] bg-[#242628] p-4"
             >
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.28em] text-neutral-300">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.28em] text-[#c1c2bd]">
                 <span>Poster {roundNumber}</span>
-                <span className={STATUS_TONES[state]}>{STATUS_LABELS[state]}</span>
+                <span className={STATUS_TONES[state]}>
+                  {STATUS_LABELS[state]}
+                </span>
               </div>
 
-              <div className="mt-3 space-y-2 text-xs text-neutral-300/90">
+              <div className="mt-3 space-y-2 text-xs text-[#c1c2bd]">
                 {releaseSummary ? (
-                  <p className="text-neutral-100/90">Release {releaseSummary}</p>
+                  <p className="text-[#f4f0e7]">Release {releaseSummary}</p>
                 ) : (
-                  <p className="text-neutral-300/80">
+                  <p className="text-[#c1c2bd]">
                     {state === "cleared"
                       ? "Release info unlocked."
                       : state === "active"
@@ -194,17 +224,17 @@ export function PosterZoomPreview({ bundle, progress }: PosterZoomPreviewProps) 
                 )}
 
                 {attemptSummary ? (
-                  <p className="text-[0.7rem] uppercase tracking-[0.24em] text-neutral-300/70">
+                  <p className="text-[0.7rem] uppercase tracking-[0.24em] text-[#c1c2bd]">
                     Attempts: {attemptSummary}
                   </p>
                 ) : null}
 
                 {hints.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-neutral-200/80">
+                  <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-[#c1c2bd]">
                     {hints.map((hint) => (
                       <span
                         key={hint}
-                        className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-semibold text-white/80"
+                        className="rounded-md border border-[#484b4d] bg-[#2c2f31] px-3 py-1 font-semibold text-[#f4f0e7]"
                       >
                         {formatHintLabel(hint)}
                       </span>
@@ -219,4 +249,3 @@ export function PosterZoomPreview({ bundle, progress }: PosterZoomPreviewProps) 
     </div>
   );
 }
-

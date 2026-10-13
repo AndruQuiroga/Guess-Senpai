@@ -14,13 +14,13 @@ export function LoginCallout({ className }: LoginCalloutProps): JSX.Element {
   return (
     <div
       className={classNames(
-        "w-full max-w-sm rounded-3xl border border-white/15 bg-white/5 p-5 text-white/90 shadow-ambient backdrop-blur-xl",
+        "w-full max-w-sm rounded-lg border border-[#686b6d] bg-[#242628] p-5 text-[#f4f0e7]",
         "flex flex-col gap-4",
         className,
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 text-lg text-white">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2c2f31] text-lg text-white">
           <svg
             aria-hidden
             viewBox="0 0 24 24"
@@ -39,15 +39,18 @@ export function LoginCallout({ className }: LoginCalloutProps): JSX.Element {
           </svg>
         </span>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-white/95">Sync your streaks</p>
-          <p className="text-xs leading-relaxed text-white/70">
-            Sign in with AniList to save completions and pick up right where you left off on any device.
+          <p className="text-sm font-semibold text-[#f4f0e7]">
+            Sync your streaks
+          </p>
+          <p className="text-xs leading-relaxed text-[#f4f0e7]">
+            Sign in with AniList to save completions and pick up right where you
+            left off on any device.
           </p>
         </div>
       </div>
       <Link
         href="/login"
-        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-500 via-purple-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:scale-[1.01] hover:shadow-[0_0_22px_rgba(147,51,234,0.3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#ff7658] bg-[#ff7658] hover:bg-[#ff8a70] px-4 py-2 text-sm font-semibold text-[#27110b] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
       >
         <span>Log in with AniList</span>
         <svg

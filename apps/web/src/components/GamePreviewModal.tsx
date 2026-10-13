@@ -8,6 +8,8 @@ import { createPortal } from "react-dom";
 import { GameDirectoryEntry, resolveGameAvailability } from "../config/games";
 import { useDailyAvailability } from "../hooks/useDailyAvailability";
 import { GameProgress } from "../types/progress";
+import { getGameOutcome } from "../utils/gameAction";
+import { Dialog } from "./ui/Primitives";
 
 type PrimaryAction = {
   label: string;
@@ -35,6 +37,7 @@ export function GamePreviewModal({
   const [rulesExpanded, setRulesExpanded] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const { guessTheOpeningEnabled, error, refresh, loading } =
     useDailyAvailability();
   const showAvailabilityError = error;
@@ -58,6 +61,15 @@ export function GamePreviewModal({
 
   useEffect(() => {
     if (!open) return;
+    openerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusTarget = closeButtonRef.current;
+    focusTarget?.focus({ preventScroll: true });
+    const mainContent = document.getElementById("main-content");
+    const wasInert = mainContent?.inert ?? false;
+    if (mainContent) mainContent.inert = true;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -83,7 +95,11 @@ export function GamePreviewModal({
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (mainContent) mainContent.inert = wasInert;
+      openerRef.current?.focus({ preventScroll: true });
+    };
   }, [open, onClose]);
 
   useEffect(() => {
@@ -113,9 +129,11 @@ export function GamePreviewModal({
     }
     return resolveGameAvailability(game, { guessTheOpeningEnabled });
   }, [game, guessTheOpeningEnabled]);
+  const availabilityErrorForGame =
+    showAvailabilityError && runtimeGame?.slug === "guess-the-opening";
 
   const primaryAction = useMemo<PrimaryAction | null>(() => {
-    if (!runtimeGame || showAvailabilityError) return null;
+    if (!runtimeGame || availabilityErrorForGame) return null;
     if (!runtimeGame.playable) {
       return {
         label: "Coming soon",
@@ -125,16 +143,20 @@ export function GamePreviewModal({
     }
 
     const href = `/games/${runtimeGame.slug}`;
-    if (progress?.completed) {
+    const outcome = getGameOutcome(progress);
+    if (outcome === "solved") {
       return { label: "View completed round", href, disabled: false };
+    }
+    if (outcome === "exhausted") {
+      return { label: "View results", href, disabled: false };
     }
     if (progress) {
       return { label: "Resume game", href, disabled: false };
     }
     return { label: "Start playing", href, disabled: false };
-  }, [progress, runtimeGame, showAvailabilityError]);
+  }, [availabilityErrorForGame, progress, runtimeGame]);
   const showDemoNotice =
-    runtimeGame?.playable && !progress && !showAvailabilityError;
+    runtimeGame?.playable && !progress && !availabilityErrorForGame;
 
   if (!mounted || !open || !runtimeGame) {
     return null;
@@ -153,22 +175,20 @@ export function GamePreviewModal({
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/75"
         onClick={handleBackdropClick}
       />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        className="relative z-10 w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/95 text-white shadow-ambient"
+      <Dialog
+        dialogRef={dialogRef}
+        labelledBy={titleId}
+        describedBy={descriptionId}
+        className="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto overscroll-contain rounded-lg border border-[#484b4d] bg-[#242628] text-white"
       >
         <button
           ref={closeButtonRef}
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#484b4d] bg-[#2c2f31] text-[#f4f0e7] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
           aria-label="Close preview"
         >
           <svg
@@ -188,7 +208,7 @@ export function GamePreviewModal({
         <div className="grid gap-6 p-6 sm:grid-cols-[1.1fr_0.9fr] sm:gap-8 sm:p-8">
           <div className="space-y-6">
             <section className="space-y-3">
-              <span className="inline-flex w-fit items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-neutral-200/80">
+              <span className="inline-flex w-fit items-center rounded-full border border-[#686b6d] bg-[#242628] px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-[#c1c2bd]">
                 {runtimeGame.playable
                   ? "Featured game"
                   : runtimeGame.comingSoon
@@ -208,15 +228,15 @@ export function GamePreviewModal({
               </div>
               <p
                 id={descriptionId}
-                className="text-base leading-relaxed text-neutral-200"
+                className="text-base leading-relaxed text-[#c1c2bd]"
               >
                 {runtimeGame.preview.summary}
               </p>
             </section>
 
-            <section className="space-y-3 border-t border-white/10 pt-6">
+            <section className="space-y-3 border-t border-[#484b4d] pt-6">
               <div className="flex items-start justify-between gap-4">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-300">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#c1c2bd]">
                   How to play
                 </h3>
                 {hasAdditionalRules ? (
@@ -224,7 +244,7 @@ export function GamePreviewModal({
                     type="button"
                     onClick={() => setRulesExpanded((current) => !current)}
                     aria-expanded={rulesExpanded}
-                    className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+                    className="text-xs font-semibold uppercase tracking-[0.28em] text-[#f4f0e7] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                   >
                     {rulesExpanded
                       ? "Hide details"
@@ -232,9 +252,9 @@ export function GamePreviewModal({
                   </button>
                 ) : null}
               </div>
-              <ul className="space-y-2 text-sm leading-relaxed text-neutral-200">
+              <ul className="space-y-2 text-sm leading-relaxed text-[#c1c2bd]">
                 {firstRule ? (
-                  <li className="relative rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-neutral-100/90">
+                  <li className="relative rounded-lg border border-[#484b4d] bg-[#242628] px-4 py-3 text-[#f4f0e7]">
                     {firstRule}
                   </li>
                 ) : null}
@@ -242,7 +262,7 @@ export function GamePreviewModal({
                   ? remainingRules.map((rule) => (
                       <li
                         key={rule}
-                        className="relative rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-neutral-100/90"
+                        className="relative rounded-lg border border-[#484b4d] bg-[#242628] px-4 py-3 text-[#f4f0e7]"
                       >
                         {rule}
                       </li>
@@ -251,10 +271,10 @@ export function GamePreviewModal({
               </ul>
             </section>
 
-            <section className="space-y-3 border-t border-white/10 pt-6">
-              {showAvailabilityError ? (
+            <section className="space-y-3 border-t border-[#484b4d] pt-6">
+              {availabilityErrorForGame ? (
                 <div className="space-y-3">
-                  <p className="inline-flex items-center gap-2 text-sm font-medium text-amber-200/90">
+                  <p className="inline-flex items-center gap-2 text-sm font-medium text-amber-200">
                     <span aria-hidden>⚠️</span>
                     <span>Unable to load today&apos;s availability.</span>
                   </p>
@@ -262,7 +282,7 @@ export function GamePreviewModal({
                     type="button"
                     onClick={handleRetry}
                     disabled={loading}
-                    className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:border-white/25 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center justify-center rounded-lg border border-[#686b6d] bg-[#242628] px-4 py-2 text-sm font-semibold text-[#f4f0e7] transition hover:border-[#686b6d] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Retry
                   </button>
@@ -271,25 +291,25 @@ export function GamePreviewModal({
                 primaryAction.href ? (
                   <Link
                     href={primaryAction.href}
-                    className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/25 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+                    className="inline-flex items-center justify-center rounded-lg border border-[#686b6d] bg-[#242628] px-4 py-2 text-sm font-semibold text-white transition hover:border-[#686b6d] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
                     onClick={onClose}
                   >
                     {primaryAction.label}
                   </Link>
                 ) : (
-                  <span className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/70">
+                  <span className="inline-flex items-center justify-center rounded-lg border border-[#686b6d] bg-[#242628] px-4 py-2 text-sm font-semibold text-[#f4f0e7]">
                     {primaryAction.label}
                   </span>
                 )
               ) : null}
-              {!showAvailabilityError && !runtimeGame.playable ? (
-                <p className="text-sm leading-relaxed text-neutral-300">
+              {!availabilityErrorForGame && !runtimeGame.playable ? (
+                <p className="text-sm leading-relaxed text-[#c1c2bd]">
                   We&apos;re polishing assets and gameplay details—thanks for
                   your patience!
                 </p>
               ) : null}
               {showDemoNotice ? (
-                <p className="text-sm leading-relaxed text-neutral-300">
+                <p className="text-sm leading-relaxed text-[#c1c2bd]">
                   This preview is a read-only demo. Start a round to track your
                   guesses.
                 </p>
@@ -297,7 +317,7 @@ export function GamePreviewModal({
             </section>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+          <div className="overflow-hidden rounded-lg border border-[#484b4d] bg-[#242628]">
             {media?.type === "image" ? (
               <Image
                 src={media.src}
@@ -319,18 +339,17 @@ export function GamePreviewModal({
               />
             ) : (
               <div
-                className={`relative flex h-full min-h-[220px] flex-col items-center justify-center gap-4 bg-gradient-to-br ${runtimeGame.accentColor} p-6 text-center`}
+                className={`relative flex h-full min-h-[220px] flex-col items-center justify-center gap-4 bg-[#2c2f31] p-6 text-center`}
               >
-                <div className="absolute inset-0 bg-black/10" aria-hidden />
                 <div className="relative z-10 space-y-3">
                   {placeholder?.icon ? (
                     <div className="text-4xl">{placeholder.icon}</div>
                   ) : null}
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f4f0e7]">
                       {placeholder?.headline ?? "Preview art coming soon"}
                     </p>
-                    <p className="text-sm text-white/80">
+                    <p className="text-sm text-[#f4f0e7]">
                       {placeholder?.description ??
                         "Concept visuals are in progress. Check back later!"}
                     </p>
@@ -340,7 +359,7 @@ export function GamePreviewModal({
             )}
           </div>
         </div>
-      </div>
+      </Dialog>
     </div>
   );
 

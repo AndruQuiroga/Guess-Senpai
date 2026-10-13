@@ -11,7 +11,9 @@ function formatLength(lengthSeconds?: number | null) {
   if (!lengthSeconds) return null;
   const minutes = Math.floor(lengthSeconds / 60);
   const seconds = lengthSeconds % 60;
-  return minutes > 0 ? `${minutes}m ${seconds.toString().padStart(2, "0")}s` : `${seconds}s`;
+  return minutes > 0
+    ? `${minutes}m ${seconds.toString().padStart(2, "0")}s`
+    : `${seconds}s`;
 }
 
 function collectRoundMetadata(round: GuessOpeningRound) {
@@ -51,30 +53,33 @@ export function GuessOpeningPreview({ bundle }: GuessOpeningPreviewProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-neutral-100/90">
-        Three openings per day. Clear all of them to lock in today&apos;s Guess the Opening win.
+      <p className="text-sm text-[#f4f0e7]">
+        Three openings per day. Clear all of them to lock in today&apos;s Guess
+        the Opening win.
       </p>
       <ul className="space-y-3">
         {rounds.map((round, index) => {
           const metadata = collectRoundMetadata(round);
           return (
             <li key={`${round.mediaId}-${index}`} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-neutral-300">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#c1c2bd]">
                 Opening {index + 1}
               </p>
               {metadata.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-neutral-200/80">
+                <div className="flex flex-wrap gap-1.5 text-[0.7rem] uppercase tracking-wide text-[#c1c2bd]">
                   {metadata.map((entry) => (
                     <span
                       key={entry}
-                      className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-semibold text-white/80"
+                      className="rounded-md border border-[#484b4d] bg-[#2c2f31] px-3 py-1 font-semibold text-[#f4f0e7]"
                     >
                       {entry}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-[0.72rem] text-neutral-400">Hints unlock as you progress.</p>
+                <p className="text-[0.72rem] text-neutral-400">
+                  Hints unlock as you progress.
+                </p>
               )}
             </li>
           );
@@ -83,4 +88,3 @@ export function GuessOpeningPreview({ bundle }: GuessOpeningPreviewProps) {
     </div>
   );
 }
-

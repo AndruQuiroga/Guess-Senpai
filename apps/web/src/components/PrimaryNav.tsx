@@ -47,12 +47,13 @@ export default function PrimaryNav({
     onMobileStateChange?.(isOpen);
   }, [isOpen, onMobileStateChange]);
 
+  const previousPathnameRef = useRef(pathname);
   useEffect(() => {
-    if (!isOpen) {
-      return;
+    if (previousPathnameRef.current !== pathname) {
+      previousPathnameRef.current = pathname;
+      close();
     }
-    close();
-  }, [pathname, isOpen, close]);
+  }, [pathname, close]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -128,20 +129,8 @@ export default function PrimaryNav({
     <>
       <nav className="hidden items-center gap-2 text-sm md:flex">
         <NavLink href="/" exact>
-          Home
+          Today
         </NavLink>
-        <NavLink href="/games/daily">Daily Challenge</NavLink>
-        <NavLink
-          href="/games"
-          isActive={(currentPathname) =>
-            currentPathname === "/games" ||
-            (currentPathname.startsWith("/games/") &&
-              !currentPathname.startsWith("/games/daily"))
-          }
-        >
-          Games
-        </NavLink>
-        <NavLink href="/how-to-play">How to Play</NavLink>
         <NavLink
           href={`/archive?selected=${encodeURIComponent(archiveDate)}`}
           isActive={(currentPathname) =>
@@ -154,7 +143,7 @@ export default function PrimaryNav({
         <AccountBadge />
       </nav>
 
-      <div className="md:hidden" aria-hidden={isOpen ? undefined : true}>
+      <div className="md:hidden" hidden={!isOpen}>
         <div
           className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-200 ${
             isOpen
@@ -171,7 +160,7 @@ export default function PrimaryNav({
           aria-modal="true"
           aria-labelledby={`${menuId}-heading`}
           tabIndex={-1}
-          className={`fixed inset-x-4 top-28 z-50 origin-top rounded-3xl border border-white/10 bg-neutral-900/95 p-6 shadow-2xl transition-all duration-200 ${
+          className={`fixed inset-x-4 top-20 z-50 max-h-[calc(100dvh-6rem)] origin-top overflow-y-auto rounded-lg border border-[#484b4d] bg-[#242628] p-5 transition-all duration-200 ${
             isOpen
               ? "pointer-events-auto translate-y-0 opacity-100"
               : "pointer-events-none -translate-y-4 opacity-0"
@@ -180,38 +169,21 @@ export default function PrimaryNav({
           <div className="mb-6 flex items-center justify-between">
             <h2
               id={`${menuId}-heading`}
-              className="text-sm font-semibold uppercase tracking-widest text-neutral-300"
+              className="text-sm font-semibold uppercase tracking-widest text-[#c1c2bd]"
             >
               Menu
             </h2>
             <button
               type="button"
               onClick={close}
-              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-wide text-neutral-200 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300"
+              className="inline-flex items-center justify-center rounded-full border border-[#484b4d] bg-[#242628] px-3 py-1 text-xs font-medium uppercase tracking-wide text-[#c1c2bd] transition hover:bg-[#2c2f31] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300"
             >
               Close
             </button>
           </div>
           <div className="flex flex-col gap-3 text-base">
             <NavLink href="/" exact className="justify-between">
-              Home
-            </NavLink>
-            <NavLink href="/games/daily" className="justify-between">
-              Daily Challenge
-            </NavLink>
-            <NavLink
-              href="/games"
-              className="justify-between"
-              isActive={(currentPathname) =>
-                currentPathname === "/games" ||
-                (currentPathname.startsWith("/games/") &&
-                  !currentPathname.startsWith("/games/daily"))
-              }
-            >
-              Games
-            </NavLink>
-            <NavLink href="/how-to-play" className="justify-between">
-              How to Play
+              Today
             </NavLink>
             <NavLink
               href={`/archive?selected=${encodeURIComponent(archiveDate)}`}

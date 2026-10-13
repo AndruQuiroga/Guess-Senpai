@@ -1,18 +1,1 @@
-<svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="120" y1="60" x2="820" y2="480" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#22d3ee" />
-      <stop offset="0.5" stop-color="#34d399" />
-      <stop offset="1" stop-color="#a3e635" />
-    </linearGradient>
-  </defs>
-  <rect width="960" height="540" rx="36" fill="url(#bg)" />
-  <rect x="150" y="120" width="660" height="320" rx="30" fill="rgba(15,23,42,0.65)" stroke="rgba(255,255,255,0.25)" stroke-width="2" />
-  <path d="M256 220C256 184 288 156 324 156H408V196H340C327 196 316 207 316 220V248H380V340H256V220Z" fill="#f0fdf4" fill-opacity="0.8" />
-  <path d="M704 220C704 184 672 156 636 156H552V196H620C633 196 644 207 644 220V248H580V340H704V220Z" fill="#ccfbf1" fill-opacity="0.8" />
-  <rect x="300" y="250" width="360" height="16" rx="8" fill="rgba(248, 250, 252, 0.35)" />
-  <rect x="320" y="286" width="320" height="12" rx="6" fill="rgba(248, 250, 252, 0.25)" />
-  <rect x="340" y="312" width="280" height="12" rx="6" fill="rgba(248, 250, 252, 0.2)" />
-  <circle cx="360" cy="192" r="22" fill="#f8fafc" fill-opacity="0.3" />
-  <circle cx="600" cy="192" r="22" fill="#f8fafc" fill-opacity="0.25" />
-</svg>
+<svg width="480" height="480" viewBox="0 0 480 480" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title"><title id="title">Quote Quiz: identify the anime from a quotation</title><rect width="480" height="480" rx="12" fill="#242628"/><path d="M32 64H448M32 416H448" stroke="#484b4d" stroke-width="2"/><text x="48" y="48" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#f4f0e7">REMEMBER THAT LINE?</text><rect x="64" y="107" width="352" height="237" rx="6" fill="#f4f0e7" stroke="#686b6d" stroke-width="2"/><path d="M104 183C104 158 115 144 141 143V157C126 158 122 165 122 178H141V215H104ZM160 183C160 158 171 144 197 143V157C182 158 178 165 178 178H197V215H160Z" fill="#ff7658"/><path d="M106 258H369M106 287H316" stroke="#484b4d" stroke-width="8" stroke-linecap="round"/><path d="M300 344V372L335 344" fill="#f4f0e7"/><text x="115" y="402" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="#f4f0e7">WORDS → ANIME</text></svg>

@@ -25,17 +25,17 @@ type TabDefinition = {
 
 function DefaultArchivePanel(): JSX.Element {
   return (
-    <div className="flex h-full flex-col justify-between gap-6 rounded-4xl border border-white/10 bg-white/5 p-8 text-neutral-100/90 shadow-ambient">
+    <div className="flex h-full flex-col justify-between gap-6 rounded-lg border border-[#484b4d] bg-[#242628] p-8 text-[#f4f0e7]">
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-white">
           Quick archive access
         </h3>
-        <p className="text-sm leading-relaxed text-neutral-300">
+        <p className="text-sm leading-relaxed text-[#c1c2bd]">
           Catch up on earlier lineups, revisit your favorite runs, or see what
           you missed. The archive keeps every daily drop ready for another
           play-through.
         </p>
-        <ul className="space-y-2 text-sm text-neutral-200">
+        <ul className="space-y-2 text-sm text-[#c1c2bd]">
           <li className="flex items-start gap-2">
             <span
               aria-hidden
@@ -57,7 +57,7 @@ function DefaultArchivePanel(): JSX.Element {
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/archive"
-          className="inline-flex items-center gap-2 rounded-3xl border border-white/20 bg-brand-500/90 px-5 py-2.5 text-sm font-semibold text-white transition hover:scale-[1.01] hover:border-white/40 hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/75"
+          className="inline-flex items-center gap-2 rounded-lg border border-[#686b6d] bg-[#ff7658] px-5 py-2.5 text-sm font-semibold text-[#27110b] transition hover:border-[#686b6d] hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/75"
         >
           Open archive
           <svg
@@ -70,7 +70,7 @@ function DefaultArchivePanel(): JSX.Element {
           </svg>
         </Link>
         <p className="text-xs uppercase tracking-[0.2em] text-neutral-400">
-          New sessions unlock every midnight PT
+          New daily puzzles unlock at midnight UTC
         </p>
       </div>
     </div>
@@ -114,10 +114,10 @@ export function HomeSectionsTabs({
               aria-controls={`${tabId}-panel`}
               onClick={() => setActiveTab(tab.id)}
               className={classNames(
-                "inline-flex items-center gap-2 rounded-3xl border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80",
+                "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80",
                 activeTab === tab.id
-                  ? "border-white/40 bg-white/15 text-white shadow-[0_12px_24px_-16px_rgba(236,72,153,0.55)]"
-                  : "border-white/10 bg-white/5 text-white/70 hover:border-white/25 hover:text-white",
+                  ? "border-[#686b6d] bg-[#2c2f31] text-white"
+                  : "border-[#484b4d] bg-[#242628] text-[#f4f0e7] hover:border-[#686b6d] hover:text-white",
               )}
             >
               {tab.label}

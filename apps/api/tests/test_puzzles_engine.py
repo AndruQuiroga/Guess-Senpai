@@ -3,10 +3,6 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, List
 
-import base64
-
-import cv2
-import numpy as np
 import pytest
 
 from app.puzzles import engine
@@ -35,6 +31,11 @@ from app.services.anilist import (
     MediaListEntry,
     Title,
 )
+
+
+@pytest.fixture(autouse=True)
+def disable_remote_opening_pool(monkeypatch):
+    monkeypatch.setattr(engine.settings, "guess_opening_pool_enabled", False)
 
 
 class DummyCache:
@@ -208,40 +209,9 @@ def test_character_guess_rounds_preserve_difficulty(monkeypatch: pytest.MonkeyPa
         assert len(round_payload.entries) == 4
         assert all(entry.reveal.label == config["label"] for entry in round_payload.entries)
 
-def test_generate_character_silhouette_cuts_background(monkeypatch: pytest.MonkeyPatch) -> None:
-    image = np.full((200, 200, 3), 255, dtype=np.uint8)
-    cv2.rectangle(image, (60, 40), (140, 180), (0, 0, 0), thickness=-1)
-    cv2.circle(image, (100, 70), 20, (0, 0, 255), thickness=-1)
-    success, encoded = cv2.imencode(".png", image)
-    assert success
-    payload = encoded.tobytes()
-
-    class DummyResponse:
-        status_code = 200
-
-        @staticmethod
-        def raise_for_status() -> None:
-            return None
-
-        @property
-        def content(self) -> bytes:
-            return payload
-
-    monkeypatch.setattr(engine.httpx, "get", lambda url, timeout=10.0: DummyResponse())
-
-    data_uri = engine._generate_character_silhouette("https://example.com/test.png")
-    assert data_uri is not None
-    header, encoded_image = data_uri.split(",", 1)
-    assert header == "data:image/png;base64"
-    result = cv2.imdecode(
-        np.frombuffer(base64.b64decode(encoded_image), dtype=np.uint8),
-        cv2.IMREAD_COLOR,
-    )
-    assert result is not None
-    assert result.shape[:2] == (200, 200)
-
-    assert result[0, 0].max() <= 5
-    assert int(result.sum()) > 0
+def test_character_game_rejects_missing_character_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(engine.character_pool, "build_round_pools", lambda *args, **kwargs: [])
+    assert engine._build_character_guess_game(make_media(91, "No cast")) is None
 
 
 def test_build_poster_bundle_without_cover_image() -> None:
@@ -316,6 +286,23 @@ def test_anidle_synopsis_uses_redacted_masking(monkeypatch: pytest.MonkeyPatch) 
     assert hints[1].text == "First Second [REDACTED]"
     assert hints[2].text == "First Second Third"
 
+
+def test_anidle_new_rules_and_legacy_payload_are_distinct() -> None:
+    from app.puzzles.models import AnidleGame
+
+    generated = engine._build_anidle(make_media(889, "Finite Daily"))
+    assert generated.rules is not None
+    assert generated.rules.version == "2"
+    assert generated.rules.max_attempts == 8
+    assert generated.rules.hint_after_incorrect == [2, 4, 6]
+    assert len(generated.spec) == 1
+    legacy_json = generated.model_dump(mode="json", exclude={"rules"})
+    legacy_json["spec"] = [spec.model_dump() for spec in engine.ANIDLE_ROUNDS]
+    legacy = AnidleGame.model_validate(legacy_json)
+    assert legacy.rules is None
+    assert len(legacy.spec) == 3
+    assert "rules" not in legacy_json
+
 @pytest.mark.asyncio
 async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPatch) -> None:
     day = date(2024, 1, 5)
@@ -324,6 +311,7 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
         make_media(202, "Beta"),
         make_media(303, "Gamma"),
         make_media(404, "Delta"),
+        *[make_media(800 + i, f"Extra {i}") for i in range(12)],
     ]
     media_by_id = {media.id: media for media in popular}
 
@@ -339,7 +327,7 @@ async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
     monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
     monkeypatch.setattr(engine, "_build_guess_opening_round", fake_build_guess_opening_round)
-    monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
+    monkeypatch.setattr(engine, "_build_character_guess_game", make_character_silhouette)
 
     cache = DummyCache()
     result = await engine._assemble_daily_puzzle(
@@ -410,7 +398,7 @@ async def test_daily_puzzle_poster_rounds_scale_difficulty(
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
     monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
     monkeypatch.setattr(engine, "_build_guess_opening_round", fake_build_guess_opening_round)
-    monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
+    monkeypatch.setattr(engine, "_build_character_guess_game", make_character_silhouette)
     monkeypatch.setattr(engine, "_select_poster_candidates", fake_select_poster_candidates)
 
     cache = DummyCache()
@@ -470,7 +458,7 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
     monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
     monkeypatch.setattr(engine, "_build_guess_opening_round", fake_build_guess_opening_round)
-    monkeypatch.setattr(engine, "_build_character_silhouette", make_character_silhouette)
+    monkeypatch.setattr(engine, "_build_character_guess_game", make_character_silhouette)
     monkeypatch.setattr(engine, "_record_recent_media", fake_record_recent_media)
     monkeypatch.setattr(engine, "_fetch_user_lists", fake_fetch_user_lists)
     monkeypatch.setattr(engine, "_get_recent_media", fake_get_recent_media)
@@ -503,7 +491,7 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
         assert attempts[-3:] == [round.mediaId for round in rounds]
 
     assert set(recorded) == set(bundle_ids)
-    assert len(recorded) == len(bundle_ids)
+    assert len(recorded) == len(set(bundle_ids))
     assert result.games.character_silhouette is not None
     assert result.games.guess_the_opening is not None
     assert len(attempts) >= 4

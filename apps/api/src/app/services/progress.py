@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List
 
+from sqlalchemy import text
+
 from ..core.config import settings
 from ..core.database import get_session_factory
 from ..puzzles.models import (
@@ -26,6 +28,8 @@ def _deserialize_progress(raw: Any) -> Dict[str, GameProgressPayload]:
     if not isinstance(raw, dict):
         return progress
     for key, value in raw.items():
+        if key.startswith("_"):
+            continue
         if not isinstance(value, dict):
             continue
         try:
@@ -57,6 +61,8 @@ def _deserialize_progress(raw: Any) -> Dict[str, GameProgressPayload]:
                 fallback_payload["anidleHistory"] = value.get("anidleHistory")
             elif "anidle_history" in value:
                 fallback_payload["anidleHistory"] = value.get("anidle_history")
+            if "attemptLimit" in value:
+                fallback_payload["attemptLimit"] = value.get("attemptLimit")
         try:
             progress[key] = GameProgressPayload.model_validate(fallback_payload)
         except Exception:
@@ -70,7 +76,7 @@ def _summarize_payload(payload: DailyProgressPayload) -> ProgressHistoryEntry:
     return ProgressHistoryEntry(date=payload.date, completed=completed, total=total)
 
 
-async def load_daily_progress(user_id: int, day: date) -> DailyProgressPayload:
+async def load_daily_progress(user_id: int, day: date, puzzle_id: str | None = None, rules_version: str | None = None) -> DailyProgressPayload:
     session_factory = get_session_factory()
     async with session_factory() as session:
         try:
@@ -79,38 +85,67 @@ async def load_daily_progress(user_id: int, day: date) -> DailyProgressPayload:
         except Exception:
             await session.rollback()
             raise
-    progress = _deserialize_progress(record.progress if record else {})
-    return DailyProgressPayload(date=day, progress=progress)
+    raw = record.progress if record else {}
+    if puzzle_id and isinstance(raw, dict) and raw.get("_identity") != {"puzzle_id": puzzle_id, "rules_version": rules_version}:
+        raw = {}
+    progress = _deserialize_progress(raw)
+    return DailyProgressPayload(date=day, puzzle_id=puzzle_id, rules_version=rules_version, progress=progress)
+
+
+def _progress_rank(value: GameProgressPayload) -> tuple[int, int, int, int]:
+    rounds = value.rounds or []
+    return (int(value.completed), value.round,
+            sum(int(bool(item.completed)) for item in rounds),
+            len(value.guesses) + sum(len(item.guesses) for item in rounds))
+
+
+async def _write_progress(user_id: int, payload: DailyProgressPayload, *, merge: bool) -> DailyProgressPayload:
+    factory = get_session_factory()
+    async with factory() as session:
+        # Serialize read/merge/write, including the first insert. Lock is scoped
+        # to the transaction and never depends on the process hosting a request.
+        if session.bind.dialect.name == "postgresql":
+            await session.execute(text("SELECT pg_advisory_xact_lock(:owner)"), {"owner": user_id})
+        previous = await repo_get_daily_progress(session, user_id, payload.date)
+        raw = dict(previous.progress) if previous and isinstance(previous.progress, dict) else {}
+        identity = {"puzzle_id": payload.puzzle_id, "rules_version": payload.rules_version}
+        incoming = {key: value.model_dump(mode="json", by_alias=True, exclude_none=True)
+                    for key, value in payload.progress.items()}
+        if not payload.puzzle_id and raw.get("_identity"):
+            # Older clients may keep legacy history, but cannot replace shared play.
+            legacy = raw.get("_legacy_history", {})
+            raw["_legacy_history"] = {**(legacy if isinstance(legacy, dict) else {}), **incoming}
+            serializable = raw
+            result = payload
+        else:
+            same_identity = raw.get("_identity") == identity if payload.puzzle_id else True
+            existing = _deserialize_progress(raw) if same_identity and merge else {}
+            merged = {**existing}
+            for key, value in payload.progress.items():
+                current = merged.get(key)
+                if payload.puzzle_id and current and _progress_rank(current) > _progress_rank(value):
+                    continue
+                merged[key] = value
+            serializable = {key: value.model_dump(mode="json", by_alias=True, exclude_none=True)
+                            for key, value in merged.items()}
+            if payload.puzzle_id:
+                serializable["_identity"] = identity
+                if raw and not same_identity:
+                    serializable["_legacy_history"] = raw
+                elif "_legacy_history" in raw:
+                    serializable["_legacy_history"] = raw["_legacy_history"]
+            result = payload.model_copy(update={"progress": merged})
+        await repo_upsert_daily_progress(session, user_id, payload.date, serializable)
+        await session.commit()
+        return result
 
 
 async def store_daily_progress(user_id: int, payload: DailyProgressPayload) -> DailyProgressPayload:
-    serializable: Dict[str, Dict[str, Any]] = {}
-    for key, value in payload.progress.items():
-        if isinstance(value, GameProgressPayload):
-            serializable[key] = value.model_dump(
-                mode="json", by_alias=True, exclude_none=True
-            )
-        else:
-            validated = GameProgressPayload.model_validate(value)
-            serializable[key] = validated.model_dump(
-                mode="json", by_alias=True, exclude_none=True
-            )
-    session_factory = get_session_factory()
-    async with session_factory() as session:
-        try:
-            await repo_upsert_daily_progress(session, user_id, payload.date, serializable)
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-    return payload
+    return await _write_progress(user_id, payload, merge=False)
 
 
 async def merge_daily_progress(user_id: int, payload: DailyProgressPayload) -> DailyProgressPayload:
-    existing = await load_daily_progress(user_id, payload.date)
-    merged = {**existing.progress, **payload.progress}
-    merged_payload = DailyProgressPayload(date=payload.date, progress=merged)
-    return await store_daily_progress(user_id, merged_payload)
+    return await _write_progress(user_id, payload, merge=True)
 
 
 async def load_streak(user_id: int) -> StreakPayload:

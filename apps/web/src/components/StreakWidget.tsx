@@ -39,7 +39,9 @@ interface WeekColumn {
 const DEFAULT_WEEKS = 12;
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function classNames(...values: Array<string | null | undefined | false>): string {
+function classNames(
+  ...values: Array<string | null | undefined | false>
+): string {
   return values.filter(Boolean).join(" ");
 }
 
@@ -70,7 +72,8 @@ export default function StreakWidget({
   weeks = DEFAULT_WEEKS,
 }: Props) {
   const streakCount = streak.count;
-  const lastCompletedIso = streak.lastCompleted ?? (completed ? currentDateIso : null);
+  const lastCompletedIso =
+    streak.lastCompleted ?? (completed ? currentDateIso : null);
 
   const currentDate = safeParseIso(currentDateIso) ?? new Date();
   const lastCompletedDate = safeParseIso(lastCompletedIso);
@@ -135,8 +138,9 @@ export default function StreakWidget({
 
   const upcomingMilestone = useMemo(() => {
     return (
-      STREAK_MILESTONES.find((milestone) => milestone.threshold > streakCount) ??
-      null
+      STREAK_MILESTONES.find(
+        (milestone) => milestone.threshold > streakCount,
+      ) ?? null
     );
   }, [streakCount]);
 
@@ -173,26 +177,25 @@ export default function StreakWidget({
   return (
     <section
       className={classNames(
-        "relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/70 p-5 shadow-ambient backdrop-blur-2xl sm:p-7",
+        "relative overflow-hidden rounded-lg border border-[#484b4d] bg-surface-raised p-5 sm:p-7",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
       <div className="relative space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200/80">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200">
               Current streak
             </p>
             <p className="text-3xl font-display font-semibold text-white sm:text-4xl">
               {streakCount}
-              <span className="ml-2 text-base font-sans font-normal text-neutral-300">
+              <span className="ml-2 text-base font-sans font-normal text-[#c1c2bd]">
                 day{streakCount === 1 ? "" : "s"}
               </span>
             </p>
-            <p className="text-sm text-neutral-300/90">{supportingText}</p>
+            <p className="text-sm text-[#c1c2bd]">{supportingText}</p>
           </div>
-          <div className="max-w-xs rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm font-medium text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+          <div className="max-w-xs rounded-lg border border-[#3f8a5f] bg-[#1f3a2c] px-4 py-3 text-sm font-medium text-emerald-50">
             {milestoneMessage}
           </div>
         </div>
@@ -204,7 +207,11 @@ export default function StreakWidget({
                 <span key={label}>{label}</span>
               ))}
             </div>
-            <div className="streak-heatmap" role="grid" aria-label="Calendar streak heatmap">
+            <div
+              className="streak-heatmap"
+              role="grid"
+              aria-label="Calendar streak heatmap"
+            >
               {weekColumns.map((week) => (
                 <div key={week.key} role="row" className="streak-heatmap__week">
                   {week.days.map((day) => (

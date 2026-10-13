@@ -79,6 +79,9 @@ describe("SynopsisRedacted autocomplete", () => {
     expect(option).toHaveAttribute("aria-selected", "true");
 
     await user.keyboard("{Enter}");
+    expect(input).toHaveValue("Steins;Gate");
+    expect(verifyGuessMock).not.toHaveBeenCalled();
+    await user.keyboard("{Enter}");
 
     await waitFor(() => {
       expect(verifyGuessMock).toHaveBeenCalledWith(73, "Steins;Gate", 900);

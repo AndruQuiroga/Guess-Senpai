@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from time import perf_counter
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
+from sqlalchemy import select
+from ..db.models import DailyPuzzleSet
 from pydantic import BaseModel
 
 from ..core.config import settings
@@ -45,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 def _parse_date(value: Optional[str]) -> date:
     if not value:
-        return date.today()
+        return datetime.now(timezone.utc).date()
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
@@ -107,6 +109,16 @@ class ArchiveIndexResponse(BaseModel):
     dates: list[str]
 
 
+class DailyAvailabilityResponse(BaseModel):
+    date: date
+    reset_at: datetime
+    published: bool
+    available_modes: list[str]
+    guess_the_opening_enabled: bool
+    puzzle_id: str
+    rules_version: str
+
+
 class GuessVerificationPayload(BaseModel):
     media_id: int
     guess: str
@@ -128,13 +140,6 @@ class GuessVerificationResponse(BaseModel):
     season_year_match: Optional[bool] = None
 
 
-def _generate_archive_dates(history_days: int) -> list[str]:
-    today = date.today()
-    total_days = max(history_days, 0)
-    return [
-        (today - timedelta(days=offset)).isoformat()
-        for offset in range(total_days)
-    ]
 def _normalize_season_label(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
@@ -176,30 +181,59 @@ async def get_today_puzzles(
     d: Optional[str] = Query(default=None, description="Override date in YYYY-MM-DD format"),
 ) -> DailyPuzzleResponse:
     day = _parse_date(d)
-    user_ctx = await _resolve_user_context(request)
-    puzzles = await get_daily_puzzle(
-        day,
-        user=user_ctx,
-        include_guess_opening=settings.animethemes_enabled,
-    )
+    try:
+        puzzles = await get_daily_puzzle(day, include_guess_opening=settings.animethemes_enabled)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return puzzles
 
 
 @router.get("/progress", response_model=DailyProgressPayload)
-async def get_progress(request: Request, d: Optional[str] = Query(default=None)) -> DailyProgressPayload:
+async def get_progress(request: Request, d: Optional[str] = None, puzzle_id: Optional[str] = None, rules_version: Optional[str] = None, account_user_id: Optional[int] = None) -> DailyProgressPayload:
     session = await _optional_session(request)
     day = _parse_date(d)
+    if isinstance(account_user_id, int) and (not session or session.user_id != account_user_id):
+        raise HTTPException(status_code=409, detail="Account changed; reload before syncing progress")
     if not session:
-        return DailyProgressPayload(date=day, progress={})
-    return await load_daily_progress(session.user_id, day)
+        return DailyProgressPayload(date=day, puzzle_id=puzzle_id, rules_version=rules_version, progress={})
+    result = await load_daily_progress(session.user_id, day, puzzle_id, rules_version)
+    return result.model_copy(update={"account_user_id": session.user_id})
+
+
+@router.get("/availability", response_model=DailyAvailabilityResponse)
+async def get_daily_availability() -> DailyAvailabilityResponse:
+    day = datetime.now(timezone.utc).date()
+    factory = get_session_factory()
+    async with factory() as session:
+        published = await session.get(DailyPuzzleSet, day)
+    modes = list(published.available_modes) if published else ["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"]
+    return DailyAvailabilityResponse(
+        date=day,
+        reset_at=published.reset_at if published else datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc),
+        published=published is not None,
+        available_modes=modes,
+        guess_the_opening_enabled="guess_the_opening" in modes,
+        puzzle_id=f"daily:{day.isoformat()}",
+        rules_version=published.rules_version if published else "1",
+    )
 
 
 @router.put("/progress", response_model=DailyProgressPayload)
 async def put_progress(request: Request, payload: DailyProgressPayload) -> DailyProgressPayload:
     session = await _optional_session(request)
+    if payload.account_user_id is not None and (not session or session.user_id != payload.account_user_id):
+        raise HTTPException(status_code=409, detail="Account changed; reload before syncing progress")
+    if payload.puzzle_id:
+        async with get_session_factory()() as db_session:
+            published = await db_session.get(DailyPuzzleSet, payload.date)
+        if not published or payload.puzzle_id != f"daily:{payload.date.isoformat()}" or payload.rules_version != published.rules_version:
+            raise HTTPException(status_code=409, detail="Progress does not match a published puzzle")
     if not session:
-        return DailyProgressPayload(date=payload.date, progress=payload.progress)
-    return await merge_daily_progress(session.user_id, payload)
+        return payload
+    result = await merge_daily_progress(session.user_id, payload)
+    return result.model_copy(update={"account_user_id": session.user_id})
 
 
 @router.get("/streak", response_model=StreakPayload)
@@ -529,8 +563,10 @@ async def search_characters(
 
 @router.get("/archive", response_model=ArchiveIndexResponse)
 async def get_archive_dates() -> ArchiveIndexResponse:
-    dates = _generate_archive_dates(settings.puzzle_history_days)
-    return ArchiveIndexResponse(dates=dates)
+    factory = get_session_factory()
+    async with factory() as session:
+        rows = (await session.scalars(select(DailyPuzzleSet.puzzle_date).order_by(DailyPuzzleSet.puzzle_date.desc()))).all()
+    return ArchiveIndexResponse(dates=[value.isoformat() for value in rows])
 
 
 __all__ = [

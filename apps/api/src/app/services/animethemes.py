@@ -42,11 +42,13 @@ async def _request(
 
 async def search_anime(title: str) -> List[Dict[str, Any]]:
     payload = await _request("/search/", params={"q": title})
+    if isinstance(payload.get("search"), dict):
+        return [{"id": item.get("id"), "attributes": item} for item in payload["search"].get("anime", [])]
     return [item for item in payload.get("data", []) if item.get("type") == "anime"]
 
 
 async def fetch_anime(slug: str) -> Dict[str, Any]:
-    includes = "animethemes,animethemes.song,animethemes.entries,animethemes.entries.videos"
+    includes = "animethemes.song.artists,animethemes.animethemeentries.videos.audio"
     return await _request(f"/anime/{slug}", params={"include": includes})
 
 
@@ -96,6 +98,8 @@ def _choose_best_video(videos: Sequence[Dict[str, Any]]) -> Optional[Dict[str, A
 
 
 def extract_opening_clip(payload: Dict[str, Any]) -> Optional[OpeningClip]:
+    if isinstance(payload.get("anime"), dict):
+        return _extract_nested_opening_clip(payload["anime"])
     index = _index_included(payload)
     anime = payload.get("data")
     if anime is None:
@@ -123,6 +127,32 @@ def extract_opening_clip(payload: Dict[str, Any]) -> Optional[OpeningClip]:
             length_seconds=video_attrs.get("length"),
             song_title=song_attrs.get("title"),
             artist=", ".join(artist.get("name") for artist in song_attrs.get("artists", [])) if song_attrs else None,
+        )
+    return None
+
+
+def _extract_nested_opening_clip(anime: Dict[str, Any]) -> Optional[OpeningClip]:
+    """Accept the current AnimeThemes nested resource representation."""
+    for theme in anime.get("animethemes", []):
+        if theme.get("type") != "OP":
+            continue
+        videos = [video for entry in theme.get("animethemeentries", [])
+                  if not entry.get("nsfw") and not entry.get("spoiler")
+                  for video in entry.get("videos", []) if video.get("link")]
+        best = _choose_best_video([{"attributes": video} for video in videos])
+        if not best:
+            continue
+        video = best["attributes"]
+        audio = video.get("audio")
+        song = theme.get("song") or {}
+        return OpeningClip(
+            title=theme.get("title") or theme.get("slug"),
+            sequence=theme.get("sequence"),
+            audio_url=audio.get("link") if isinstance(audio, dict) else audio,
+            video_url=video.get("link"),
+            length_seconds=video.get("length"),
+            song_title=song.get("title"),
+            artist=", ".join(artist["name"] for artist in song.get("artists", []) if artist.get("name")) or None,
         )
     return None
 

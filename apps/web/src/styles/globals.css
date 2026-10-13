@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -8,54 +8,359 @@
 
 :root {
   color-scheme: dark;
+  --ink: #171819;
+  --panel: #242628;
+  --panel-raised: #2c2f31;
+  --line: #484b4d;
+  --paper: #f4f0e7;
+  --muted: #c1c2bd;
+  --signal: #ff7658;
+  --signal-ink: #27110b;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  @apply font-sans text-neutral-100 bg-[#020617];
+  @apply font-sans;
   min-height: 100vh;
-  background-color: #020617;
-  background-image: radial-gradient(
-      circle at 20% 15%,
-      rgba(59, 130, 246, 0.12),
-      rgba(15, 23, 42, 0.7) 52%,
-      rgba(2, 6, 23, 0.95) 92%
-    ),
-    radial-gradient(
-      circle at 75% 8%,
-      rgba(236, 72, 153, 0.08),
-      rgba(2, 6, 23, 0.9) 55%
-    );
-  background-attachment: fixed;
-  background-size: cover;
-  background-position: center;
-  position: relative;
+  background: var(--ink);
+  color: var(--paper);
   overflow-x: hidden;
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  inset: -10%;
-  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='240'%20viewBox='0%200%20240%20240'%3E%3Cfilter%20id='noise'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.9'%20numOctaves='3'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23noise)'%20opacity='0.08'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 480px 480px;
-  mix-blend-mode: screen;
-  opacity: 0.28;
-  filter: saturate(110%) blur(0.35px);
-  z-index: -2;
-  pointer-events: none;
+* {
+  scrollbar-color: #686b6d #242628;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+*:focus-visible {
+  outline: 3px solid #ff9b83;
+  outline-offset: 3px;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+a {
+  color: inherit;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.5);
-  border-radius: 9999px;
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.skip-link {
+  position: absolute;
+  z-index: 100;
+  top: 0.5rem;
+  left: 0.5rem;
+  transform: translateY(-160%);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.75rem 1rem;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.game-shell input {
+  min-height: 44px;
+}
+
+.button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  border-radius: 7px;
+  padding: 0.7rem 1.15rem;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button-primary {
+  background: var(--signal);
+  color: var(--signal-ink);
+  border: 1px solid var(--signal);
+}
+
+.button-primary:hover {
+  background: #ff8a70;
+}
+
+.today-page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+
+.today-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.today-intro h1 {
+  margin: 0.25rem 0 0;
+  font:
+    700 clamp(2rem, 5vw, 3rem) / 1.04 "Space Grotesk",
+    sans-serif;
+  letter-spacing: -0.045em;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.today-subtitle {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.today-meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.today-meta strong {
+  color: var(--paper);
+}
+
+.featured-puzzles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.featured-card {
+  min-width: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+}
+
+.featured-art {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #302c2a;
+  border-right: 1px solid var(--line);
+  color: var(--signal);
+  font:
+    700 2rem "Space Grotesk",
+    sans-serif;
+}
+
+.featured-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.4rem;
+}
+
+.featured-card:nth-child(2) .featured-art {
+  background: #2b3030;
+  color: #b5d5d0;
+}
+
+.featured-copy {
+  min-width: 0;
+  padding: 1rem;
+}
+
+.card-heading,
+.secondary-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-heading h2,
+.secondary-heading h2 {
+  margin: 0.15rem 0 0;
+  font:
+    700 1.45rem / 1.15 "Space Grotesk",
+    sans-serif;
+}
+
+.status-pill {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.featured-copy > p {
+  min-height: 2.6em;
+  margin: 0.6rem 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.play-link {
+  width: 100%;
+}
+
+.more-puzzles {
+  margin-top: 0.85rem;
+  padding: 0.85rem 1rem;
+}
+
+.secondary-heading span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.more-puzzles ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.55rem 0 0;
+}
+
+.more-puzzles li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 42px;
+  border-top: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+
+.more-puzzles li > span:first-child {
+  flex: 1;
+  font-weight: 600;
+}
+
+.muted-status {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.more-puzzles li a {
+  color: #ff987f;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 0.5rem;
+}
+
+.account-note,
+.today-help {
+  margin: 0.85rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.account-note a,
+.today-help a {
+  color: #ff987f;
+}
+
+@media (max-width: 640px) {
+  .today-page {
+    padding-top: 0.25rem;
+  }
+
+  .today-intro {
+    align-items: start;
+  }
+
+  .today-meta {
+    font-size: 0.75rem;
+  }
+
+  .featured-puzzles {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .featured-card {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+
+  .featured-art {
+    font-size: 1.5rem;
+  }
+
+  .featured-copy {
+    padding: 0.75rem;
+  }
+
+  .featured-copy > p {
+    min-height: 0;
+    margin: 0.45rem 0 0.7rem;
+  }
+
+  .card-heading h2 {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .today-meta {
+    max-width: 90px;
+    white-space: normal;
+    text-align: right;
+  }
+
+  .featured-card {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Native form controls stay readable across puzzle modes. */
+.game-shell button,
+.game-shell select {
+  min-height: 44px;
+}
+.game-shell select,
+.game-shell input {
+  font-size: 1rem;
+}
+.game-shell select option {
+  background: var(--panel-raised);
+  color: var(--paper);
+}
+.game-shell button:disabled {
+  cursor: not-allowed;
+}
+.game-shell form > *,
+.game-shell form > div > * {
+  min-width: 0;
 }

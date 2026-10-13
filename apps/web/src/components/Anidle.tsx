@@ -25,7 +25,9 @@ import type {
   ScalarStatus,
 } from "../types/anidle";
 import { CURRENT_ANIDLE_EVALUATION_VERSION } from "../types/anidle";
+import { isProgressExhausted } from "../utils/gameAction";
 import NextPuzzleButton from "./NextPuzzleButton";
+import { Button, Field } from "./ui/Primitives";
 import {
   TitleGuessField,
   type TitleGuessFieldHandle,
@@ -71,30 +73,30 @@ const SCALAR_TONES: Record<
   { className: string; icon: string; description: string }
 > = {
   match: {
-    className: "border-emerald-400/40 bg-emerald-500/10 text-emerald-100",
+    className: "border-[#686b6d] bg-[#2c2f31] text-[#f4f0e7]",
     icon: "✓",
     description: "Exact match",
   },
   higher: {
-    className: "border-rose-400/40 bg-rose-500/10 text-rose-100",
+    className: "border-[#686b6d] bg-[#2c2f31] text-[#f4f0e7]",
     icon: "↓",
     description: "Guess is higher than the answer",
   },
   lower: {
-    className: "border-amber-400/40 bg-amber-500/10 text-amber-100",
+    className: "border-[#686b6d] bg-[#2c2f31] text-[#f4f0e7]",
     icon: "↑",
     description: "Guess is lower than the answer",
   },
   unknown: {
-    className: "border-white/10 bg-white/5 text-neutral-200",
+    className: "border-[#484b4d] bg-[#2c2f31] text-[#f4f0e7]",
     icon: "?",
     description: "Feedback unavailable",
   },
 } as const;
 
 const LIST_TONES: Record<ListStatus, string> = {
-  match: "border-emerald-400/40 bg-emerald-500/10 text-emerald-50",
-  miss: "border-white/10 bg-white/5 text-neutral-200",
+  match: "border-[#484b4d] bg-[#2c2f31] text-[#f4f0e7]",
+  miss: "border-[#484b4d] bg-[#242628] text-[#f4f0e7]",
 } as const;
 
 type ScalarColumnKey = "year" | "averageScore" | "popularity";
@@ -139,7 +141,10 @@ export default function Anidle({
   nextSlug,
   accountDifficulty: _accountDifficulty,
 }: Props) {
-  const [round, setRound] = useState(initialProgress?.round ?? 1);
+  const rules = payload.rules?.version === "2" ? payload.rules : null;
+  const totalRounds = rules ? 1 : TOTAL_ROUNDS;
+  const submissionLock = useRef(false);
+  const [round, setRound] = useState(rules ? 1 : (initialProgress?.round ?? 1));
   const [guess, setGuess] = useState("");
   const [historyEntries, setHistoryEntries] = useState<
     AnidleGuessHistoryEntry[]
@@ -156,6 +161,7 @@ export default function Anidle({
   const [hydrating, setHydrating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [hydrationProgress, setHydrationProgress] = useState({
     completed: 0,
     total: 0,
@@ -185,7 +191,7 @@ export default function Anidle({
       setRound(1);
       setCompleted(false);
     } else {
-      setRound(initialProgress.round ?? 1);
+      setRound(rules ? 1 : (initialProgress.round ?? 1));
       setCompleted(initialProgress.completed ?? false);
     }
 
@@ -200,14 +206,14 @@ export default function Anidle({
     }
 
     previousMediaIdRef.current = mediaId;
-  }, [initialProgress, mediaId]);
+  }, [initialProgress, mediaId, rules]);
 
   useEffect(() => {
     if (!registerRoundController) return;
     registerRoundController((targetRound) => {
-      setRound(() => Math.max(1, Math.min(TOTAL_ROUNDS, targetRound)));
+      setRound(() => Math.max(1, Math.min(totalRounds, targetRound)));
     });
-  }, [registerRoundController]);
+  }, [registerRoundController, totalRounds]);
 
   const guessValues = useMemo(
     () => historyEntries.map((entry) => entry.guess),
@@ -218,6 +224,12 @@ export default function Anidle({
     () => Math.max(0, historyEntries.length - (completed ? 1 : 0)),
     [completed, historyEntries.length],
   );
+  const exhausted = isProgressExhausted({
+    completed,
+    attemptLimit: rules?.max_attempts,
+    anidleHistory: historyEntries,
+  });
+  const finished = completed || exhausted;
 
   const evaluations = useMemo(
     () =>
@@ -228,6 +240,44 @@ export default function Anidle({
   );
 
   const aggregatedHints = useMemo<AggregatedHint[]>(() => {
+    if (rules) {
+      const stage = rules.hint_after_incorrect.filter(
+        (count) => incorrectGuessCount >= count,
+      ).length;
+      if (!stage) return [];
+      const entries = payload.hints.synopsis.filter((hint) => hint.text.trim());
+      if (entries.length) {
+        const hint = entries[Math.min(stage - 1, entries.length - 1)];
+        return [
+          {
+            type: "synopsis",
+            label: "Synopsis hint",
+            ratio: hint.ratio,
+            text: hint.text,
+          },
+        ];
+      }
+      const hints: AggregatedHint[] = [];
+      if (payload.hints.genres.length)
+        hints.push({
+          type: "text",
+          label: "Genres",
+          value: payload.hints.genres.join(", "),
+        });
+      if (stage >= 2 && payload.hints.year != null)
+        hints.push({
+          type: "text",
+          label: "Year",
+          value: String(payload.hints.year),
+        });
+      if (stage >= 3 && payload.hints.tags.length)
+        hints.push({
+          type: "tags",
+          label: "Tag hints",
+          values: payload.hints.tags.slice(0, 4),
+        });
+      return hints;
+    }
     if (incorrectGuessCount < MIN_INCORRECT_GUESSES_FOR_HINT) {
       return [];
     }
@@ -326,7 +376,7 @@ export default function Anidle({
     }
 
     return fallbackHints;
-  }, [incorrectGuessCount, payload]);
+  }, [incorrectGuessCount, payload, rules]);
 
   const synopsisHints = useMemo(
     () =>
@@ -360,8 +410,9 @@ export default function Anidle({
       round,
       guesses: guessValues,
       anidleHistory: historySnapshot,
+      ...(rules ? { attemptLimit: rules.max_attempts } : {}),
     });
-  }, [completed, round, guessValues, historyEntries, onProgressChange]);
+  }, [completed, round, guessValues, historyEntries, onProgressChange, rules]);
 
   const createFallbackEvaluation = useCallback(
     (title: string): AnidleGuessEvaluation => ({
@@ -647,16 +698,30 @@ export default function Anidle({
   ]);
 
   const advanceRound = useCallback(() => {
-    setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
-  }, []);
+    setRound((prev) => (prev >= totalRounds ? totalRounds : prev + 1));
+  }, [totalRounds]);
 
   const submitGuess = useCallback(
     async (rawValue: string, suggestionId?: number) => {
       const value = rawValue.trim();
-      if (!value || submitting) return;
+      if (!value || finished || submissionLock.current) return;
+      const normalize = (title: string) =>
+        title.trim().replace(/\s+/g, " ").toLowerCase();
+      if (
+        rules &&
+        historyEntries.some(
+          (entry) =>
+            normalize(entry.guess) === normalize(value) ||
+            (suggestionId != null && entry.guessMediaId === suggestionId),
+        )
+      ) {
+        setErrorMessage("You already guessed that title. Try another anime.");
+        return;
+      }
 
       setErrorMessage(null);
       setSubmitting(true);
+      submissionLock.current = true;
 
       const normalizedGuess = value.toLowerCase();
 
@@ -666,6 +731,17 @@ export default function Anidle({
           guess: value,
           guessMediaId: suggestionId,
         });
+        if (
+          rules &&
+          historyEntries.some(
+            (entry) =>
+              normalize(entry.evaluation?.title ?? entry.guess) ===
+              normalize(evaluation.title),
+          )
+        ) {
+          setErrorMessage("You already guessed that title. Try another anime.");
+          return;
+        }
         const resolvedCorrect =
           evaluation.correct || normalizedGuess === normalizedAnswer;
         const evaluationRecord: AnidleGuessEvaluation = resolvedCorrect
@@ -702,6 +778,7 @@ export default function Anidle({
             : "Unable to evaluate your guess. Please try again.";
         setErrorMessage(message);
       } finally {
+        submissionLock.current = false;
         setSubmitting(false);
       }
     },
@@ -712,26 +789,29 @@ export default function Anidle({
       mediaId,
       normalizedAnswer,
       submitting,
+      finished,
+      rules,
+      historyEntries,
     ],
   );
 
   const handleFieldSubmit = useCallback(
     (selection: TitleGuessSelection) => {
-      if (completed || submitting) return;
+      if (finished || submitting) return;
       void submitGuess(selection.value, selection.suggestionId);
     },
-    [completed, submitGuess, submitting],
+    [finished, submitGuess, submitting],
   );
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (completed || submitting) return;
+      if (finished || submitting) return;
       const selection = guessFieldRef.current?.submit();
       if (!selection) return;
       await submitGuess(selection.value, selection.suggestionId);
     },
-    [completed, submitGuess, submitting],
+    [finished, submitGuess, submitting],
   );
 
   useEffect(() => {
@@ -761,11 +841,11 @@ export default function Anidle({
           : null;
       return (
         <div
-          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1 text-sm font-medium ${tone.className}`}
+          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1 text-sm font-medium ${tone.className}`}
         >
           <span>{guessDisplay}</span>
           {seasonDisplay ? (
-            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-white/70">
+            <span className="text-xs font-semibold text-[#c1c2bd]">
               [{seasonDisplay}]
             </span>
           ) : null}
@@ -786,9 +866,14 @@ export default function Anidle({
           items.map((item) => (
             <span
               key={item.value}
-              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${LIST_TONES[item.status]}`}
+              aria-label={`${item.value}: ${item.status === "match" ? "match" : "no match"}`}
+              className={`inline-flex items-center gap-1 rounded-md border px-3 py-1 text-sm font-medium ${LIST_TONES[item.status]}`}
             >
+              <span aria-hidden>{item.status === "match" ? "✓" : "×"}</span>
               {item.value}
+              <span className="text-xs text-[#c1c2bd]">
+                {item.status === "match" ? "Match" : "No match"}
+              </span>
             </span>
           ))
         ) : (
@@ -810,7 +895,35 @@ export default function Anidle({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-[#f4f0e7]">
+      <details className="rounded-md border border-[#484b4d] bg-[#2c2f31] px-4 py-3 text-sm leading-relaxed text-[#d0d0ca]">
+        <summary className="cursor-pointer font-semibold">
+          How to play Anidle
+        </summary>
+        <p className="mt-2">
+          {rules ? (
+            <>
+              Find one exact anime title in {rules.max_attempts} accepted
+              guesses. Synopsis hints unlock after{" "}
+              {rules.hint_after_incorrect.join(", ")} wrong guesses; when no
+              synopsis is available, hints reveal genres, then year, then tags.
+              Invalid titles, repeated anime, and failed requests cost no
+              attempt. Compare year, score, popularity, genres, tags, studios,
+              and source. Arrows point toward the answer; ✓ means a match. The
+              final guess can still win.
+            </>
+          ) : (
+            <>
+              Guess the anime title. Each accepted title is one attempt; a wrong
+              guess advances the round (three rounds total). Compare year,
+              format, episodes, score, popularity, genres, and tags with the
+              answer. Arrows show higher or lower, and ✓ means a match. The
+              first synopsis hint appears after 10 wrong guesses, then another
+              every 2.
+            </>
+          )}
+        </p>
+      </details>
       {synopsisHints.length > 0 || chipHints.length > 0 ? (
         <div className="space-y-3">
           {synopsisHints.map((hint) => {
@@ -818,37 +931,37 @@ export default function Anidle({
             return (
               <div
                 key={`synopsis-${percentage}`}
-                className="rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-left backdrop-blur"
+                className="rounded-md border border-[#686b6d] bg-[#2c2f31] px-4 py-3 text-left"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-200/80">
+                  <span className="text-sm font-semibold text-[#f4f0e7]">
                     {hint.label}
                   </span>
-                  <span className="text-[0.65rem] uppercase tracking-[0.3em] text-brand-200/60">
+                  <span className="text-sm text-[#c1c2bd]">
                     {percentage}% revealed
                   </span>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-neutral-100/90">
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#f4f0e7]">
                   {hint.text}
                 </p>
               </div>
             );
           })}
           {chipHints.length > 0 ? (
-            <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100/80">
+            <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-brand-100">
               {chipHints.map((hint) => {
                 if (hint.type === "tags") {
                   return (
                     <div
                       key={`${hint.label}-${hint.values.join("|")}`}
-                      className="flex flex-wrap items-center gap-2 rounded-2xl border border-fuchsia-400/40 bg-fuchsia-500/10 px-3 py-1 font-semibold text-[0.7rem] text-fuchsia-100 backdrop-blur"
+                      className="flex flex-wrap items-center gap-2 rounded-md border border-[#686b6d] bg-[#2c2f31] px-3 py-1 font-semibold text-sm text-[#f4f0e7]"
                     >
-                      <span className="text-fuchsia-200/80">{hint.label}:</span>
-                      <div className="flex flex-wrap gap-1 normal-case text-[0.65rem] text-fuchsia-50">
+                      <span className="text-[#c1c2bd]">{hint.label}:</span>
+                      <div className="flex flex-wrap gap-1 normal-case text-sm text-[#f4f0e7]">
                         {hint.values.map((value) => (
                           <span
                             key={`${hint.label}-${value}`}
-                            className="rounded-full border border-fuchsia-300/40 bg-fuchsia-400/20 px-2 py-0.5 font-medium"
+                            className="rounded border border-[#686b6d] bg-[#383a3c] px-2 py-0.5 font-medium"
                           >
                             {value}
                           </span>
@@ -860,10 +973,10 @@ export default function Anidle({
                 return (
                   <span
                     key={`${hint.label}-${hint.value}`}
-                    className="rounded-full border border-brand-400/30 bg-brand-500/10 px-3 py-1 font-semibold text-[0.7rem] backdrop-blur"
+                    className="rounded-md border border-[#686b6d] bg-[#2c2f31] px-3 py-1 text-sm font-semibold"
                   >
-                    <span className="text-brand-200/80">{hint.label}:</span>{" "}
-                    <span className="text-white/90">{hint.value}</span>
+                    <span className="text-brand-200">{hint.label}:</span>{" "}
+                    <span className="text-[#f4f0e7]">{hint.value}</span>
                   </span>
                 );
               })}
@@ -871,116 +984,213 @@ export default function Anidle({
           ) : null}
         </div>
       ) : null}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative w-full">
-          <TitleGuessField
-            ref={guessFieldRef}
-            className="w-full"
-            value={guess}
-            onValueChange={setGuess}
-            onSubmit={handleFieldSubmit}
-            disabled={completed || submitting}
-            placeholder={completed ? "You solved Anidle!" : "Type your guess…"}
-            ariaLabel="Anidle guess"
-            suggestionsLabel="Anidle title suggestions"
-          />
-        </div>
-        <button
-          type="submit"
-          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-brand-500 via-brand-400 to-cyan-400 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={completed || submitting}
+      <p className="text-sm text-[#c1c2bd]">
+        Attempts:{" "}
+        <strong className="text-[#f4f0e7]">{historyEntries.length}</strong>
+        {rules ? ` / ${rules.max_attempts}` : ""}
+        {completed ? " · Solved" : exhausted ? " · Out of guesses" : ""}
+      </p>
+      {!finished && (
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-3 sm:flex-row"
         >
-          {submitting ? "Checking…" : "Submit Guess"}
-        </button>
-      </form>
+          <Field
+            id="anidle-answer"
+            label="Anime title"
+            className="relative w-full"
+          >
+            <TitleGuessField
+              ref={guessFieldRef}
+              id="anidle-answer"
+              className="w-full"
+              value={guess}
+              onValueChange={setGuess}
+              onSubmit={handleFieldSubmit}
+              disabled={completed || submitting}
+              placeholder={
+                completed ? "You solved Anidle!" : "Type your guess…"
+              }
+              ariaLabel="Anidle guess"
+              suggestionsLabel="Anidle title suggestions"
+            />
+          </Field>
+          <button
+            type="submit"
+            className="button button-primary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            disabled={completed || submitting}
+          >
+            {submitting ? "Checking…" : "Submit Guess"}
+          </button>
+        </form>
+      )}
       <div className="space-y-4" aria-live="polite">
         {errorMessage && (
-          <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="rounded-lg border border-[#c0566a] bg-[#40242a] px-4 py-3 text-sm text-rose-200">
             {errorMessage}
+          </div>
+        )}
+        {finished && (
+          <div className="space-y-3">
+            <div
+              className="rounded-md border border-[#a44b38] bg-[#382521] px-4 py-4 text-base text-[#f4f0e7]"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="block text-sm font-semibold text-[#ff987f]">
+                {completed
+                  ? `Solved in ${historyEntries.length} ${historyEntries.length === 1 ? "attempt" : "attempts"}`
+                  : "Out of guesses · Answer revealed"}
+              </span>
+              <span className="mt-1 block text-xl font-bold">
+                {payload.answer}
+              </span>
+            </div>
+            <NextPuzzleButton
+              nextSlug={nextSlug}
+              className="button button-primary w-full sm:w-auto"
+            />
+            <Button
+              type="button"
+              className="border border-[#686b6d] bg-[#2c2f31] text-[#f4f0e7]"
+              onClick={async () => {
+                const text = completed
+                  ? `I solved today's Anidle puzzle in ${historyEntries.length} ${historyEntries.length === 1 ? "guess" : "guesses"}.`
+                  : `Today's Anidle: ${historyEntries.length}/${rules?.max_attempts} guesses, answer revealed. Try the same daily puzzle.`;
+                try {
+                  if (navigator.share) {
+                    await navigator.share({ text });
+                  } else {
+                    await navigator.clipboard.writeText(text);
+                    setShareMessage("Spoiler-free share text copied.");
+                  }
+                } catch (error) {
+                  if (error instanceof Error && error.name !== "AbortError") {
+                    setShareMessage(
+                      "Share could not be opened. Your result is saved.",
+                    );
+                  }
+                }
+              }}
+            >
+              Share result
+            </Button>
+            {shareMessage && (
+              <p role="status" className="text-sm text-[#c1c2bd]">
+                {shareMessage}
+              </p>
+            )}
           </div>
         )}
         {(evaluations.length > 0 || hydrating) && (
           <div className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-              Guess feedback
+            <div className="text-sm font-semibold text-[#c1c2bd]">
+              Guess history · {evaluations.length}{" "}
+              {evaluations.length === 1 ? "attempt" : "attempts"}
             </div>
             <div className="relative min-h-[5rem]">
               <div className="space-y-3">
                 {evaluations.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[56rem] rounded-2xl border border-white/10 bg-white/5">
-                      <table className="w-full border-collapse text-sm text-white">
-                        <thead>
-                          <tr className="text-left text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                            <th className="px-4 py-3 font-semibold">Guess</th>
-                            {FEEDBACK_COLUMNS.map((column) => (
-                              <th
-                                key={column.key}
-                                className="px-4 py-3 font-semibold"
-                              >
-                                {column.label}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/10">
-                          {evaluations.map((entry, index) => {
-                            const solved = entry.correct;
-                            return (
-                              <tr
-                                key={`${entry.title}-${index}`}
-                                className={`transition ${
-                                  solved
-                                    ? "bg-emerald-500/10"
-                                    : "bg-transparent"
-                                }`}
-                              >
-                                <td className="px-4 py-4 align-top">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-sm font-semibold text-white">
-                                        {entry.title}
-                                      </p>
-                                      <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
-                                        Guess {index + 1}
-                                      </p>
+                  <>
+                    <div className="hidden overflow-x-auto lg:block">
+                      <div className="min-w-[56rem] rounded-md border border-[#484b4d] bg-[#202223]">
+                        <table className="w-full border-collapse text-sm text-white">
+                          <thead>
+                            <tr className="text-left text-sm font-semibold text-[#c1c2bd]">
+                              <th className="px-4 py-3 font-semibold">Guess</th>
+                              {FEEDBACK_COLUMNS.map((column) => (
+                                <th
+                                  key={column.key}
+                                  className="px-4 py-3 font-semibold"
+                                >
+                                  {column.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/10">
+                            {evaluations.map((entry, index) => {
+                              const solved = entry.correct;
+                              return (
+                                <tr
+                                  key={`${entry.title}-${index}`}
+                                  className={
+                                    solved ? "bg-[#302c2a]" : "bg-transparent"
+                                  }
+                                >
+                                  <td className="px-4 py-4 align-top">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="text-sm font-semibold text-white">
+                                          {entry.title}
+                                        </p>
+                                        <p className="text-sm text-[#c1c2bd]">
+                                          Attempt {index + 1}
+                                        </p>
+                                      </div>
+                                      {solved ? (
+                                        <span className="inline-flex items-center rounded-md border border-[#686b6d] bg-[#2c2f31] px-3 py-1 text-sm font-semibold text-[#f4f0e7]">
+                                          ✓ Correct
+                                        </span>
+                                      ) : null}
                                     </div>
-                                    {solved ? (
-                                      <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-emerald-50">
-                                        Correct
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </td>
-                                {FEEDBACK_COLUMNS.map((column) => (
-                                  <td
-                                    key={column.key}
-                                    className="px-4 py-4 align-top"
-                                  >
-                                    {renderFeedbackCell(column, entry)}
                                   </td>
-                                ))}
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  {FEEDBACK_COLUMNS.map((column) => (
+                                    <td
+                                      key={column.key}
+                                      className="px-4 py-4 align-top"
+                                    >
+                                      {renderFeedbackCell(column, entry)}
+                                    </td>
+                                  ))}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
+                    <div className="space-y-2 lg:hidden">
+                      {evaluations.map((entry, index) => (
+                        <details
+                          key={`${entry.title}-mobile-${index}`}
+                          className="rounded-md border border-[#484b4d] bg-[#202223]"
+                        >
+                          <summary className="min-h-11 cursor-pointer px-3 py-3 font-semibold">
+                            {entry.correct ? "✓ " : "Guess "}
+                            {entry.title}
+                            <span className="ml-2 text-sm font-normal text-[#c1c2bd]">
+                              Attempt {index + 1} · details
+                            </span>
+                          </summary>
+                          <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-[#484b4d] p-3 text-sm">
+                            {FEEDBACK_COLUMNS.map((column) => (
+                              <div key={column.key}>
+                                <dt className="font-semibold text-[#c1c2bd]">
+                                  {column.label}
+                                </dt>
+                                <dd>{renderFeedbackCell(column, entry)}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </details>
+                      ))}
+                    </div>
+                  </>
                 ) : (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-neutral-300">
+                  <div className="rounded-md border border-[#484b4d] bg-[#242628] px-4 py-6 text-sm text-[#c1c2bd]">
                     Previous guesses will appear here.
                   </div>
                 )}
               </div>
               {hydrating && (
                 <div
-                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-neutral-950/70 px-6 py-6 text-center backdrop-blur-sm"
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-[#202223] px-6 py-6 text-center"
                   role="status"
                   aria-live="polite"
                 >
                   <div
-                    className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                    className="h-6 w-6 animate-spin rounded-full border-2 border-[#686b6d] border-t-white"
                     aria-hidden
                   />
                   <span className="text-sm font-medium text-white">
@@ -991,18 +1201,6 @@ export default function Anidle({
                 </div>
               )}
             </div>
-          </div>
-        )}
-        {completed && (
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-              Nailed it! The answer was{" "}
-              <span className="font-semibold text-emerald-100">
-                {payload.answer}
-              </span>
-              .
-            </div>
-            <NextPuzzleButton nextSlug={nextSlug} />
           </div>
         )}
       </div>

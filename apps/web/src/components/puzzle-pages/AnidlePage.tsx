@@ -7,6 +7,7 @@ import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { AnidleGame } from "../../types/puzzles";
+import { isProgressExhausted } from "../../utils/gameAction";
 
 interface Props {
   slug: string;
@@ -34,7 +35,11 @@ export function AnidlePage({
   const controller = useRef<((round: number) => void) | null>(null);
   const [controllerReady, setControllerReady] = useState(false);
 
-  const totalRounds = useMemo(() => Math.max(payload.spec.length, 1), [payload.spec.length]);
+  const rules = payload.rules?.version === "2" ? payload.rules : null;
+  const totalRounds = useMemo(
+    () => (rules ? rules.max_attempts : Math.max(payload.spec.length, 1)),
+    [payload.spec.length, rules],
+  );
 
   const clampDifficulty = useCallback(
     (value: number | undefined | null) => {
@@ -50,7 +55,26 @@ export function AnidlePage({
   const selectedDifficulty = clampDifficulty(accountDifficulty);
   const recommendedDifficulty = clampDifficulty(difficultyHint);
   const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
-  const [displayRound, setDisplayRound] = useState(progress?.round ?? highlightDifficulty);
+  // Rules v2 is one anime with a guess budget, so the header counts guesses.
+  // Legacy rules keep the three-round header.
+  const headerPosition = useCallback(
+    (state?: GameProgress | null) => {
+      if (!rules) return state?.round ?? highlightDifficulty;
+      const accepted = state?.anidleHistory?.length ?? 0;
+      const finished =
+        Boolean(state?.completed) ||
+        isProgressExhausted({
+          completed: state?.completed,
+          anidleHistory: state?.anidleHistory,
+          attemptLimit: rules.max_attempts,
+        });
+      return Math.min(finished ? accepted : accepted + 1, rules.max_attempts);
+    },
+    [highlightDifficulty, rules],
+  );
+  const [displayRound, setDisplayRound] = useState(() =>
+    headerPosition(progress),
+  );
 
   useEffect(() => {
     controller.current = null;
@@ -64,15 +88,15 @@ export function AnidlePage({
   }, [controllerReady, highlightDifficulty, progress?.completed]);
 
   useEffect(() => {
-    setDisplayRound(progress?.round ?? highlightDifficulty);
-  }, [progress?.round, highlightDifficulty]);
+    setDisplayRound(headerPosition(progress));
+  }, [progress, headerPosition]);
 
   const handleProgressChange = useCallback(
     (state: GameProgress) => {
-      setDisplayRound(state.round);
+      setDisplayRound(headerPosition(state));
       onProgressChange(state);
     },
-    [onProgressChange],
+    [headerPosition, onProgressChange],
   );
 
   return (
@@ -81,6 +105,7 @@ export function AnidlePage({
         title="Anidle"
         round={displayRound}
         totalRounds={totalRounds}
+        roundLabel={rules ? "Guess" : "Round"}
         actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
       >
         <Anidle

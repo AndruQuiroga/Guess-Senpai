@@ -33,8 +33,8 @@ export default function HeaderNavigation({
         onClick={handleToggle}
         aria-controls={menuId}
         aria-expanded={isOpen}
-        className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300 md:hidden ${
-          isOpen ? "bg-white/15 text-brand-200" : "hover:bg-white/10"
+        className={`inline-flex h-11 w-11 items-center justify-center rounded-md border border-[#484b4d] bg-[#242628] text-[#f4f0e7] transition md:hidden ${
+          isOpen ? "bg-[#2c2f31] text-brand-200" : "hover:bg-[#2c2f31]"
         }`}
       >
         <span className="sr-only">Toggle navigation menu</span>

@@ -5,7 +5,11 @@ import { FormEvent, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 
 import type { CharacterGuessEntry } from "../../../types/puzzles";
-import { TitleGuessField, type TitleGuessFieldHandle, type TitleGuessSelection } from "../TitleGuessField";
+import {
+  TitleGuessField,
+  type TitleGuessFieldHandle,
+  type TitleGuessSelection,
+} from "../TitleGuessField";
 import type { CharacterEntryState, FeedbackState } from "./types";
 
 interface CharacterCardProps {
@@ -89,7 +93,13 @@ export function CharacterCard({
       }
       onSubmit(selection, trimmedCharacter);
     },
-    [cardDisabled, onSubmit, onValidationError, state.animeValue, state.characterValue],
+    [
+      cardDisabled,
+      onSubmit,
+      onValidationError,
+      state.animeValue,
+      state.characterValue,
+    ],
   );
 
   const attemptsLabel = useMemo(() => {
@@ -101,9 +111,9 @@ export function CharacterCard({
   return (
     <form
       onSubmit={handleFormSubmit}
-      className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/4 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-lg"
+      className="flex h-full flex-col overflow-hidden rounded-lg border border-[#686b6d] bg-[#2c2f31]  "
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-white/5">
+      <div className="relative aspect-[4/5] w-full overflow-hidden bg-[#2c2f31]">
         <Image
           src={entry.character.image}
           alt={entry.character.name}
@@ -114,7 +124,7 @@ export function CharacterCard({
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/0 to-black/30" />
         <div className="absolute inset-x-0 bottom-0 space-y-2 p-4 text-white">
-          <div className="text-xs uppercase tracking-[0.28em] text-white/80">
+          <div className="text-sm uppercase tracking-[0.28em] text-[#f4f0e7]">
             Card {index + 1}
           </div>
           <div className="space-y-1">
@@ -122,7 +132,7 @@ export function CharacterCard({
               {entry.reveal.label}
             </p>
             {revealDescription ? (
-              <p className="text-xs text-white/80">{revealDescription}</p>
+              <p className="text-sm text-[#f4f0e7]">{revealDescription}</p>
             ) : null}
           </div>
         </div>
@@ -130,13 +140,16 @@ export function CharacterCard({
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         {roleLabel ? (
-          <p className="text-xs font-medium uppercase tracking-[0.24em] text-brand-200/80">
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#c1c2bd]">
             {roleLabel}
           </p>
         ) : null}
 
         <div className="space-y-2">
-          <label htmlFor={`${characterId}-anime`} className="text-xs font-semibold text-white/80">
+          <label
+            htmlFor={`${characterId}-anime`}
+            className="text-sm font-semibold text-[#f4f0e7]"
+          >
             Anime
           </label>
           <TitleGuessField
@@ -155,7 +168,7 @@ export function CharacterCard({
         <div className="space-y-2">
           <label
             htmlFor={`${characterId}-character`}
-            className="text-xs font-semibold text-white/80"
+            className="text-sm font-semibold text-[#f4f0e7]"
           >
             Character
           </label>
@@ -166,15 +179,15 @@ export function CharacterCard({
             onChange={(event) => onCharacterChange(event.target.value)}
             disabled={cardDisabled || state.completed}
             placeholder="Enter the character name"
-            className="w-full rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] focus:border-brand-400/70 focus:outline-none focus:ring-2 focus:ring-brand-400/30 disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full rounded-xl border border-[#686b6d] bg-[#2c2f31] px-3 py-2 text-base text-white  focus:border-[#ff7658]  focus:ring-2 focus:ring-[#ff9b83] disabled:cursor-not-allowed disabled:opacity-70"
           />
         </div>
 
         <div className="mt-auto space-y-3">
-          <div className="flex items-center justify-between text-xs text-white/70">
+          <div className="flex items-center justify-between text-sm text-[#f4f0e7]">
             <span>{attemptsLabel}</span>
             {state.completed ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-1 text-[0.65rem] font-semibold text-emerald-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#1f3a2c] px-2 py-1 text-sm font-semibold text-emerald-200">
                 ✓ Solved
               </span>
             ) : null}
@@ -183,12 +196,12 @@ export function CharacterCard({
           {displayFeedback ? (
             <div
               className={[
-                "rounded-xl border px-3 py-2 text-xs leading-snug",
+                "rounded-xl border px-3 py-2 text-sm leading-snug",
                 displayFeedback.type === "success"
-                  ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-100"
+                  ? "border-[#3f8a5f] bg-[#1f3a2c] text-emerald-100"
                   : displayFeedback.type === "partial"
-                    ? "border-amber-300/60 bg-amber-500/15 text-amber-100"
-                    : "border-rose-400/60 bg-rose-500/15 text-rose-100",
+                    ? "border-[#c9a13e] bg-[#3d3220] text-amber-100"
+                    : "border-[#c0566a] bg-[#40242a] text-rose-100",
               ].join(" ")}
             >
               {displayFeedback.message}
@@ -198,13 +211,16 @@ export function CharacterCard({
           <button
             type="submit"
             disabled={cardDisabled || state.completed}
-            className="w-full rounded-xl bg-brand-500 px-3 py-2 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(59,130,246,0.35)] transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-black disabled:cursor-not-allowed disabled:bg-white/20"
+            className="w-full rounded-xl bg-[#ff7658] px-3 py-2 text-base font-semibold text-[#27110b]  transition hover:bg-[#ff8a70]  focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-black disabled:cursor-not-allowed disabled:bg-[#383a3c]"
           >
-            {state.completed ? "Solved" : state.submitting ? "Checking…" : "Submit guess"}
+            {state.completed
+              ? "Solved"
+              : state.submitting
+                ? "Checking…"
+                : "Submit guess"}
           </button>
         </div>
       </div>
     </form>
   );
 }
-

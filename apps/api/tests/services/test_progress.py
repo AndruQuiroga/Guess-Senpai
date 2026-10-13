@@ -143,3 +143,32 @@ def test_streak_persistence() -> None:
         assert persisted.last_completed == date(2024, 11, 2)
 
     asyncio.run(_scenario())
+
+
+def test_anidle_attempt_limit_round_trips_for_exhaustion() -> None:
+    """Exhausted v2 Anidle stays completed=False but keeps its attempt budget."""
+    user_id = 202
+    day = date(2024, 11, 2)
+
+    async def _scenario() -> None:
+        payload = DailyProgressPayload(
+            date=day,
+            progress={
+                "anidle": GameProgressPayload.model_validate(
+                    {
+                        "completed": False,
+                        "round": 1,
+                        "guesses": ["a", "b"],
+                        "attemptLimit": 2,
+                    }
+                ),
+            },
+        )
+        await progress.store_daily_progress(user_id, payload)
+        stored = await progress.load_daily_progress(user_id, day)
+        entry = stored.progress["anidle"]
+        assert entry.completed is False
+        assert entry.attempt_limit == 2
+        assert entry.model_dump(by_alias=True, exclude_none=True)["attemptLimit"] == 2
+
+    asyncio.run(_scenario())

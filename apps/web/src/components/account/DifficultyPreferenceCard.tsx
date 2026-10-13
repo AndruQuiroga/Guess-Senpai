@@ -3,28 +3,35 @@
 import { useCallback, useMemo } from "react";
 
 import { useUserPreferences } from "../../hooks/useUserPreferences";
-import { DifficultyPresetSelector, type DifficultyPresetOption } from "../preferences/DifficultyPresetSelector";
+import {
+  DifficultyPresetSelector,
+  type DifficultyPresetOption,
+} from "../preferences/DifficultyPresetSelector";
 
 const PROFILE_DIFFICULTY_PRESETS: DifficultyPresetOption[] = [
   {
     value: 1,
     label: "Relaxed",
-    description: "Start each puzzle with extra context and the gentlest hint cadence.",
+    description:
+      "Start each puzzle with extra context and the gentlest hint cadence.",
   },
   {
     value: 2,
     label: "Balanced",
-    description: "Stick with the default challenge tuned for a mix of guidance and mystery.",
+    description:
+      "Stick with the default challenge tuned for a mix of guidance and mystery.",
   },
   {
     value: 3,
     label: "Hardcore",
-    description: "Jump straight to late-round clues and rely on instinct over hand-holding.",
+    description:
+      "Jump straight to late-round clues and rely on instinct over hand-holding.",
   },
 ];
 
 export function DifficultyPreferenceCard() {
-  const { difficultyLevel, updateDifficulty, loading, error } = useUserPreferences();
+  const { difficultyLevel, updateDifficulty, loading, error } =
+    useUserPreferences();
 
   const description = useMemo(() => {
     if (error) {

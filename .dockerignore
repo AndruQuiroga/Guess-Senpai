@@ -5,6 +5,8 @@ out
 dist
 .cache
 coverage
+**/node_modules
+**/.next
 
 # env & local
 .env

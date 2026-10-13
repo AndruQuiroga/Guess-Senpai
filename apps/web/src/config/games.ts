@@ -45,29 +45,30 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
   {
     slug: "anidle",
     title: "Anidle",
-    tagline: "Name the anime from remixed OP and ED track hints.",
+    tagline: "Identify the anime using metadata feedback and synopsis hints.",
     accentColor: "from-amber-400 via-orange-500 to-rose-500",
     playable: true,
     comingSoon: false,
     gameKey: "anidle",
-    description: "Identify each series from a playlist of opening and ending themes.",
+    description:
+      "Identify the anime from metadata comparisons and progressively revealed synopsis clues.",
     preview: {
       summary:
-        "Tackle three rounds of remixed anime openings and endings, locking in the show before the final beat drops.",
+        "Use metadata feedback from title guesses and unlock more synopsis clues as you progress.",
       rules: [
-        "Listen to a short mashup of opening and ending themes for each round.",
-        "Submit a guess after every listen—wrong answers unlock richer hints.",
-        "Solve the playlist in three rounds to keep your streak alive.",
+        "Submit an anime title to compare its metadata with the answer.",
+        "Use higher/lower, matching, and partial-match feedback to narrow the possibilities.",
+        "Synopsis hints reveal progressively as you make incorrect guesses.",
       ],
       media: {
         type: "image",
         src: "/games/anidle.svg",
-        alt: "Stylized waveform cards highlighting a blended anime soundtrack.",
+        alt: "Metadata comparison cells with match checks and higher or lower arrows.",
       },
       placeholder: {
-        headline: "Audio sampler",
+        headline: "Metadata comparison",
         description:
-          "A waveform preview highlighting the shifting blend of iconic OP and ED tracks.",
+          "Match checks and higher or lower clues help narrow down the anime.",
         icon: "🎧",
       },
     },
@@ -75,7 +76,8 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
   {
     slug: "poster-zoomed",
     title: "Poster Zoomed",
-    tagline: "Sharpen the view across three rounds to name the anime and its release.",
+    tagline:
+      "Sharpen the view across three rounds to name the anime and its release.",
     accentColor: "from-emerald-400 via-teal-400 to-sky-500",
     playable: true,
     comingSoon: false,
@@ -88,16 +90,17 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       rules: [
         "Start with a tight crop; each round widens the frame and layers on extra metadata.",
         "Submit both the anime title and its release season or year to clear the round.",
-        "Seal the win before the third-round reveal to perfect your poster streak.",
+        "Complete the round by matching the anime and its release information.",
       ],
       media: {
         type: "image",
         src: "/games/poster-zoomed.svg",
-        alt: "Layered poster frames expanding outward from a highlighted focal point.",
+        alt: "A poster crop within corner marks, opening toward the full image.",
       },
       placeholder: {
         headline: "Poster focus",
-        description: "A shifting crop that unveils key art details frame by frame.",
+        description:
+          "A shifting crop that unveils key art details frame by frame.",
         icon: "🖼️",
       },
     },
@@ -123,11 +126,12 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       media: {
         type: "image",
         src: "/games/character-silhouette.svg",
-        alt: "Neon-lit character silhouette emerging from a dramatic spotlight.",
+        alt: "A hidden character outline with a question mark: name the character and anime.",
       },
       placeholder: {
         headline: "Silhouette spotlight",
-        description: "A character outline emerging from neon rim lighting.",
+        description:
+          "A hidden character outline awaiting its character and anime names.",
         icon: "🌌",
       },
     },
@@ -152,11 +156,12 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       media: {
         type: "image",
         src: "/games/redacted-synopsis.svg",
-        alt: "Classified dossier with highlighted lines and bold redaction bars.",
+        alt: "A story page with words concealed by solid redaction bars.",
       },
       placeholder: {
         headline: "Blackout dossier",
-        description: "Highlighted text lines with dramatic black bars covering keywords.",
+        description:
+          "Highlighted text lines with dramatic black bars covering keywords.",
         icon: "📝",
       },
     },
@@ -169,10 +174,11 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     playable: false,
     comingSoon: true,
     gameKey: "guess_the_opening",
-    description: "Match a short music clip to the right series before time runs out.",
+    description:
+      "Match a short music clip to the right series before time runs out.",
     preview: {
       summary:
-        "A trio of anime openings drop every day—clear the full set to bank your Guess the Opening streak.",
+        "An optional mode that is available when a playable clip set is returned.",
       rules: [
         "Spin up each short clip sourced from AnimeThemes and lock in the correct series.",
         "Three openings per day—solve every clip to secure the daily win.",
@@ -181,11 +187,12 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       media: {
         type: "image",
         src: "/games/guess-the-opening.svg",
-        alt: "Colorful equalizer bars pulsing behind a glowing play button.",
+        alt: "A play button and sound waveform for identifying an anime opening.",
       },
       placeholder: {
         headline: "Loop lab",
-        description: "Pulsing equalizer bars teasing the next wave of OP snippets.",
+        description:
+          "Pulsing equalizer bars teasing the next wave of OP snippets.",
         icon: "🎶",
       },
     },
@@ -197,23 +204,25 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     accentColor: "from-rose-400 via-amber-400 to-yellow-400",
     playable: false,
     comingSoon: true,
-    description: "Pick the speaker after listening to a single in-character quote.",
+    description:
+      "Pick the speaker after listening to a single in-character quote.",
     preview: {
       summary:
         "Clip detectives will love this—identify the character and series from a single in-character quote.",
       rules: [
         "Listen to the isolated voice line pulled from the anime.",
         "Pick the right character or series before the reveal is triggered.",
-        "Rack up streak bonuses for consecutive perfect matches.",
+        "Submit your character and anime guesses to receive feedback.",
       ],
       media: {
         type: "image",
         src: "/games/mystery-voice.svg",
-        alt: "Retro microphone console surrounded by radiating vocal waveforms.",
+        alt: "A microphone with sound waves for identifying a mystery voice.",
       },
       placeholder: {
         headline: "Vocal vignette",
-        description: "Stylized sound waves paired with a silhouetted character profile.",
+        description:
+          "Stylized sound waves paired with a silhouetted character profile.",
         icon: "🎙️",
       },
     },
@@ -232,16 +241,17 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       rules: [
         "Study the emoji sequence for characters, settings, and twists.",
         "Lock in the anime title that best fits the pictographic story.",
-        "Earn bonus points for solving without requesting clarifying hints.",
+        "Submit the title that best matches the emoji clues.",
       ],
       media: {
         type: "image",
         src: "/games/emoji-synopsis.svg",
-        alt: "Collage of vibrant emojis arranged over a glassy card surface.",
+        alt: "Lightning, a home, and a hero face as symbolic story clues.",
       },
       placeholder: {
         headline: "Emoji storyboard",
-        description: "Rows of expressive icons hinting at dramatic twists and tropes.",
+        description:
+          "Rows of expressive icons hinting at dramatic twists and tropes.",
         icon: "🧩",
       },
     },
@@ -253,19 +263,20 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     accentColor: "from-cyan-400 via-emerald-400 to-lime-400",
     playable: false,
     comingSoon: true,
-    description: "Test your memory of legendary lines from across anime history.",
+    description:
+      "Test your memory of legendary lines from across anime history.",
     preview: {
       summary:
         "Put your quote library to the test by matching legendary anime lines to their source series.",
       rules: [
         "Read the highlighted quote pulled from the original script.",
         "Select the correct series or speaker from multiple options.",
-        "Maintain accuracy streaks to climb the leaderboard when it launches.",
+        "Identify the anime or speaker from the displayed quote.",
       ],
       media: {
         type: "image",
         src: "/games/quote-quiz.svg",
-        alt: "Dual speech bubbles floating above a neon quote card.",
+        alt: "A speech card with quotation marks and a line to identify.",
       },
       placeholder: {
         headline: "Quote archive",
@@ -309,5 +320,7 @@ export function resolveGameAvailability(
 export function buildRuntimeGamesDirectory(
   availability: RuntimeGameAvailability,
 ): GameDirectoryEntry[] {
-  return GAMES_DIRECTORY.map((game) => resolveGameAvailability(game, availability));
+  return GAMES_DIRECTORY.map((game) =>
+    resolveGameAvailability(game, availability),
+  );
 }

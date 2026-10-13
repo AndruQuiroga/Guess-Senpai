@@ -20,6 +20,11 @@ export interface AnidleHints {
 }
 
 export interface AnidleGame {
+  rules?: {
+    version: "2";
+    max_attempts: number;
+    hint_after_incorrect: number[];
+  } | null;
   spec: RoundSpec[];
   answer: string;
   hints: AnidleHints;
@@ -199,6 +204,11 @@ export interface GamesPayload {
 
 export interface DailyPuzzleResponse {
   date: string;
+  puzzle_id: string;
+  rules_version: string;
+  reset_at: string;
+  available_modes: string[];
+  mode_puzzle_ids: Record<string, string>;
   games: GamesPayload;
   guess_the_opening_enabled: boolean;
 }

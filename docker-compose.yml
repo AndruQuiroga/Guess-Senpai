@@ -19,15 +19,23 @@ services:
       - redis
       - postgres
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health/live"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=2)",
+        ]
       interval: 10s
       timeout: 3s
       retries: 5
 
   web:
     build:
-      context: .                       # repo root (so the Dockerfile can see pnpm-lock + workspace)
+      context: . # repo root (so the Dockerfile can see pnpm-lock + workspace)
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
     env_file: .env
     environment:
       API_BASE_URL: ${API_BASE_URL:-http://api:8000}
@@ -38,7 +46,7 @@ services:
     depends_on:
       - api
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
       interval: 15s
       timeout: 3s
       retries: 5

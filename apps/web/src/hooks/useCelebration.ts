@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-export type CelebrationStatus = "not-started" | "in-progress" | "completed";
+export type CelebrationStatus =
+  | "not-started"
+  | "in-progress"
+  | "completed"
+  | "exhausted";
 
 export interface CelebrationOptions {
   /**
@@ -41,4 +45,3 @@ export function useCelebration(
 
   return isCelebrating;
 }
-

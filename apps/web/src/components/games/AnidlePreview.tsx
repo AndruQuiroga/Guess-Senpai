@@ -7,36 +7,27 @@ interface AnidlePreviewProps {
 export function AnidlePreview({ bundle }: AnidlePreviewProps) {
   if (!bundle) return null;
 
-  const synopsisHints = bundle.puzzle.hints?.synopsis ?? [];
-  const firstHint = synopsisHints[0];
-  const previewText = firstHint?.text ?? "Piece together the anime using a heavily redacted synopsis.";
+  const previewText =
+    "Compare metadata from your title guesses and use the progressively revealed synopsis hints.";
   const trimmedPreview =
-    previewText.length > 220 ? `${previewText.slice(0, 217).trimEnd()}…` : previewText;
-  const revealPercent = firstHint ? Math.round(firstHint.ratio * 100) : 30;
-  const futurePercents = synopsisHints
-    .slice(1)
-    .map((hint) => `${Math.round(hint.ratio * 100)}%`)
-    .join(", ");
+    previewText.length > 220
+      ? `${previewText.slice(0, 217).trimEnd()}…`
+      : previewText;
 
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-brand-400/20 bg-brand-500/5 px-3 py-2 text-left">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-200/80">
-          {revealPercent}% revealed synopsis
+      <div className="rounded-lg border border-[#ff7658] bg-[#3a2a25] px-3 py-2 text-left">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-200">
+          How Anidle works
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-neutral-100/90">{trimmedPreview}</p>
+        <p className="mt-2 text-sm leading-relaxed text-[#f4f0e7]">
+          {trimmedPreview}
+        </p>
       </div>
 
-      {futurePercents ? (
-        <p className="text-xs text-neutral-400">
-          Later rounds uncover more of the synopsis ({futurePercents}) while stat comparisons stay locked to guess feedback.
-        </p>
-      ) : (
-        <p className="text-xs text-neutral-400">
-          Stat comparisons (genres, year, popularity, and more) only appear after you submit guesses.
-        </p>
-      )}
+      <p className="text-xs text-neutral-400">
+        This preview does not show today&apos;s answer or clue text.
+      </p>
     </div>
   );
 }
-

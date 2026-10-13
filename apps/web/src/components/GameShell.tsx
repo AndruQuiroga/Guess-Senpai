@@ -18,27 +18,32 @@ export function GameShell({
   roundLabel,
   children,
 }: PropsWithChildren<GameShellProps>) {
-
   return (
-    <section className="relative flex min-h-[60vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 shadow-ambient backdrop-blur-2xl transition hover:border-brand-400/30 hover:shadow-glow">
-      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/70 to-transparent" />
-      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="game-shell panel relative flex flex-col overflow-visible p-4 sm:p-6">
+      <header className="mb-5 flex flex-col gap-3 border-b border-[#484b4d] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-display font-semibold tracking-tight text-white drop-shadow-[0_0_12px_rgba(59,130,246,0.35)]">
+          <h2 className="text-2xl font-display font-bold tracking-tight text-[#f4f0e7]">
             {title}
           </h2>
-          <div className="mt-2 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-brand-200/80">
-            <span className="rounded-full border border-brand-400/60 bg-brand-500/10 px-3 py-1 text-[0.65rem] font-semibold text-brand-200">
+          <div className="mt-2 flex items-center gap-2 text-sm text-[#c1c2bd]">
+            <span className="rounded-md border border-[#686b6d] bg-[#2c2f31] px-3 py-1 font-semibold text-[#f4f0e7]">
               {roundLabel ?? "Round"} {round} / {totalRounds}
             </span>
           </div>
         </div>
-        {actions ? <div className="flex items-center gap-2 text-sm text-neutral-300">{actions}</div> : null}
+        {actions ? (
+          <div className="flex items-center gap-2 text-sm text-[#c1c2bd]">
+            {actions}
+          </div>
+        ) : null}
       </header>
       <div className="flex-1 space-y-5">{children}</div>
-      <div className="mt-6 h-1 w-full overflow-hidden rounded-full bg-white/5">
+      <div
+        className="mt-5 h-1 w-full overflow-hidden rounded-full bg-[#484b4d]"
+        aria-hidden="true"
+      >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-brand-400 via-brand-500 to-brand-300 transition-all duration-500"
+          className="h-full bg-[#ff7658] transition-all duration-300"
           style={{ width: `${(round / totalRounds) * 100}%` }}
         />
       </div>

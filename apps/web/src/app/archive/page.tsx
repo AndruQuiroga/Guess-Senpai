@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import ArchiveIndexContent from "./ArchiveIndexContent";
 
 const API_BASE =
@@ -35,32 +37,48 @@ async function fetchArchiveIndex(): Promise<ArchiveIndexResponse | null> {
   }
 }
 
-export default async function ArchiveIndexPage({ searchParams }: ArchivePageProps) {
+export default async function ArchiveIndexPage({
+  searchParams,
+}: ArchivePageProps) {
   const selectedParam = normalizeSelected(searchParams?.selected);
   const archiveIndex = await fetchArchiveIndex();
 
   if (!archiveIndex) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="rounded-3xl border border-red-500/40 bg-red-500/10 px-6 py-5 text-red-100">
+        <div className="rounded-lg border border-[#c0566a] bg-[#40242a] px-6 py-5 text-[#f4f0e7]">
           <h1 className="text-2xl font-semibold">Archive Unavailable</h1>
           <p className="mt-2 text-sm text-red-100/80">
-            We couldn&apos;t load the archive dates right now. Please try again later.
+            We couldn&apos;t load the archive dates right now. You can retry
+            without leaving the archive.
           </p>
+          <Link href="/archive" className="button button-primary mt-4">
+            Retry archive
+          </Link>
         </div>
       </div>
     );
   }
 
-  const selectedDate = selectedParam && archiveIndex.dates.includes(selectedParam) ? selectedParam : undefined;
+  const selectedDate =
+    selectedParam && archiveIndex.dates.includes(selectedParam)
+      ? selectedParam
+      : undefined;
 
   if (archiveIndex.dates.length === 0) {
     return (
       <div className="mx-auto max-w-3xl space-y-8">
         <header className="space-y-3">
-          <p className="text-sm uppercase tracking-wider text-brand-200/80">Archive</p>
-          <h1 className="text-4xl font-semibold text-white">Archive coming soon</h1>
-          <p className="text-sm text-neutral-300">New puzzles are on their way. Check back soon for replayable challenges.</p>
+          <p className="text-sm uppercase tracking-wider text-[#c1c2bd]">
+            Archive
+          </p>
+          <h1 className="text-4xl font-semibold text-white">
+            No published puzzles yet
+          </h1>
+          <p className="text-sm text-[#c1c2bd]">
+            Published daily puzzles will appear here after they become
+            available.
+          </p>
         </header>
       </div>
     );
@@ -68,7 +86,10 @@ export default async function ArchiveIndexPage({ searchParams }: ArchivePageProp
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <ArchiveIndexContent dates={archiveIndex.dates} selectedDate={selectedDate} />
+      <ArchiveIndexContent
+        dates={archiveIndex.dates}
+        selectedDate={selectedDate}
+      />
     </div>
   );
 }

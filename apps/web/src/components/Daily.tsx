@@ -27,14 +27,12 @@ import {
 } from "../utils/shareText";
 import { formatDurationFromMs, getNextResetIso } from "../utils/time";
 import { projectStreakSnapshot } from "../utils/streak";
-import { GlassSection } from "./GlassSection";
+import { PanelSection } from "./PanelSection";
 import SolutionReveal from "./SolutionReveal";
 import StreakWidget from "./StreakWidget";
 import NotificationOptInCard from "./NotificationOptInCard";
-import {
-  ShareCardRequestPayload,
-  ShareComposer,
-} from "./ShareComposer";
+import { ShareCardRequestPayload, ShareComposer } from "./ShareComposer";
+import { getGameOutcome } from "../utils/gameAction";
 import {
   AnidlePreview,
   CharacterSilhouettePreview,
@@ -57,7 +55,6 @@ interface TimelineEntry {
   slug: string;
   title: string;
   description?: string;
-  accentColor: string;
   gameKey: GameKey;
   status: GameProgressStatus;
   statusLabel: string;
@@ -68,17 +65,28 @@ interface TimelineEntry {
 export default function Daily({ data }: Props) {
   if (!data) {
     return (
-      <div className="relative flex min-h-[50vh] flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border border-white/10 bg-surface-raised p-6 text-center text-neutral-100 shadow-ambient backdrop-blur-xl">
-        <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-        <p className="max-w-md text-sm text-neutral-200">
-          Couldn&apos;t load today&apos;s puzzles. Please refresh or try again later.
+      <div className="relative flex min-h-[50vh] flex-col items-center justify-center gap-4 overflow-hidden rounded-lg border border-[#484b4d] bg-surface-raised p-6 text-center text-[#f4f0e7]">
+        <p className="max-w-md text-sm text-[#c1c2bd]">
+          Couldn&apos;t load today&apos;s puzzles. Your saved progress on this
+          device is kept. Retry when the connection is available.
         </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-lg border border-[#686b6d] bg-[#2c2f31] px-4 py-2 text-sm font-semibold text-[#f4f0e7] hover:bg-[#2c2f31] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
   return (
-    <PuzzleProgressProvider date={data.date}>
+    <PuzzleProgressProvider
+      date={data.date}
+      puzzleId={data.puzzle_id}
+      rulesVersion={data.rules_version}
+    >
       <DailyContent data={data} />
     </PuzzleProgressProvider>
   );
@@ -87,7 +95,10 @@ export default function Daily({ data }: Props) {
 function DailyContent({ data }: { data: DailyPuzzleResponse }) {
   const { progress, refresh, isRefreshing } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
-  const nextResetIso = useMemo(() => getNextResetIso(data.date), [data.date]);
+  const nextResetIso = useMemo(
+    () => data.reset_at || getNextResetIso(data.date),
+    [data.reset_at, data.date],
+  );
   const includeGuessTheOpening = data.guess_the_opening_enabled;
   const anidleBundle = data.games.anidle;
   const posterBundle = data.games.poster_zoomed;
@@ -103,7 +114,9 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       character_silhouette: silhouetteBundle,
       redacted_synopsis: synopsisBundle,
       guess_the_opening:
-        includeGuessTheOpening && guessOpeningBundle ? guessOpeningBundle : null,
+        includeGuessTheOpening && guessOpeningBundle
+          ? guessOpeningBundle
+          : null,
     }),
     [
       anidleBundle,
@@ -167,7 +180,10 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
   const mediaIdLabel = useMemo(() => {
     const posterRoundIds = (posterBundle?.puzzle.rounds ?? [])
       .map((round) => round?.mediaId)
-      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+      .filter(
+        (value): value is number =>
+          typeof value === "number" && Number.isFinite(value),
+      );
     const ids = [
       anidleBundle?.mediaId ?? null,
       posterBundle?.mediaId ?? null,
@@ -217,9 +233,11 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
 
       const progressForGame = progress[entry.gameKey];
       const completed = Boolean(progressForGame?.completed);
+      const exhausted = getGameOutcome(progressForGame) === "exhausted";
       const inProgress = Boolean(
         progressForGame &&
           !progressForGame.completed &&
+          !exhausted &&
           ((progressForGame.round ?? 0) > 0 ||
             (progressForGame.guesses?.length ?? 0) > 0),
       );
@@ -232,19 +250,28 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
         status = "completed";
         statusLabel = "Completed";
         statusIcon = "✓";
+      } else if (exhausted) {
+        status = "exhausted";
+        statusLabel = "Out of guesses";
+        statusIcon = "●";
       } else if (inProgress) {
         status = "in-progress";
         statusLabel = "In progress";
         statusIcon = "◐";
       }
 
-      const ctaLabel = completed ? "Replay" : inProgress ? "Resume" : "Play now";
+      const ctaLabel = exhausted
+        ? "Results"
+        : completed
+          ? "Replay"
+          : inProgress
+            ? "Resume"
+            : "Play now";
 
       const timelineEntry = {
         slug: entry.slug,
         title: entry.title,
         description: entry.description,
-        accentColor: entry.accentColor,
         gameKey: entry.gameKey,
         status,
         statusLabel,
@@ -262,7 +289,9 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       poster_zoomed: (
         <PosterZoomPreview bundle={posterBundle} progress={posterProgress} />
       ),
-      character_silhouette: <CharacterSilhouettePreview bundle={silhouetteBundle} />,
+      character_silhouette: (
+        <CharacterSilhouettePreview bundle={silhouetteBundle} />
+      ),
       redacted_synopsis: <RedactedSynopsisPreview bundle={synopsisBundle} />,
       guess_the_opening:
         includeGuessTheOpening && guessOpeningBundle ? (
@@ -280,7 +309,9 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
     ],
   );
 
-  const requiredGames: GameKey[] = timelineEntries.map((entry) => entry.gameKey);
+  const requiredGames: GameKey[] = timelineEntries.map(
+    (entry) => entry.gameKey,
+  );
 
   const { streak: accountStreak } = useAccountStreak();
   const allCompleted = requiredGames.every((key) => progress[key]?.completed);
@@ -291,13 +322,19 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
   const streakCount = streakInfo.count;
 
   const shareEvent = useMemo<ShareEventData>(() => {
-    return buildShareEvent(data.date, progress, {
-      includeGuessTheOpening,
-      aniListUrls: allCompleted ? solutionUrls : undefined,
-    });
+    return {
+      ...buildShareEvent(data.date, progress, {
+        includeGuessTheOpening,
+        aniListUrls: allCompleted ? solutionUrls : undefined,
+      }),
+      puzzleId: data.puzzle_id,
+      rulesVersion: data.rules_version,
+    };
   }, [
     allCompleted,
     data.date,
+    data.puzzle_id,
+    data.rules_version,
     includeGuessTheOpening,
     progress,
     solutionUrls,
@@ -305,11 +342,11 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
 
   const shareCardPayload = useMemo<ShareCardRequestPayload>(() => {
     const preferredTitle = primarySolution
-      ? primarySolution.titles.userPreferred ??
+      ? (primarySolution.titles.userPreferred ??
         primarySolution.titles.english ??
         primarySolution.titles.romaji ??
         primarySolution.titles.native ??
-        null
+        null)
       : null;
 
     return {
@@ -318,11 +355,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       streak: streakCount,
       cover: primarySolution?.coverImage ?? null,
     };
-  }, [
-    shareEvent,
-    primarySolution,
-    streakCount,
-  ]);
+  }, [shareEvent, primarySolution, streakCount]);
 
   const shareLocked = useMemo(() => {
     return shareEvent.games.every((game) => game.status === "pending");
@@ -336,6 +369,17 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
   const syncButtonLabel = isRefreshing ? "Syncing…" : "Sync progress";
 
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const [hasRolledOver, setHasRolledOver] = useState(false);
+
+  useEffect(() => {
+    const checkRollover = () => {
+      const todayUtc = new Date().toISOString().slice(0, 10);
+      setHasRolledOver(data.date < todayUtc);
+    };
+    checkRollover();
+    const interval = window.setInterval(checkRollover, 15_000);
+    return () => window.clearInterval(interval);
+  }, [data.date]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -369,13 +413,10 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
 
   const countdownDisplay = timeRemaining ?? "— — : — —";
 
-  const [syncToast, setSyncToast] = useState<
-    | {
-        tone: "success" | "error";
-        message: string;
-      }
-    | null
-  >(null);
+  const [syncToast, setSyncToast] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const handleSync = useCallback(async () => {
     const result = await refresh();
@@ -398,25 +439,39 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <header className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised px-6 py-7 shadow-ambient backdrop-blur-2xl sm:px-8">
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
+      <header className="relative overflow-hidden rounded-lg border border-[#484b4d] bg-surface-raised px-6 py-7 sm:px-8">
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start">
           <div className="flex-1 space-y-6">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-brand-200/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-brand-200">
                 Daily challenge
               </p>
-              <h1 className="text-3xl font-display font-semibold tracking-tight text-white drop-shadow-[0_0_12px_rgba(59,130,246,0.35)] sm:text-[2.6rem]">
+              <h1 className="text-3xl font-display font-semibold tracking-tight text-[#f4f0e7] drop- sm:text-[2.6rem]">
                 GuessSenpai Daily
               </h1>
-              <p className="text-sm text-neutral-300/90">{formattedDate}</p>
+              <p className="text-sm text-[#c1c2bd]">{formattedDate}</p>
+              {hasRolledOver && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#ff7658] bg-[#3a2a25] p-3 text-sm text-[#f4f0e7]">
+                  <span>
+                    A new UTC daily puzzle is available. This puzzle and its
+                    progress are still here.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    Load new daily
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2.5 text-sm">
-              <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-gradient-to-r from-amber-400/25 via-amber-500/10 to-amber-400/25 px-4 py-1.5 font-medium text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-sm">
+              <span className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-[#2c2f31] px-4 py-1.5 font-medium text-amber-50">
                 🔥 Streak {streakCount}
               </span>
               {mediaIdLabel && (
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 font-medium text-white/90 backdrop-blur-sm">
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#686b6d] bg-[#2c2f31] px-4 py-1.5 font-medium text-[#f4f0e7]">
                   {mediaIdLabel}
                 </span>
               )}
@@ -424,7 +479,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-lg border border-[#686b6d] bg-[#2c2f31] px-5 py-2 text-sm font-semibold text-[#f4f0e7] transition hover:bg-[#2c2f31] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={handleSync}
                 disabled={isRefreshing}
               >
@@ -433,14 +488,14 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
             </div>
           </div>
           <div className="flex w-full max-w-sm flex-none items-center justify-center self-stretch">
-            <div className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/10 px-6 py-6 text-center shadow-ambient backdrop-blur-2xl sm:px-7">
-              <span className="text-xs font-semibold uppercase tracking-[0.4em] text-white/70">
+            <div className="relative w-full overflow-hidden rounded-lg border border-[#484b4d] bg-[#2c2f31] px-6 py-6 text-center sm:px-7">
+              <span className="text-xs font-semibold uppercase tracking-[0.4em] text-[#f4f0e7]">
                 Time left
               </span>
-              <span className="mt-3 block font-mono text-4xl font-semibold leading-none text-white sm:text-5xl">
+              <span className="mt-3 block font-mono text-4xl font-semibold leading-none text-[#f4f0e7] sm:text-5xl">
                 {countdownDisplay}
               </span>
-              <span className="mt-3 block text-sm text-neutral-200/80">
+              <span className="mt-3 block text-sm text-[#c1c2bd]">
                 Keep playing before the next drop lands.
               </span>
             </div>
@@ -452,10 +507,10 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
         <div
           role="status"
           aria-live="polite"
-          className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium shadow-glow backdrop-blur sm:px-5 ${
+          className={`inline-flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium sm:px-5 ${
             syncToast.tone === "success"
-              ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-100"
-              : "border-rose-400/40 bg-rose-500/20 text-rose-100"
+              ? "border-[#3f8a5f] bg-[#1f3a2c] text-emerald-100"
+              : "border-[#c0566a] bg-[#40242a] text-rose-100"
           }`}
         >
           {syncToast.message}
@@ -465,20 +520,19 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       <section className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] lg:items-start">
         <div className="space-y-5 sm:space-y-6">
           <div className="space-y-1">
-            <h2 className="text-xl font-display font-semibold tracking-tight text-white sm:text-2xl">
+            <h2 className="text-xl font-display font-semibold tracking-tight text-[#f4f0e7] sm:text-2xl">
               Today&apos;s games
             </h2>
-            <p className="text-sm leading-relaxed text-neutral-300/90">
+            <p className="text-sm leading-relaxed text-[#c1c2bd]">
               Jump straight into each challenge—every puzzle is just a tap away.
             </p>
           </div>
 
           {timelineEntries.length > 0 ? (
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-raised/80 p-5 shadow-ambient backdrop-blur-2xl sm:p-7">
-              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent sm:inset-x-9" />
+            <div className="relative overflow-hidden rounded-lg border border-[#484b4d] bg-surface-raised p-5 sm:p-7">
               <div className="relative sm:pl-8">
                 <span className="pointer-events-none absolute left-[0.35rem] top-6 bottom-6">
-                  <span className="block h-full w-px bg-white/15" />
+                  <span className="block h-full w-px bg-[#2c2f31]" />
                 </span>
                 <ol className="space-y-6 sm:space-y-8">
                   {timelineEntries.map((entry, index) => (
@@ -490,7 +544,6 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
                       status={entry.status}
                       statusLabel={entry.statusLabel}
                       statusIcon={entry.statusIcon}
-                      accentColor={entry.accentColor}
                       ctaLabel={entry.ctaLabel}
                       href={`/games/${entry.slug}`}
                       index={index}
@@ -501,27 +554,27 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
               </div>
             </div>
           ) : (
-            <GlassSection
-              className="border-dashed border-white/10 bg-surface-raised/50"
-              innerClassName="space-y-2 text-center"
-            >
-              <p className="text-sm font-medium text-white/90">
+            <PanelSection dashed innerClassName="space-y-2 text-center">
+              <p className="text-sm font-medium text-[#f4f0e7]">
                 No daily puzzles are available right now.
               </p>
-              <p className="text-xs text-neutral-300/80">
+              <p className="text-xs text-[#c1c2bd]">
                 Check back soon for fresh challenges.
               </p>
-            </GlassSection>
+            </PanelSection>
           )}
         </div>
 
         <aside className="order-last lg:order-none">
-          <GlassSection innerClassName="space-y-4 text-neutral-200" className="h-full border-white/5 bg-surface-raised/70">
+          <PanelSection
+            innerClassName="space-y-4 text-[#c1c2bd]"
+            className="h-full"
+          >
             <div className="space-y-1">
-              <h2 className="text-lg font-display font-semibold tracking-tight text-white">
+              <h2 className="text-lg font-display font-semibold tracking-tight text-[#f4f0e7]">
                 Share your run
               </h2>
-              <p className="text-sm text-neutral-300/90">
+              <p className="text-sm text-[#c1c2bd]">
                 Craft a recap card with a single tap and show off your streak.
               </p>
             </div>
@@ -530,7 +583,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
               shareLocked={shareLocked}
               fileName={shareFileName}
             />
-          </GlassSection>
+          </PanelSection>
         </aside>
       </section>
 
