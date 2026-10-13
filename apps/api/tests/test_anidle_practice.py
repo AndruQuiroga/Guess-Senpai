@@ -52,8 +52,8 @@ async def test_practice_returns_v2_game_from_the_pool_without_publishing(practic
     assert bundle.mediaId in {media.id for media in practice_pool}
     assert bundle.puzzle.rules is not None
     assert bundle.puzzle.rules.version == "2"
-    assert bundle.puzzle.rules.max_attempts == 8
-    assert bundle.puzzle.rules.hint_after_incorrect == [2, 4, 6]
+    assert bundle.puzzle.rules.max_attempts == 20
+    assert bundle.puzzle.rules.hint_after_incorrect == [10, 13, 16]
     assert bundle.puzzle.answer
     async with get_session_factory()() as session:
         assert (await session.scalars(select(DailyPuzzleSet))).all() == []
@@ -207,3 +207,24 @@ async def test_unpublished_availability_reset_at_is_utc():
     availability = await puzzles_router.get_daily_availability()
     assert availability.published is False
     assert availability.model_dump(mode="json")["reset_at"].endswith("Z")
+
+
+@pytest.mark.asyncio
+async def test_published_sets_serve_current_anidle_rules(local_generation):  # noqa: F811
+    day = datetime.now(timezone.utc).date()
+    await engine.get_daily_puzzle(day)
+    async with get_session_factory()() as session:
+        row = await session.get(DailyPuzzleSet, day)
+    assert row is not None
+    content = dict(row.content)
+    # Simulate a set published under the old eight-guess defaults.
+    content["games"]["anidle"]["puzzle"]["rules"] = {
+        "version": "2",
+        "max_attempts": 8,
+        "hint_after_incorrect": [2, 4, 6],
+    }
+    row.content = content
+    rules = engine._daily_response(row).games.anidle.puzzle.rules
+    assert rules is not None
+    assert rules.max_attempts == 20
+    assert rules.hint_after_incorrect == [10, 13, 16]

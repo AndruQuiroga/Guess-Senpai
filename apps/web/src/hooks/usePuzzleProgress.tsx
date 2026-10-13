@@ -528,6 +528,14 @@ function normalizeGameProgressEntry(value: unknown): GameProgress | null {
     normalized.attemptLimit = attemptLimit;
   }
 
+  const hintsRevealed = coercePositiveInteger(
+    recordEntries["hintsRevealed"] ?? recordEntries["hints_revealed"],
+    0,
+  );
+  if (hintsRevealed !== undefined) {
+    normalized.hintsRevealed = hintsRevealed;
+  }
+
   return normalized;
 }
 

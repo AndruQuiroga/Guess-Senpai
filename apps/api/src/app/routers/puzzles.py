@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
 from time import perf_counter
@@ -34,7 +35,7 @@ from ..services.progress import (
     store_streak,
 )
 from ..services.session import SessionData, get_session_manager
-from ..services.anilist import Media, search_media
+from ..services.anilist import Media, MediaTitlePair, search_media
 from ..services.anidle_evaluator import (
     AnidleEvaluationService,
     AnidleGuessEvaluationPayload,
@@ -534,26 +535,56 @@ async def search_titles(
             results=[TitleSuggestion(id=item.media_id, title=item.title) for item in index_results]
         )
 
-    user_ctx = await _resolve_user_context(request)
-    token = user_ctx.access_token if user_ctx else None
+    # Index miss: ask AniList once per term, then serve the cached answer
+    # (including "no results") so repeat searches never leave the server.
     cache = await get_cache(settings.redis_url)
-    remote_results = await search_media(search_term, limit=limit, token=token)
-    for pair in remote_results:
-        try:
-            await puzzle_engine._load_media_details(pair.id, cache, settings)
-        except Exception:
-            continue
-
-    async with session_factory() as session:
-        refreshed = await title_index.search_titles(session, search_term, limit=limit)
-
-    if refreshed:
-        return TitleSuggestionResponse(
-            results=[TitleSuggestion(id=item.media_id, title=item.title) for item in refreshed]
+    search_key = f"anilist:search:{limit}:{title_index.normalize_title(search_term)}"
+    cached_pairs = await cache.get(search_key)
+    if isinstance(cached_pairs, list):
+        remote_results = [MediaTitlePair.model_validate(item) for item in cached_pairs]
+    else:
+        user_ctx = await _resolve_user_context(request)
+        token = user_ctx.access_token if user_ctx else None
+        remote_results = await search_media(search_term, limit=limit, token=token)
+        await cache.set(
+            search_key,
+            [pair.model_dump(mode="json") for pair in remote_results],
+            settings.anilist_cache_ttl_seconds,
         )
+        await _warm_title_index([pair.id for pair in remote_results], cache)
 
-    # No matches even after remote lookup; return empty set.
-    return TitleSuggestionResponse(results=[])
+        async with session_factory() as session:
+            refreshed = await title_index.search_titles(session, search_term, limit=limit)
+        if refreshed:
+            return TitleSuggestionResponse(
+                results=[TitleSuggestion(id=item.media_id, title=item.title) for item in refreshed]
+            )
+
+    # AniList matched on something the index cannot (abbreviations, synonyms),
+    # so return its own titles rather than nothing.
+    suggestions: List[TitleSuggestion] = []
+    for pair in remote_results[:limit]:
+        title = pair.title.userPreferred or pair.title.english or pair.title.romaji
+        if title:
+            suggestions.append(TitleSuggestion(id=pair.id, title=title))
+    return TitleSuggestionResponse(results=suggestions)
+
+
+_WARM_CONCURRENCY = 4
+
+
+async def _warm_title_index(media_ids: List[int], cache) -> None:
+    """Load details for search hits so later searches and guesses stay local."""
+    semaphore = asyncio.Semaphore(_WARM_CONCURRENCY)
+
+    async def warm(media_id: int) -> None:
+        async with semaphore:
+            try:
+                await puzzle_engine._load_media_details(media_id, cache, settings)
+            except Exception:
+                logger.debug("Failed to warm title index for media %s", media_id)
+
+    await asyncio.gather(*(warm(media_id) for media_id in media_ids))
 
 
 @router.get("/search-characters", response_model=CharacterSuggestionResponse)

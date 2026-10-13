@@ -273,18 +273,48 @@ describe("Anidle hydration", () => {
     [2, "First clue"],
     [4, "Second clue"],
     [6, "Third clue"],
-  ])("resumes %i attempts with its unlocked hint", (count, hint) => {
+  ])("resumes %i attempts with its revealed hint", (count, hint) => {
     render(
       <Anidle
         mediaId={88}
         payload={finitePayload}
-        initialProgress={stored(count as number)}
+        initialProgress={{ ...stored(count as number), hintsRevealed: 3 }}
         onProgressChange={vi.fn()}
       />,
     );
     if (hint) expect(screen.getByText(hint)).toBeInTheDocument();
     else expect(screen.queryByText("First clue")).not.toBeInTheDocument();
     expect(evaluateAnidleGuessMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps earned hints hidden until the player reveals one", () => {
+    const progress = vi.fn();
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(4)}
+        onProgressChange={progress}
+      />,
+    );
+    expect(screen.queryByText("First clue")).not.toBeInTheDocument();
+    expect(screen.getByText(/2 hints are available/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reveal hint" }));
+    expect(screen.getByText("First clue")).toBeInTheDocument();
+    expect(screen.getByText(/A hint is available/)).toBeInTheDocument();
+    expect(progress).toHaveBeenLastCalledWith(
+      expect.objectContaining({ hintsRevealed: 1 }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reveal hint" }));
+    expect(screen.getByText("Second clue")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Reveal hint" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Next hint available after 2 more/),
+    ).toBeInTheDocument();
   });
 
   it("accepts the eighth miss, reveals the answer, and resumes exhaustion without awarding a solve", async () => {
@@ -438,7 +468,7 @@ describe("Anidle hydration", () => {
           ...finitePayload,
           hints: { ...finitePayload.hints, synopsis: [] },
         }}
-        initialProgress={stored(2)}
+        initialProgress={{ ...stored(2), hintsRevealed: 3 }}
         onProgressChange={vi.fn()}
       />,
     );
@@ -451,7 +481,7 @@ describe("Anidle hydration", () => {
           ...finitePayload,
           hints: { ...finitePayload.hints, synopsis: [] },
         }}
-        initialProgress={stored(6)}
+        initialProgress={{ ...stored(6), hintsRevealed: 3 }}
         onProgressChange={vi.fn()}
       />,
     );

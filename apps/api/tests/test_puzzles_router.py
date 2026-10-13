@@ -354,3 +354,42 @@ async def test_verify_endpoint_reports_season_flags(monkeypatch: pytest.MonkeyPa
         assert combined_payload["anime_match"] is True
         assert combined_payload["season_match"] is True
         assert combined_payload["season_year_match"] is True
+
+
+@pytest.mark.asyncio
+async def test_search_titles_caches_remote_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services.cache import InMemoryCache
+
+    remote_media = make_media(4242, "Attack on Titan")
+    cache = InMemoryCache()
+    remote_calls = {"value": 0}
+    warmed: list[int] = []
+
+    async def fake_get_cache(_url=None):
+        return cache
+
+    async def empty_index(session, query, limit=8):  # type: ignore[override]
+        return []
+
+    async def fake_search_media(query: str, limit: int = 8, token: str | None = None):
+        remote_calls["value"] += 1
+        return [MediaTitlePair(id=remote_media.id, title=remote_media.title)]
+
+    async def fake_load_media_details(media_id: int, _cache, _settings):
+        warmed.append(media_id)
+        return remote_media
+
+    monkeypatch.setattr(puzzles_router, "get_cache", fake_get_cache)
+    monkeypatch.setattr(puzzles_router.title_index, "search_titles", empty_index)
+    monkeypatch.setattr(puzzles_router, "search_media", fake_search_media)
+    monkeypatch.setattr(puzzle_engine, "_load_media_details", fake_load_media_details)
+
+    request = Request(scope={"type": "http", "headers": [], "app": None})
+    first = await puzzles_router.search_titles(request, q="AoT", limit=5)
+    second = await puzzles_router.search_titles(request, q="aot ", limit=5)
+
+    # AniList matched an abbreviation the local index cannot, so its titles are returned.
+    assert [item.id for item in first.results] == [remote_media.id]
+    assert [item.title for item in second.results] == ["Attack on Titan"]
+    assert remote_calls["value"] == 1
+    assert warmed == [remote_media.id]

@@ -8,6 +8,9 @@ import {
   type DifficultyPresetOption,
 } from "../preferences/DifficultyPresetSelector";
 
+/** Balanced applies until a player saves their own preference. */
+const DEFAULT_DIFFICULTY = 2;
+
 const PROFILE_DIFFICULTY_PRESETS: DifficultyPresetOption[] = [
   {
     value: 1,
@@ -59,6 +62,8 @@ export function DifficultyPreferenceCard() {
       description={description}
       presets={PROFILE_DIFFICULTY_PRESETS}
       selected={difficultyLevel ?? undefined}
+      defaultValue={DEFAULT_DIFFICULTY}
+      loading={loading}
       onSelect={handleSelect}
     />
   );

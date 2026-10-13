@@ -11,17 +11,58 @@ export const LEGACY_TOTAL_ROUNDS = 3;
 const MIN_INCORRECT_GUESSES_FOR_HINT = 10;
 const INCORRECT_GUESS_INTERVAL = 2;
 
-/** Hints unlocked by the number of incorrect accepted guesses. */
+/** How many rules-v2 hints the player has earned (they still choose to reveal). */
+export function availableHintCount(
+  rules: AnidleRules,
+  incorrectGuessCount: number,
+): number {
+  return rules.hint_after_incorrect.filter(
+    (count) => incorrectGuessCount >= count,
+  ).length;
+}
+
+/** Wrong guesses still needed before the next hint becomes available. */
+export function missesUntilNextHint(
+  rules: AnidleRules,
+  incorrectGuessCount: number,
+): number | null {
+  const next = rules.hint_after_incorrect.find(
+    (count) => count > incorrectGuessCount,
+  );
+  return next == null ? null : next - incorrectGuessCount;
+}
+
+/** Player-facing summary of the rules-v2 guess budget and hint cadence. */
+export function describeAnidleRules(rules: AnidleRules): string[] {
+  const thresholds = rules.hint_after_incorrect;
+  const list =
+    thresholds.length > 1
+      ? `${thresholds.slice(0, -1).join(", ")} and ${thresholds[thresholds.length - 1]}`
+      : String(thresholds[0] ?? "");
+  return [
+    `Find one exact anime title in ${rules.max_attempts} accepted guesses.`,
+    thresholds.length
+      ? `Optional hints become available after ${list} wrong guesses. Nothing is revealed unless you ask: a partly redacted synopsis, or genres, then year, then tags when no synopsis exists.`
+      : "This puzzle has no hints.",
+  ];
+}
+
+/**
+ * Hints shown to the player. Rules v2 shows the `revealed` hints the player
+ * asked for (capped by what they have earned); legacy rules unlock by misses.
+ */
 export function computeAnidleHints(
   payload: AnidleGame,
   rules: AnidleRules | null,
   incorrectGuessCount: number,
+  revealed = 0,
 ): AggregatedHint[] {
   if (rules) {
-    const stage = rules.hint_after_incorrect.filter(
-      (count) => incorrectGuessCount >= count,
-    ).length;
-    if (!stage) return [];
+    const stage = Math.min(
+      revealed,
+      availableHintCount(rules, incorrectGuessCount),
+    );
+    if (stage <= 0) return [];
     const entries = payload.hints.synopsis.filter((hint) => hint.text.trim());
     if (entries.length) {
       const hint = entries[Math.min(stage - 1, entries.length - 1)];

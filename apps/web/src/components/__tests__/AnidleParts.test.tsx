@@ -110,7 +110,7 @@ describe("episodes and format columns", () => {
         ]}
       />,
     );
-    const row = screen.getAllByRole("row")[1];
+    const row = screen.getAllByRole("row")[0];
     expect(within(row).getAllByRole("cell")).toHaveLength(9);
     expect(
       within(row).getByText("Episodes 12: the answer is higher"),
@@ -119,12 +119,8 @@ describe("episodes and format columns", () => {
     expect(within(row).getByText("Format: 0 of 1 match")).toBeInTheDocument();
     const cover = row.querySelector("img");
     expect(cover).toHaveAttribute("src", "https://img.example/cover.jpg");
-    expect(
-      within(screen.getAllByRole("row")[0]).getByText("Episodes"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getAllByRole("row")[0]).getByText("Format"),
-    ).toBeInTheDocument();
+    expect(within(row).getByText("Episodes")).toBeInTheDocument();
+    expect(within(row).getByText("Format")).toBeInTheDocument();
   });
 
   it("shows a no-data tile for guesses saved before the new columns existed", () => {
@@ -133,7 +129,7 @@ describe("episodes and format columns", () => {
         evaluations={[evaluation({ episodes: undefined, format: undefined })]}
       />,
     );
-    const row = screen.getAllByRole("row")[1];
+    const row = screen.getAllByRole("row")[0];
     expect(within(row).getByText("Episodes: no data")).toBeInTheDocument();
     expect(within(row).getByText("Format: No data")).toBeInTheDocument();
   });
@@ -149,7 +145,7 @@ describe("GuessGrid", () => {
         ]}
       />,
     );
-    const rows = screen.getAllByRole("row").slice(1);
+    const rows = screen.getAllByRole("row");
     expect(rows[0]).toHaveTextContent("Second");
     expect(rows[1]).toHaveTextContent("First");
     const cells = within(rows[0]).getAllByRole("cell");
@@ -162,14 +158,15 @@ describe("GuessGrid", () => {
     expect(screen.getByRole("list", { name: "Legend" })).toBeInTheDocument();
   });
 
-  it("shows matched chips, caps them, and collapses the rest into +n", () => {
+  it("lists every matched and missed genre, tag and studio", () => {
     render(<GuessGrid evaluations={[evaluation()]} />);
-    const row = screen.getAllByRole("row")[1];
+    const row = screen.getAllByRole("row")[0];
     expect(within(row).getByText("✓ Action")).toBeInTheDocument();
-    expect(within(row).getByText("✓ C")).toBeInTheDocument();
-    expect(within(row).queryByText("✓ D")).toBeNull();
-    expect(within(row).getByText("+2")).toBeInTheDocument();
-    expect(within(row).getAllByText("+1")).toHaveLength(2);
+    expect(within(row).getByText("✗ Drama")).toBeInTheDocument();
+    expect(within(row).getByText("✓ D")).toBeInTheDocument();
+    expect(within(row).getByText("✗ E")).toBeInTheDocument();
+    expect(within(row).getByText("✗ Bones")).toBeInTheDocument();
+    expect(within(row).queryByText(/^\+\d/)).toBeNull();
   });
 
   it("only animates the freshly added row", () => {
@@ -180,10 +177,10 @@ describe("GuessGrid", () => {
       />,
     );
     const rows = container.querySelectorAll('[role="row"]');
-    expect(rows[1].querySelectorAll(".anidle-reveal").length).toBeGreaterThan(
+    expect(rows[0].querySelectorAll(".anidle-reveal").length).toBeGreaterThan(
       0,
     );
-    expect(rows[2].querySelectorAll(".anidle-reveal")).toHaveLength(0);
+    expect(rows[1].querySelectorAll(".anidle-reveal")).toHaveLength(0);
   });
 });
 
@@ -264,6 +261,7 @@ describe("Anidle empty state", () => {
           round: 1,
           guesses: ["G0", "G1"],
           anidleHistory: history,
+          hintsRevealed: 1,
         }}
       />,
     );

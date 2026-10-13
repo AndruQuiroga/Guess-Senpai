@@ -1358,7 +1358,7 @@ async def get_daily_puzzle(
 def _daily_response(row: DailyPuzzleSet) -> DailyPuzzleResponse:
     content = dict(row.content)
     modes = list(row.available_modes)
-    return DailyPuzzleResponse.model_validate({
+    response = DailyPuzzleResponse.model_validate({
         **content,
         "puzzle_id": f"daily:{row.puzzle_date.isoformat()}",
         "rules_version": row.rules_version,
@@ -1366,3 +1366,9 @@ def _daily_response(row: DailyPuzzleSet) -> DailyPuzzleResponse:
         "available_modes": modes,
         "mode_puzzle_ids": {mode: f"daily:{row.puzzle_date.isoformat()}:{mode}:v{row.rules_version}" for mode in modes},
     })
+    # The guess budget and hint cadence are tuning, not puzzle content: serve
+    # the current values even for sets published under older defaults.
+    anidle = response.games.anidle.puzzle
+    if anidle.rules is not None and anidle.rules.version == "2":
+        anidle.rules = AnidleRules()
+    return response

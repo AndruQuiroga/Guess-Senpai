@@ -29,18 +29,74 @@ export function RedactedText({ text }: { text: string }) {
   return <>{nodes}</>;
 }
 
-interface HintStripProps {
-  hints: AggregatedHint[];
+export interface HintOffer {
+  /** Hints earned but not yet revealed. */
+  pending: number;
+  used: number;
+  total: number;
+  /** Wrong guesses until the next hint is earned; null when none remain. */
+  nextHintIn: number | null;
+  onReveal(): void;
 }
 
-/** Compact hint area shown below the input once a hint has unlocked. */
-export function HintStrip({ hints }: HintStripProps) {
-  if (hints.length === 0) return null;
+interface HintStripProps {
+  hints: AggregatedHint[];
+  /** Rules v2 opt-in hints. Without it, every hint passed is shown. */
+  offer?: HintOffer | null;
+}
+
+function HintOfferBar({ offer }: { offer: HintOffer }) {
+  const status =
+    offer.pending > 0
+      ? `${offer.pending === 1 ? "A hint is" : `${offer.pending} hints are`} available.`
+      : offer.nextHintIn != null
+        ? `Next hint available after ${offer.nextHintIn} more wrong ${
+            offer.nextHintIn === 1 ? "guess" : "guesses"
+          }.`
+        : "No hints left.";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <p className="text-muted">
+        <span className="font-semibold text-paper">
+          Hints {offer.used}/{offer.total}
+        </span>{" "}
+        · {status}
+      </p>
+      {offer.pending > 0 ? (
+        <button
+          type="button"
+          onClick={offer.onReveal}
+          className="inline-flex items-center rounded-md border border-signal bg-signal-soft px-3 py-1 text-sm font-semibold text-paper transition hover:bg-hover"
+        >
+          Reveal hint
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Hint area below the input. With an offer (rules v2) hints are opt-in: the
+ * bar says when one is available and nothing is shown until it is revealed.
+ */
+export function HintStrip({ hints, offer = null }: HintStripProps) {
+  if (hints.length === 0 && !offer) return null;
+  if (hints.length === 0 && offer) {
+    return (
+      <section
+        aria-label="Hint options"
+        className="rounded-md border border-line bg-panel px-3 py-2"
+      >
+        <HintOfferBar offer={offer} />
+      </section>
+    );
+  }
   return (
     <section
       aria-label="Hints"
       className="space-y-2 rounded-md border border-signal-deep bg-signal-soft px-3 py-3"
     >
+      {offer ? <HintOfferBar offer={offer} /> : null}
       {hints.map((hint) => {
         if (hint.type === "synopsis") {
           return (

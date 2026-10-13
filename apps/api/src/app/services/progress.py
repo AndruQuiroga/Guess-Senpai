@@ -63,6 +63,8 @@ def _deserialize_progress(raw: Any) -> Dict[str, GameProgressPayload]:
                 fallback_payload["anidleHistory"] = value.get("anidle_history")
             if "attemptLimit" in value:
                 fallback_payload["attemptLimit"] = value.get("attemptLimit")
+            if "hintsRevealed" in value:
+                fallback_payload["hintsRevealed"] = value.get("hintsRevealed")
         try:
             progress[key] = GameProgressPayload.model_validate(fallback_payload)
         except Exception:

@@ -19,6 +19,32 @@ interface TitleSuggestionResponse {
   results?: TitleSuggestion[];
 }
 
+/*
+ * Session-wide cache of search results, shared by every guess field. Titles
+ * rarely change, so repeat queries (backspacing, retyping, other games) never
+ * hit the network twice. Oldest entries are evicted past the cap.
+ */
+const CACHE_LIMIT = 300;
+const suggestionCache = new Map<string, TitleSuggestion[]>();
+
+function cacheKey(query: string, limit: number): string {
+  return `${limit}:${query.toLowerCase().replace(/\s+/g, " ")}`;
+}
+
+function rememberSuggestions(key: string, results: TitleSuggestion[]): void {
+  suggestionCache.delete(key);
+  suggestionCache.set(key, results);
+  if (suggestionCache.size > CACHE_LIMIT) {
+    const oldest = suggestionCache.keys().next().value;
+    if (oldest !== undefined) suggestionCache.delete(oldest);
+  }
+}
+
+/** Test hook: forget cached suggestions. */
+export function clearTitleSuggestionCache(): void {
+  suggestionCache.clear();
+}
+
 export function useTitleSuggestions(
   query: string,
   { debounceMs = 300, limit = 8, minLength = 2 }: Options = {},
@@ -31,6 +57,21 @@ export function useTitleSuggestions(
   const normalizedQuery = useMemo(() => query.trim(), [query]);
 
   useEffect(() => {
+    const key = cacheKey(normalizedQuery, limit);
+    const cached =
+      normalizedQuery.length >= minLength
+        ? suggestionCache.get(key)
+        : undefined;
+    if (cached) {
+      // Cache hits skip the debounce entirely.
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+      setError(null);
+      setLoading(false);
+      setSuggestions(cached);
+      return;
+    }
+
     const handle = window.setTimeout(() => {
       setError(null);
 
@@ -63,7 +104,9 @@ export function useTitleSuggestions(
             throw new Error(`Request failed with status ${response.status}`);
           }
           const payload = (await response.json()) as TitleSuggestionResponse;
-          setSuggestions(Array.isArray(payload.results) ? payload.results : []);
+          const results = Array.isArray(payload.results) ? payload.results : [];
+          rememberSuggestions(key, results);
+          setSuggestions(results);
           setLoading(false);
         })
         .catch((reason) => {
