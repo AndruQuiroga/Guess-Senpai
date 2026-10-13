@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   web:
-    image: ghcr.io/andruquiroga/guesssenpai-web:${IMAGE_TAG}
+    image: ghcr.io/andruquiroga/guesssenpai-web:sha-03c585bc7688ae652c2d6ad65ecb3a36575828fd
     environment:
       API_BASE_URL: http://guesssenpai_api:8000
       SITE_URL: https://guesssenpai.mustache.network
@@ -33,7 +33,7 @@ services:
       options: { max-size: 10m, max-file: "3" }
 
   api:
-    image: ghcr.io/andruquiroga/guesssenpai-api:${IMAGE_TAG}
+    image: ghcr.io/andruquiroga/guesssenpai-api:sha-03c585bc7688ae652c2d6ad65ecb3a36575828fd
     command: ["python", "-m", "app.core.production"]
     environment:
       FRONTEND_BASE_URL: https://guesssenpai.mustache.network
