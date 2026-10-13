@@ -548,6 +548,14 @@ function normalizeGameProgressEntry(value: unknown): GameProgress | null {
     recordEntries["hintsRevealed"] ?? recordEntries["hints_revealed"],
     0,
   );
+  const anidleHints =
+    recordEntries["anidleHints"] ?? recordEntries["anidle_hints"];
+  if (Array.isArray(anidleHints)) {
+    normalized.anidleHints = anidleHints.filter(
+      (value): value is string => typeof value === "string",
+    );
+  }
+
   if (hintsRevealed !== undefined) {
     normalized.hintsRevealed = hintsRevealed;
   }

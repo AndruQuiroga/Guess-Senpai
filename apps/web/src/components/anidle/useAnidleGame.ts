@@ -23,11 +23,17 @@ import type {
   TitleGuessSelection,
 } from "../games/TitleGuessField";
 import {
+  ANIDLE_CLUES,
   LEGACY_TOTAL_ROUNDS,
-  availableHintCount,
+  anidleClueAvailable,
+  anidleClueCost,
+  anidleClueLabel,
+  anidleClueUnlockAt,
   computeAnidleHints,
-  missesUntilNextHint,
+  isAnidleClueId,
+  legacyAnidleClues,
   type AggregatedHint,
+  type AnidleClueId,
 } from "./hints";
 import { getHistoryKey, useAnidleHydration } from "./useAnidleHydration";
 
@@ -37,6 +43,14 @@ export interface UseAnidleGameOptions {
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
   registerRoundController?: (fn: (round: number) => void) => void;
+}
+
+/** Bought clue types from progress; older saves stored a count. */
+function cluesFromProgress(progress?: GameProgress): AnidleClueId[] {
+  if (progress?.anidleHints?.length) {
+    return progress.anidleHints.filter(isAnidleClueId);
+  }
+  return legacyAnidleClues(progress?.hintsRevealed ?? 0);
 }
 
 function normalizeTitle(title: string) {
@@ -75,8 +89,8 @@ export function useAnidleGame({
   const [completed, setCompleted] = useState(
     initialProgress?.completed ?? false,
   );
-  const [hintsRevealed, setHintsRevealed] = useState(
-    initialProgress?.hintsRevealed ?? 0,
+  const [boughtClues, setBoughtClues] = useState<AnidleClueId[]>(() =>
+    cluesFromProgress(initialProgress),
   );
   const [hydrating, setHydrating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -107,9 +121,13 @@ export function useAnidleGame({
     setHistoryEntries(normalizedHistory);
     // Reveals only ever grow within a puzzle, so a stale echo of older
     // progress cannot hide a hint the player already asked for.
-    const savedHints = initialProgress?.hintsRevealed ?? 0;
-    setHintsRevealed((prev) =>
-      puzzleChanged ? savedHints : Math.max(prev, savedHints),
+    const savedClues = cluesFromProgress(initialProgress);
+    setBoughtClues((prev) =>
+      puzzleChanged
+        ? savedClues
+        : ANIDLE_CLUES.map((clue) => clue.id).filter(
+            (id) => prev.includes(id) || savedClues.includes(id),
+          ),
     );
 
     if (!initialProgress) {
@@ -162,24 +180,36 @@ export function useAnidleGame({
     [historyEntries],
   );
 
-  const hintsAvailable = rules
-    ? availableHintCount(rules, incorrectGuessCount)
-    : 0;
-  const hintsUsed = Math.min(hintsRevealed, hintsAvailable);
-  const hintsTotal = rules?.hint_after_incorrect.length ?? 0;
-  const nextHintIn = rules
-    ? missesUntilNextHint(rules, incorrectGuessCount)
-    : null;
+  /** Rules-v2 clues with their price, unlock point and state. */
+  const clues = useMemo(
+    () =>
+      rules
+        ? ANIDLE_CLUES.map((clue, index) => ({
+            id: clue.id,
+            label: anidleClueLabel(payload, clue.id),
+            cost: clue.cost,
+            unlockAt: anidleClueUnlockAt(rules, index),
+            bought: boughtClues.includes(clue.id),
+          })).filter((clue) => anidleClueAvailable(payload, clue.id))
+        : [],
+    [boughtClues, payload, rules],
+  );
+  const clueCost = anidleClueCost(boughtClues);
 
   const hints = useMemo<AggregatedHint[]>(
-    () => computeAnidleHints(payload, rules, incorrectGuessCount, hintsUsed),
-    [hintsUsed, incorrectGuessCount, payload, rules],
+    () => computeAnidleHints(payload, rules, incorrectGuessCount, boughtClues),
+    [boughtClues, incorrectGuessCount, payload, rules],
   );
 
-  const revealHint = useCallback(() => {
-    if (!rules || finished) return;
-    setHintsRevealed((prev) => Math.min(prev + 1, hintsAvailable));
-  }, [finished, hintsAvailable, rules]);
+  const buyClue = useCallback(
+    (id: string) => {
+      if (!rules || finished || !isAnidleClueId(id)) return;
+      const clue = clues.find((entry) => entry.id === id);
+      if (!clue || clue.bought || incorrectGuessCount < clue.unlockAt) return;
+      setBoughtClues((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    },
+    [clues, finished, incorrectGuessCount, rules],
+  );
 
   useEffect(() => {
     const historySnapshot = historyEntries.map((entry) => ({
@@ -196,13 +226,15 @@ export function useAnidleGame({
       guesses: guessValues,
       anidleHistory: historySnapshot,
       ...(rules ? { attemptLimit: rules.max_attempts } : {}),
-      ...(hintsRevealed > 0 ? { hintsRevealed } : {}),
+      ...(boughtClues.length
+        ? { anidleHints: boughtClues, hintsRevealed: boughtClues.length }
+        : {}),
     });
   }, [
     completed,
     round,
     guessValues,
-    hintsRevealed,
+    boughtClues,
     historyEntries,
     onProgressChange,
     rules,
@@ -363,12 +395,10 @@ export function useAnidleGame({
     exhausted,
     finished,
     hints,
-    /** Rules v2: hints earned but not yet revealed. */
-    hintsPending: Math.max(0, hintsAvailable - hintsUsed),
-    hintsUsed,
-    hintsTotal,
-    nextHintIn,
-    revealHint,
+    clues,
+    clueCost,
+    incorrectGuessCount,
+    buyClue,
     hydrating,
     hydrationProgress,
     submitting,

@@ -295,7 +295,7 @@ describe("Anidle empty state", () => {
           round: 1,
           guesses: ["G0", "G1"],
           anidleHistory: history,
-          hintsRevealed: 1,
+          anidleHints: ["synopsis"],
         }}
       />,
     );

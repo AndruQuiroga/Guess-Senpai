@@ -88,10 +88,6 @@ describe("GuessOpening rounds", () => {
       hints: 2,
       answers: { year: true, video: true },
     });
-    // 1,000 − 150 (year) − 300 (video).
-    expect(screen.getByRole("region", { name: "Clues" })).toHaveTextContent(
-      "Playing for 550 / 1,000 pts",
-    );
     expect(screen.queryByText(/artist/i)).toBeNull();
   });
 

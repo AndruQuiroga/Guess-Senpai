@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import Anidle from "../Anidle";
 import { AttemptMeter } from "../anidle/AttemptMeter";
+import { StakeBadge, StakeProvider } from "../rounds/RoundUI";
 import { GameShell } from "../GameShell";
 import type { GameProgress } from "../../types/progress";
 import { isProgressExhausted } from "../../utils/gameAction";
@@ -134,82 +135,87 @@ export function UnlimitedAnidlePage() {
   const average = formatAverage(tally);
 
   return (
-    <GameShell
-      title="Unlimited Anidle"
-      slug="unlimited-anidle"
-      rules={[
-        PRACTICE_INTRO,
-        ...(rules ? describeAnidleRules(rules) : []),
-        ...PRACTICE_RULES,
-      ]}
-      status={
-        rules && state === "ready" ? (
-          <AttemptMeter
-            used={used}
-            max={rules.max_attempts}
-            hintAfter={rules.hint_after_incorrect}
-            finished={finished}
-          />
-        ) : null
-      }
-    >
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted">
-        <p>
-          Practice mode. Not counted toward your streak or daily score.{" "}
-          <Link href="/games/anidle" className="text-paper underline">
-            Play today&apos;s Anidle
-          </Link>
-        </p>
-        <p aria-label="Practice tally">
-          Played {tally.played} · Solved {tally.solved} · Avg {average}
-          {average === "—" ? "" : " guesses"}
-        </p>
-      </div>
-
-      {state === "loading" ? (
-        <p role="status" className="text-base text-muted">
-          Loading a new puzzle…
-        </p>
-      ) : null}
-
-      {state === "error" ? (
-        <div className="space-y-3" role="alert">
-          <p className="text-base text-wrong-ink">{error}</p>
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={() => void startNewGame()}
-          >
-            Try again
-          </button>
+    <StakeProvider>
+      <GameShell
+        title="Unlimited Anidle"
+        slug="unlimited-anidle"
+        rules={[
+          PRACTICE_INTRO,
+          ...(rules ? describeAnidleRules(rules) : []),
+          ...PRACTICE_RULES,
+        ]}
+        status={
+          rules && state === "ready" ? (
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <AttemptMeter
+                used={used}
+                max={rules.max_attempts}
+                hintAfter={rules.hint_after_incorrect}
+                finished={finished}
+              />
+              <StakeBadge />
+            </span>
+          ) : null
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted">
+          <p>
+            Practice mode. Not counted toward your streak or daily score.{" "}
+            <Link href="/games/anidle" className="text-paper underline">
+              Play today&apos;s Anidle
+            </Link>
+          </p>
+          <p aria-label="Practice tally">
+            Played {tally.played} · Solved {tally.solved} · Avg {average}
+            {average === "—" ? "" : " guesses"}
+          </p>
         </div>
-      ) : null}
 
-      {state === "ready" && session ? (
-        <>
-          <Anidle
-            key={session.practiceId}
-            mediaId={session.mediaId}
-            payload={session.puzzle}
-            initialProgress={session.progress}
-            onProgressChange={handleProgressChange}
-            answerCoverImage={session.coverImage}
-            onNewPuzzle={() => void startNewGame()}
-          />
-          {!finished ? (
-            <p className="text-sm text-muted">
-              <button
-                type="button"
-                className="underline hover:text-paper"
-                onClick={() => void startNewGame()}
-              >
-                Skip this puzzle
-              </button>{" "}
-              (not counted in your tally)
-            </p>
-          ) : null}
-        </>
-      ) : null}
-    </GameShell>
+        {state === "loading" ? (
+          <p role="status" className="text-base text-muted">
+            Loading a new puzzle…
+          </p>
+        ) : null}
+
+        {state === "error" ? (
+          <div className="space-y-3" role="alert">
+            <p className="text-base text-wrong-ink">{error}</p>
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={() => void startNewGame()}
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
+
+        {state === "ready" && session ? (
+          <>
+            <Anidle
+              key={session.practiceId}
+              mediaId={session.mediaId}
+              payload={session.puzzle}
+              initialProgress={session.progress}
+              onProgressChange={handleProgressChange}
+              answerCoverImage={session.coverImage}
+              onNewPuzzle={() => void startNewGame()}
+            />
+            {!finished ? (
+              <p className="text-sm text-muted">
+                <button
+                  type="button"
+                  className="underline hover:text-paper"
+                  onClick={() => void startNewGame()}
+                >
+                  Skip this puzzle
+                </button>{" "}
+                (not counted in your tally)
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </GameShell>
+    </StakeProvider>
   );
 }

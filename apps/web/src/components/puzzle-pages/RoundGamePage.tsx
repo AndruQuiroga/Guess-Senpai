@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { GameShell } from "../GameShell";
-import { roundStatus } from "../rounds/RoundUI";
+import { StakeBadge, StakeProvider } from "../rounds/RoundUI";
+import { formatPoints } from "../rounds/scoring";
 import type { GameProgress } from "../../types/progress";
 
 interface Props {
@@ -48,14 +49,25 @@ export function RoundGamePage({
   const points = rounds.reduce((sum, round) => sum + (round.points ?? 0), 0);
 
   return (
-    <GameShell
-      title={title}
-      slug={slug}
-      rules={rules}
-      status={roundStatus(played, roundCount, points)}
-    >
-      {children(handleProgressChange)}
-    </GameShell>
+    <StakeProvider>
+      <GameShell
+        title={title}
+        slug={slug}
+        rules={rules}
+        status={
+          <span className="flex items-center gap-2">
+            <span>
+              {played >= roundCount
+                ? `Done · ${formatPoints(points)} pts`
+                : `Round ${Math.min(roundCount, played + 1)} / ${roundCount}`}
+            </span>
+            <StakeBadge />
+          </span>
+        }
+      >
+        {children(handleProgressChange)}
+      </GameShell>
+    </StakeProvider>
   );
 }
 
