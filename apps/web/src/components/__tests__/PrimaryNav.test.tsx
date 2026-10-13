@@ -6,6 +6,9 @@ import type { NavGame } from "../nav/useNavGames";
 
 const pathname = vi.hoisted(() => ({ value: "/" }));
 const games = vi.hoisted(() => ({ value: [] as NavGame[] }));
+const score = vi.hoisted(() => ({
+  value: null as null | { total: number; max: number; perGame: object },
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname.value,
@@ -15,6 +18,9 @@ vi.mock("../nav/NavAccount", () => ({
 }));
 vi.mock("../nav/useNavGames", () => ({
   useNavGames: () => games.value,
+}));
+vi.mock("../nav/useDailyScore", () => ({
+  useDailyScore: () => score.value,
 }));
 
 const baseGames: NavGame[] = [
@@ -44,6 +50,7 @@ describe("PrimaryNav", () => {
     games.value = baseGames;
   });
   afterEach(() => {
+    score.value = null;
     pathname.value = "/";
   });
 
@@ -129,5 +136,20 @@ describe("PrimaryNav", () => {
     expect(
       screen.queryByRole("button", { name: /navigation menu/i }),
     ).toBeNull();
+  });
+
+  it("shows today's score in the sidebar and compact bar, and hides it while unknown", () => {
+    const { rerender } = render(<PrimaryNav archiveDate="2026-10-12" />);
+    expect(screen.queryByText("2,450 / 4,000")).toBeNull();
+
+    score.value = { total: 2450, max: 4000, perGame: {} };
+    rerender(<PrimaryNav archiveDate="2026-10-12" />);
+    const links = screen.getAllByRole("link", {
+      name: /Today.s score 2,450 \/ 4,000/,
+    });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/how-to-play#daily-score");
+    }
   });
 });

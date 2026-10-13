@@ -9,6 +9,8 @@ interface PanelSectionProps {
   innerClassName?: string;
   /** Use a dashed border for empty or placeholder states. */
   dashed?: boolean;
+  /** Optional anchor id (e.g. for #fragment links). */
+  id?: string;
 }
 
 /**
@@ -20,6 +22,7 @@ export function PanelSection({
   className,
   innerClassName,
   dashed = false,
+  id,
 }: PropsWithChildren<PanelSectionProps>) {
   const base = [
     "panel p-5 sm:p-6",
@@ -29,7 +32,7 @@ export function PanelSection({
     .filter(Boolean)
     .join(" ");
   return (
-    <section className={base}>
+    <section id={id} className={base}>
       <div className={innerClassName}>{children}</div>
     </section>
   );

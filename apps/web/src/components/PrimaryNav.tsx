@@ -8,7 +8,9 @@ import NavLink, { matchesPath } from "./NavLink";
 import { NavAccount } from "./nav/NavAccount";
 import { NavIcon } from "./nav/NavIcon";
 import { StatusMark } from "./nav/StatusMark";
+import { useDailyScore } from "./nav/useDailyScore";
 import { useNavGames, type NavGame } from "./nav/useNavGames";
+import { formatDailyScore, type DailyScore } from "../utils/dailyScore";
 import { GAME_STATUS_TEXT, type GameStatus } from "../utils/gameAction";
 
 interface PrimaryNavProps {
@@ -49,10 +51,11 @@ const isArchive = (pathname: string) =>
  */
 export default function PrimaryNav({ archiveDate }: PrimaryNavProps) {
   const games = useNavGames();
+  const score = useDailyScore();
   return (
     <>
-      <DesktopSidebar games={games} archiveDate={archiveDate} />
-      <MobileNav games={games} archiveDate={archiveDate} />
+      <DesktopSidebar games={games} archiveDate={archiveDate} score={score} />
+      <MobileNav games={games} archiveDate={archiveDate} score={score} />
     </>
   );
 }
@@ -60,9 +63,11 @@ export default function PrimaryNav({ archiveDate }: PrimaryNavProps) {
 function DesktopSidebar({
   games,
   archiveDate,
+  score,
 }: {
   games: NavGame[];
   archiveDate: string;
+  score: DailyScore | null;
 }) {
   return (
     <aside className="hidden border-r border-line bg-ink md:sticky md:top-0 md:flex md:h-screen md:w-64 md:shrink-0 md:flex-col md:px-3 md:py-4">
@@ -113,7 +118,19 @@ function DesktopSidebar({
           </NavLink>
         </div>
       </nav>
-      <div className="mt-3 border-t border-line-subtle pt-3">
+      <div className="mt-3 space-y-2 border-t border-line-subtle pt-3">
+        {score ? (
+          <Link
+            href="/how-to-play#daily-score"
+            className="block rounded-md px-3 py-1 text-sm no-underline hover:bg-hover"
+            aria-label={`Today's score ${formatDailyScore(score)}. How scoring works`}
+          >
+            <span className="block text-muted">Today&apos;s score</span>
+            <span className="block font-display text-lg font-bold text-paper">
+              {formatDailyScore(score)}
+            </span>
+          </Link>
+        ) : null}
         <NavAccount />
       </div>
     </aside>
@@ -126,9 +143,11 @@ const chipBase =
 function MobileNav({
   games,
   archiveDate,
+  score,
 }: {
   games: NavGame[];
   archiveDate: string;
+  score: DailyScore | null;
 }) {
   const pathname = usePathname() ?? "";
   const rowRef = useRef<HTMLUListElement>(null);
@@ -177,7 +196,18 @@ function MobileNav({
     <div className="sticky top-0 z-30 border-b border-line bg-ink md:hidden">
       <div className="flex items-center justify-between px-4">
         <Wordmark />
-        <NavAccount compact />
+        <div className="flex items-center gap-2">
+          {score ? (
+            <Link
+              href="/how-to-play#daily-score"
+              aria-label={`Today's score ${formatDailyScore(score)}. How scoring works`}
+              className="inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold text-muted no-underline hover:text-paper"
+            >
+              {formatDailyScore(score)}
+            </Link>
+          ) : null}
+          <NavAccount compact />
+        </div>
       </div>
       <nav aria-label="Primary (compact)" className="px-4 pb-3">
         <ul

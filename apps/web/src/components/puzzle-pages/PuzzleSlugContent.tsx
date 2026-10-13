@@ -111,27 +111,13 @@ export function PuzzleSlugContent({ data, slug }: Props) {
   }
 
   if (!gameKey) {
-    return (
-      <PlaceholderPuzzlePage
-        title={slug.title}
-        slug={slug.slug}
-        description={slug.description}
-        dailyProgress={progress}
-      />
-    );
+    return <PlaceholderPuzzlePage title={slug.title} />;
   }
 
   switch (gameKey) {
     case "anidle":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
         const anidleBundle = bundle as { mediaId: number; puzzle: AnidleGame };
@@ -151,14 +137,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
     case "poster_zoomed":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
         const posterBundle = bundle as {
@@ -167,10 +146,8 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         };
         return (
           <PosterZoomedPage
-            slug={slug.slug}
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.poster_zoomed}
@@ -180,14 +157,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
     case "character_silhouette":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
         const silhouetteBundle = bundle as {
@@ -196,11 +166,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         };
         return (
           <CharacterSilhouettePage
-            slug={slug.slug}
             mediaId={silhouetteBundle.mediaId}
             payload={silhouetteBundle.puzzle}
             progress={progress.character_silhouette}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.character_silhouette}
@@ -210,14 +178,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
     case "redacted_synopsis":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
         const synopsisBundle = bundle as {
@@ -226,11 +187,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         };
         return (
           <RedactedSynopsisPage
-            slug={slug.slug}
             mediaId={synopsisBundle.mediaId}
             payload={synopsisBundle.puzzle}
             progress={progress.redacted_synopsis}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.redacted_synopsis}
@@ -240,14 +199,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
       }
     case "guess_the_opening":
       if (!bundle) {
-        return (
-          <PlaceholderPuzzlePage
-            title={slug.title}
-            slug={slug.slug}
-            description={slug.description}
-            dailyProgress={progress}
-          />
-        );
+        return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
         const openingBundle = bundle as {
@@ -256,11 +208,9 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         };
         return (
           <GuessOpeningPage
-            slug={slug.slug}
             mediaId={openingBundle.mediaId}
             payload={openingBundle.puzzle}
             progress={progress.guess_the_opening}
-            dailyProgress={progress}
             accountDifficulty={difficultyLevel ?? undefined}
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.guess_the_opening}
@@ -269,13 +219,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         );
       }
     default:
-      return (
-        <PlaceholderPuzzlePage
-          title={slug.title}
-          slug={slug.slug}
-          description={slug.description}
-          dailyProgress={progress}
-        />
-      );
+      return <PlaceholderPuzzlePage title={slug.title} />;
   }
 }

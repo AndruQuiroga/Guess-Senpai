@@ -126,6 +126,21 @@ describe("Today page", () => {
     ).toHaveTextContent("Out of guesses");
   });
 
+  it("shows the daily score in the meta line, linked to the scoring rules", () => {
+    state.progress = {
+      anidle: {
+        completed: true,
+        round: 1,
+        guesses: [],
+        anidleHistory: [{}],
+        attemptLimit: 8,
+      },
+    };
+    render(<HomePage />);
+    const link = screen.getByRole("link", { name: "Today 1,000 / 4,000" });
+    expect(link).toHaveAttribute("href", "/how-to-play#daily-score");
+  });
+
   it("adds Guess the Opening only when today's availability enables it", () => {
     state.opening = true;
     render(<HomePage />);

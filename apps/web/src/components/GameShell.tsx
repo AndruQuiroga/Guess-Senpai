@@ -23,21 +23,6 @@ interface GameShellProps {
   slug?: string;
   /** Replaces the rules list shown behind the "?" button. */
   rules?: string[];
-  /**
-   * @deprecated Ignored. The shell no longer renders a round badge or progress
-   * bar; games render their own progress through `status`. Kept optional so
-   * existing page components still compile.
-   */
-  round?: number;
-  /** @deprecated Ignored (see `round`). */
-  totalRounds?: number;
-  /** @deprecated Ignored (see `round`). */
-  roundLabel?: string;
-  /**
-   * @deprecated Ignored. The persistent sidebar and mobile chip row replace the
-   * old in-header game switcher that pages passed here.
-   */
-  actions?: ReactNode;
 }
 
 function useRules(title: string, slug?: string, rules?: string[]) {

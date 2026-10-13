@@ -25,7 +25,7 @@ import {
   formatShareDate,
   type ShareEventData,
 } from "../utils/shareText";
-import { formatDurationFromMs, getNextResetIso } from "../utils/time";
+import { formatDurationFromMs, getMsUntilNextUtcMidnight } from "../utils/time";
 import { projectStreakSnapshot } from "../utils/streak";
 import { PanelSection } from "./PanelSection";
 import SolutionReveal from "./SolutionReveal";
@@ -95,10 +95,6 @@ export default function Daily({ data }: Props) {
 function DailyContent({ data }: { data: DailyPuzzleResponse }) {
   const { progress, refresh, isRefreshing } = usePuzzleProgress(data.date);
   const formattedDate = useMemo(() => formatShareDate(data.date), [data.date]);
-  const nextResetIso = useMemo(
-    () => data.reset_at || getNextResetIso(data.date),
-    [data.reset_at, data.date],
-  );
   const includeGuessTheOpening = data.guess_the_opening_enabled;
   const anidleBundle = data.games.anidle;
   const posterBundle = data.games.poster_zoomed;
@@ -236,10 +232,10 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       const exhausted = getGameOutcome(progressForGame) === "exhausted";
       const inProgress = Boolean(
         progressForGame &&
-        !progressForGame.completed &&
-        !exhausted &&
-        ((progressForGame.round ?? 0) > 0 ||
-          (progressForGame.guesses?.length ?? 0) > 0),
+          !progressForGame.completed &&
+          !exhausted &&
+          ((progressForGame.round ?? 0) > 0 ||
+            (progressForGame.guesses?.length ?? 0) > 0),
       );
 
       let status: GameProgressStatus = "not-started";
@@ -382,34 +378,17 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
   }, [data.date]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    if (!nextResetIso) {
-      setTimeRemaining(null);
-      return;
-    }
-
-    const targetTime = new Date(nextResetIso).getTime();
-    if (Number.isNaN(targetTime)) {
-      setTimeRemaining(null);
-      return;
-    }
-
+    // Count to the next 00:00 UTC, never to the payload's reset_at: a value
+    // without a timezone suffix is read as local time and can exceed 24h.
     const updateTimeRemaining = () => {
-      const diff = targetTime - Date.now();
-      if (diff <= 0) {
-        setTimeRemaining("00:00:00");
-        return;
-      }
-      setTimeRemaining(formatDurationFromMs(diff));
+      setTimeRemaining(formatDurationFromMs(getMsUntilNextUtcMidnight()));
     };
 
     updateTimeRemaining();
     const intervalId = window.setInterval(updateTimeRemaining, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [nextResetIso]);
+  }, []);
 
   const countdownDisplay = timeRemaining ?? "— — : — —";
 

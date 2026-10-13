@@ -26,3 +26,4 @@ docker-compose.override.yml
 # Build/tool outputs
 *.tsbuildinfo
 artifacts/
+.next-*/

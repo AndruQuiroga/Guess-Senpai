@@ -3,17 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import SynopsisRedacted from "../SynopsisRedacted";
-import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
-import type { DailyProgress, GameProgress } from "../../types/progress";
+import type { GameProgress } from "../../types/progress";
 import { RedactedSynopsisGame } from "../../types/puzzles";
 
 interface Props {
-  slug: string;
   mediaId: number;
   payload: RedactedSynopsisGame;
   progress?: GameProgress;
-  dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
@@ -21,11 +18,9 @@ interface Props {
 }
 
 export function RedactedSynopsisPage({
-  slug,
   mediaId,
   payload,
   progress,
-  dailyProgress,
   accountDifficulty,
   difficultyHint,
   onProgressChange,
@@ -65,9 +60,13 @@ export function RedactedSynopsisPage({
     <div className="space-y-6">
       <GameShell
         title="Redacted Synopsis"
-        round={progress?.round ?? highlightDifficulty}
-        totalRounds={totalRounds}
-        actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
+        status={
+          <>
+            {progress?.completed
+              ? "Revealed"
+              : `Hint ${Math.min(totalRounds, progress?.round ?? highlightDifficulty)} / ${totalRounds}`}
+          </>
+        }
       >
         <SynopsisRedacted
           mediaId={mediaId}

@@ -3,17 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import GuessOpening from "../GuessOpening";
-import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
-import type { DailyProgress, GameProgress } from "../../types/progress";
+import type { GameProgress } from "../../types/progress";
 import { GuessOpeningGame } from "../../types/puzzles";
 
 interface Props {
-  slug: string;
   mediaId: number;
   payload: GuessOpeningGame;
   progress?: GameProgress;
-  dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
@@ -21,11 +18,9 @@ interface Props {
 }
 
 export function GuessOpeningPage({
-  slug,
   mediaId,
   payload,
   progress,
-  dailyProgress,
   accountDifficulty,
   difficultyHint,
   onProgressChange,
@@ -102,10 +97,11 @@ export function GuessOpeningPage({
     <div className="space-y-6">
       <GameShell
         title="Guess the Opening"
-        round={displayRound}
-        totalRounds={totalRounds}
-        roundLabel="Opening"
-        actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
+        status={
+          <>
+            Opening {displayRound} / {totalRounds}
+          </>
+        }
       >
         <GuessOpening
           payload={rounds}

@@ -46,6 +46,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Browser chrome colour must be a literal; mirrors the --ink token.
   themeColor: "#171819",
   colorScheme: "dark",
 };

@@ -3,16 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import PosterZoom from "../PosterZoom";
-import GameSwitcher from "../GameSwitcher";
 import { GameShell } from "../GameShell";
-import type { DailyProgress, GameProgress } from "../../types/progress";
+import type { GameProgress } from "../../types/progress";
 import { PosterZoomGame } from "../../types/puzzles";
 
 interface Props {
-  slug: string;
   payload: PosterZoomGame;
   progress?: GameProgress;
-  dailyProgress?: DailyProgress;
   accountDifficulty?: number;
   difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
@@ -20,10 +17,8 @@ interface Props {
 }
 
 export function PosterZoomedPage({
-  slug,
   payload,
   progress,
-  dailyProgress,
   accountDifficulty,
   onProgressChange,
   nextSlug,
@@ -77,9 +72,11 @@ export function PosterZoomedPage({
     <div className="space-y-6">
       <GameShell
         title="Poster Zoomed"
-        round={displayRound}
-        totalRounds={totalRounds}
-        actions={<GameSwitcher currentSlug={slug} progress={dailyProgress} />}
+        status={
+          <>
+            Round {displayRound} / {totalRounds}
+          </>
+        }
       >
         <PosterZoom
           payload={payload}

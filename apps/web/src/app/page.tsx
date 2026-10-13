@@ -1,10 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 
 import { DailyRolloverNotice } from "../components/DailyRolloverNotice";
-import { StatusMark } from "../components/nav/StatusMark";
+import { GameTile } from "../components/GameTile";
 import { useAccount, useAccountStreak } from "../hooks/useAccount";
 import {
   useDailyAvailability,
@@ -14,6 +13,7 @@ import {
   PuzzleProgressProvider,
   usePuzzleProgress,
 } from "../hooks/usePuzzleProgress";
+import { computeDailyScore, formatDailyScore } from "../utils/dailyScore";
 import { getGameStatus } from "../utils/gameAction";
 
 export default function HomePage() {
@@ -65,6 +65,10 @@ function Today({ date }: { date: string }) {
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${date}T00:00:00Z`));
+  const score = computeDailyScore(
+    games.flatMap((game) => (game.gameKey ? [game.gameKey] : [])),
+    progress,
+  );
   const streakText =
     streakError || accountError
       ? "Streak unavailable"
@@ -85,47 +89,34 @@ function Today({ date }: { date: string }) {
         <p className="text-sm text-muted">
           {day} · Resets 00:00 UTC
           {streakText ? ` · ${streakText}` : ""}
+          {score.max > 0 ? (
+            <>
+              {" · "}
+              <Link
+                href="/how-to-play#daily-score"
+                className="whitespace-nowrap text-paper underline"
+              >
+                Today {formatDailyScore(score)}
+              </Link>
+            </>
+          ) : null}
         </p>
       </header>
 
       <ul
         aria-label="Daily puzzles"
-        className="grid list-none gap-3 p-0 sm:grid-cols-2 sm:gap-4"
+        className="grid list-none gap-3 p-0 sm:grid-cols-2"
       >
-        {games.map((game) => {
-          const status = getGameStatus(
-            game.gameKey ? progress[game.gameKey] : undefined,
-          );
-          const art =
-            game.preview.media?.type === "image" ? game.preview.media : null;
-          return (
-            <li key={game.slug} className="flex">
-              <Link
-                href={`/games/${game.slug}`}
-                className="panel group flex w-full flex-row items-center gap-4 p-3 no-underline transition hover:border-line-strong hover:bg-hover sm:flex-col sm:items-stretch sm:gap-3 sm:p-4"
-              >
-                {art ? (
-                  <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-ink sm:h-36 sm:w-full">
-                    <Image
-                      src={art.src}
-                      alt=""
-                      width={144}
-                      height={144}
-                      className="h-full w-auto object-contain"
-                    />
-                  </span>
-                ) : null}
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="font-display text-xl font-bold leading-tight text-paper">
-                    {game.title}
-                  </span>
-                  <span className="text-base text-muted">{game.tagline}</span>
-                  <StatusMark status={status} className="mt-1" />
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+        {games.map((game) => (
+          <li key={game.slug} className="flex">
+            <GameTile
+              game={game}
+              status={getGameStatus(
+                game.gameKey ? progress[game.gameKey] : undefined,
+              )}
+            />
+          </li>
+        ))}
       </ul>
 
       {!loading && !accountError && !account.authenticated && (

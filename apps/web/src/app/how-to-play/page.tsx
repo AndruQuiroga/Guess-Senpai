@@ -125,6 +125,34 @@ export default function HowToPlayPage() {
             <li>Use the available clip and clues to identify its anime.</li>
           </ul>
         </PanelSection>
+
+        <PanelSection
+          id="daily-score"
+          className="scroll-mt-20"
+          innerClassName="space-y-4"
+        >
+          <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
+            Daily score
+          </h2>
+          <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
+            <li>
+              Each daily mode is worth up to 1,000 points, so the maximum is
+              1,000 × the modes available today.
+            </li>
+            <li>
+              Anidle: solving on guess 1 earns 1,000 and each extra guess costs
+              125, down to 125 on guess 8.
+            </li>
+            <li>
+              Other modes: every round earns full marks, minus 25% for each
+              wrong guess or extra hint, never below 25% once solved.
+            </li>
+            <li>
+              Unsolved or out-of-guesses modes score 0. The score is computed on
+              your device for fun and is not a ranking.
+            </li>
+          </ul>
+        </PanelSection>
       </div>
 
       <p className="text-sm leading-relaxed text-muted">

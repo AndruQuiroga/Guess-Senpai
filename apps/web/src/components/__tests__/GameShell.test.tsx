@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 describe("GameShell", () => {
   it("renders the title with no round badge or progress bar by default", () => {
     const { container } = render(
-      <GameShell title="Anidle" round={2} totalRounds={3} roundLabel="Round">
+      <GameShell title="Anidle">
         <div>board</div>
       </GameShell>,
     );
