@@ -4,6 +4,7 @@ import time
 from typing import Optional
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -43,17 +44,19 @@ async def callback(code: str, state: str) -> RedirectResponse:
     if not state_data:
         raise HTTPException(status_code=400, detail="Invalid or expired state parameter")
 
-    token_response = await anilist.exchange_code_for_token(
-        code=code,
-        client_id=settings.anilist_client_id,
-        client_secret=settings.anilist_client_secret,
-        redirect_uri=str(settings.anilist_redirect_uri),
-    )
-
-    user = token_response.user or {}
+    try:
+        token_response = await anilist.exchange_code_for_token(
+            code=code,
+            client_id=settings.anilist_client_id,
+            client_secret=settings.anilist_client_secret,
+            redirect_uri=str(settings.anilist_redirect_uri),
+        )
+        user = await anilist.fetch_viewer(token_response.access_token)
+    except (anilist.AniListError, httpx.HTTPError):
+        raise HTTPException(status_code=502, detail="AniList login could not be completed. Start sign-in again.") from None
     user_id = user.get("id")
     if not user_id:
-        raise HTTPException(status_code=500, detail="AniList token response missing user information")
+        raise HTTPException(status_code=502, detail="AniList authenticated user is unavailable")
 
     now = time.time()
     expires_at = now + token_response.expires_in

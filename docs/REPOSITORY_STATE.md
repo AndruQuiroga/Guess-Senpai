@@ -217,6 +217,24 @@ See [production operations](../infra/README.md) and Stache Infra's maintained
 GuessSenpai topic for deployment evidence and remaining limits. Historical
 baseline operational gaps above are superseded only by these explicit checks.
 
+### AniList OAuth hotfix — 2026-10-13
+
+The first human sign-in exposed an integration defect: AniList's token response
+contains credentials, while the callback expected an embedded user object.
+The hotfix on `codex/fix-anilist-oauth` fetches the authenticated GraphQL Viewer
+before issuing a session. Token/profile lookup failures return a retry message
+without setting a session cookie; production access logging is disabled to avoid
+recording one-time credentials from callback query strings.
+
+PR #189 contains the correction. CI passed 61 backend tests (3 opt-in skipped),
+119 frontend tests, TypeScript and both production builds. Portainer stack 20
+now uses image tag `sha-03c585bc7688ae652c2d6ad65ecb3a36575828fd`; its manifest
+Git reference stays on main. Running-image inspection and public readiness passed.
+The human confirmed a fresh AniList sign-in successfully returns to the app
+signed in. Account progress synchronization remains separate QA. The earlier
+callback code/state cannot be reused. Merge PR #189 to align main's application
+code with this hotfix.
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.

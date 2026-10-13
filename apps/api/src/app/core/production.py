@@ -31,4 +31,5 @@ if __name__ == "__main__":
         raise RuntimeError("Production requires a generated session secret")
     asyncio.run(wait_for_database())
     subprocess.run(["alembic", "upgrade", "head"], check=True)
-    os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"])
+    # OAuth callback query strings contain one-time credentials.
+    os.execvp("uvicorn", ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"])
