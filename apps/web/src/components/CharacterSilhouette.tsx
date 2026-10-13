@@ -17,6 +17,12 @@ import type {
 } from "../types/puzzles";
 import { verifyGuess } from "../utils/verifyGuess";
 import {
+  ART_LEVELS,
+  ART_MODE_LABELS,
+  CharacterArt,
+  artModeFor,
+} from "./games/CharacterArt";
+import {
   TitleGuessField,
   type TitleGuessFieldHandle,
 } from "./games/TitleGuessField";
@@ -36,16 +42,6 @@ import {
 } from "./rounds/scoring";
 import { useRoundGame, type RoundGameState } from "./rounds/useRoundGame";
 
-/*
- * AniList character art is a rectangular painting, not a cut-out, so a pure
- * black fill would erase it. Stage 0 is a high-contrast "ink" shadow that keeps
- * the outline and hair shape; each hint on a card sharpens it one step.
- */
-export const CLARITY_FILTERS = [
-  "grayscale(1) contrast(8) brightness(0.22) blur(4px)",
-  "grayscale(1) contrast(2.6) brightness(0.6) blur(1.5px)",
-  "grayscale(0.5) blur(0.5px)",
-] as const;
 export const SHARPEN_HINT_COST = 60;
 
 interface CardHints {
@@ -316,32 +312,30 @@ function CharacterRound({
       </p>
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {entries.map((entry, card) => {
-          const sharpened = Math.min(
-            CLARITY_FILTERS.length - 1,
-            hintsByCard[card] ?? 0,
-          );
+          const sharpened = Math.min(ART_LEVELS - 1, hintsByCard[card] ?? 0);
+          const mode = artModeFor(round.difficulty, card);
           return (
             <li
               key={entry.character.id}
               className="space-y-3 rounded-lg border border-line-strong bg-panel p-3"
             >
-              <div className="relative overflow-hidden rounded-md border border-line bg-paper">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+              <div className="relative overflow-hidden rounded-md border border-line">
+                <CharacterArt
                   src={entry.character.image}
-                  alt={`Character ${card + 1}, obscured`}
-                  className="aspect-[3/4] w-full object-cover"
-                  style={{ filter: CLARITY_FILTERS[sharpened] }}
-                  draggable={false}
+                  mode={mode}
+                  level={sharpened}
+                  seed={entry.character.id}
+                  label={`Character ${card + 1}, obscured (${ART_MODE_LABELS[mode].toLowerCase()})`}
                 />
                 <span className="absolute left-2 top-2 rounded bg-ink px-2 py-0.5 text-xs font-bold text-paper">
                   #{card + 1}
+                  {mode !== "shadow" ? ` · ${ART_MODE_LABELS[mode]}` : ""}
                 </span>
               </div>
               <HintButton
                 label="Sharpen"
                 cost={SHARPEN_HINT_COST}
-                disabled={sharpened >= CLARITY_FILTERS.length - 1}
+                disabled={sharpened >= ART_LEVELS - 1}
                 used="Clearest"
                 onClick={() =>
                   game.takeHint(index, {

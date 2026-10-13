@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
-import CharacterSilhouette, { CLARITY_FILTERS } from "../CharacterSilhouette";
+import CharacterSilhouette from "../CharacterSilhouette";
 import type { GameProgress } from "../../types/progress";
 import type {
   CharacterGuessEntry,
@@ -77,11 +77,13 @@ describe("CharacterSilhouette check-all rounds", () => {
     expect(
       screen.getByRole("button", { name: /Round 1 · Easy/ }),
     ).toHaveAttribute("aria-current", "step");
-    const images = screen.getAllByAltText(/obscured/) as HTMLImageElement[];
-    expect(images).toHaveLength(2);
-    images.forEach((image) =>
-      expect(image.style.filter).toBe(CLARITY_FILTERS[0]),
-    );
+    const art = screen.getAllByRole("img", { name: /obscured/ });
+    expect(art).toHaveLength(2);
+    art.forEach((card) => {
+      expect(card).toHaveAttribute("data-art", "shadow");
+      expect(card).toHaveAttribute("data-level", "0");
+    });
+    expect(screen.queryByAltText("Lelouch")).toBeNull();
   });
 
   it("sharpens one card for a cost", () => {
@@ -94,13 +96,60 @@ describe("CharacterSilhouette check-all rounds", () => {
       />,
     );
     fireEvent.click(screen.getAllByRole("button", { name: /Sharpen/ })[1]);
-    const images = screen.getAllByAltText(/obscured/) as HTMLImageElement[];
-    expect(images[0].style.filter).toBe(CLARITY_FILTERS[0]);
-    expect(images[1].style.filter).toBe(CLARITY_FILTERS[1]);
+    const art = screen.getAllByRole("img", { name: /obscured/ });
+    expect(art[0]).toHaveAttribute("data-level", "0");
+    expect(art[1]).toHaveAttribute("data-level", "1");
     expect(progress.mock.calls.at(-1)?.[0].rounds[0]).toMatchObject({
       hints: 1,
       answers: { cardHints: { 1: 1 } },
     });
+  });
+
+  it("mixes close-up, mosaic and scrambled tiles in a Hard round", () => {
+    const hard: CharacterSilhouetteGame = {
+      ...payload,
+      rounds: [
+        {
+          order: 1,
+          difficulty: 3,
+          entries: [
+            card(5, "A", "Show A", 500),
+            card(6, "B", "Show B", 600),
+            card(7, "C", "Show C", 700),
+            card(8, "D", "Show D", 800),
+          ],
+        },
+      ],
+    };
+    render(
+      <CharacterSilhouette
+        payload={hard}
+        mediaId={500}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    const art = screen.getAllByRole("img", { name: /obscured/ });
+    expect(art.map((item) => item.getAttribute("data-art"))).toEqual([
+      "crop",
+      "mosaic",
+      "tiles",
+      "crop",
+    ]);
+    // Close-up: a zoomed slice; mosaic: a canvas; tiles: nine, none in place.
+    expect(art[0].querySelector("img")?.style.transform).toBe("scale(2.6)");
+    expect(art[1].querySelector("canvas")).not.toBeNull();
+    const tiles = art[2].querySelectorAll("[data-tile]");
+    expect(tiles).toHaveLength(9);
+    expect(art[2].querySelectorAll('[data-in-place="true"]')).toHaveLength(0);
+    expect(screen.getByText(/#1 · Close-up/)).toBeInTheDocument();
+
+    // Each Sharpen puts three more tiles back.
+    fireEvent.click(screen.getAllByRole("button", { name: /Sharpen/ })[2]);
+    expect(
+      screen
+        .getAllByRole("img", { name: /obscured/ })[2]
+        .querySelectorAll('[data-in-place="true"]').length,
+    ).toBeGreaterThanOrEqual(3);
   });
 
   it("checks every card against its own character and anime", async () => {

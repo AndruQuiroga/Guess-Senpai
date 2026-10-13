@@ -535,6 +535,9 @@ def test_tiered_poster_crops_never_show_the_whole_poster() -> None:
 async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
     day = date(2024, 2, 1)
     popular = [_media_with_character(900 + i, f"Show {i}", popularity=100_000 - i * 1000) for i in range(45)]
+    for media in popular[::2]:
+        media.status = "RELEASING"
+    # Airing shows still count toward the other modes, so only openings skip them.
     media_by_id = {media.id: media for media in popular}
     tiers = engine._popularity_tiers(popular)
 
@@ -573,6 +576,9 @@ async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: py
 
     openings = result.games.guess_the_opening.puzzle.rounds
     assert [r.difficulty for r in openings] == [1, 2, 3]
+    # Openings use the shared tiers and never pick a show that is still airing.
+    assert all(r.mediaId in tiers[r.difficulty] for r in openings)
+    assert all(media_by_id[r.mediaId].status != "RELEASING" for r in openings)
 
     every_round = (
         [r.mediaId for r in poster] + [r.mediaId for r in synopsis] + card_media + [r.mediaId for r in openings]

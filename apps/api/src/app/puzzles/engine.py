@@ -1385,21 +1385,14 @@ async def _assemble_daily_puzzle(
 
     guess_bundle: Optional[GuessOpeningPuzzleBundle] = None
     opening_rounds: List[GuessOpeningRound] = []
-    opening_pool: Optional[List[Media]] = None
-    if include_guess_opening and settings.guess_opening_pool_enabled:
-        try:
-            opening_pool = await anilist.fetch_opening_pool(
-                cache,
-                day=day,
-                ttl=settings.anilist_cache_ttl_seconds,
-            )
-        except Exception:
-            logger.exception("Failed to load dedicated opening pool")
     if include_guess_opening:
-        candidate_pool = [m for m in (opening_pool or pool) if not _is_sequel(m)] or opening_pool or pool
+        # Same popularity tiers as the other modes: Hard is a less popular but
+        # established show, never this season's new releases. (The old
+        # dedicated pool mixed in current-season shows and made Hard obscure.)
+        candidate_pool = [media for media in round_pool if (media.status or "").upper() != "RELEASING"] or round_pool
         if candidate_pool:
             required_rounds = len(ROUND_DIFFICULTIES)
-            opening_tiers = _popularity_tiers(candidate_pool)
+            opening_tiers = tiers
             tried_ids: set[int] = set()
             selected_for_opening: set[int] = set()
             for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):

@@ -17,6 +17,7 @@ const RULES = [
   ...ROUND_RULES,
   "Each round shows four shadowed characters, each from a different anime. Fill in every character's name and anime, then press Check all.",
   `Each card is worth a quarter of the round: half for the name, half for the anime. Sharpen a card (−${SHARPEN_HINT_COST} from that card) to see it more clearly.`,
+  "Easy and Medium show shadows. Hard mixes a close-up of one detail, a pixel mosaic and scrambled tiles.",
 ];
 
 export function CharacterSilhouettePage({
