@@ -230,9 +230,10 @@ PR #189 contains the correction. CI passed 61 backend tests (3 opt-in skipped),
 119 frontend tests, TypeScript and both production builds. Portainer stack 20
 now uses image tag `sha-03c585bc7688ae652c2d6ad65ecb3a36575828fd`; its manifest
 Git reference stays on main. Running-image inspection and public readiness passed.
-Completed human OAuth/account synchronization remains pending until a fresh
-sign-in verifies the upstream Viewer lookup. The earlier callback code/state
-cannot be reused. Merge PR #189 to align main's application code with this hotfix.
+The human confirmed a fresh AniList sign-in successfully returns to the app
+signed in. Account progress synchronization remains separate QA. The earlier
+callback code/state cannot be reused. Merge PR #189 to align main's application
+code with this hotfix.
 
 ## Navigation for future work
 
