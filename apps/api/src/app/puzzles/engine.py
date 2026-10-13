@@ -1115,12 +1115,8 @@ def _choose_media_from_pool(
         if media.id not in excluded_ids
         and (attempted_ids is None or media.id not in attempted_ids)
     ]
-    if not filtered and attempted_ids:
-        filtered = [media for media in pool if media.id not in attempted_ids]
     if not filtered:
-        filtered = [media for media in pool if media.id not in excluded_ids]
-    if not filtered:
-        filtered = list(pool)
+        raise ValueError("No unused anime remain in the candidate pool")
 
     seed = f"{base_seed}:{game_key}:{attempt}"
     return _select_media(seed, filtered)
@@ -1156,7 +1152,7 @@ def _tier_candidates(
         ]
         if members:
             return members
-    return [media for media in pool if media.id not in excluded_ids] or list(pool)
+    return [media for media in pool if media.id not in excluded_ids]
 
 
 def _choose_tiered(
@@ -1172,6 +1168,8 @@ def _choose_tiered(
     if not pool:
         raise ValueError("Candidate pool is empty")
     candidates = _tier_candidates(pool, tiers, difficulty, excluded_ids)
+    if not candidates:
+        raise ValueError("No unused anime remain in the candidate pool")
     return _select_media(f"{base_seed}:{label}:d{difficulty}:{attempt}", candidates)
 
 
@@ -1300,6 +1298,8 @@ async def _assemble_daily_puzzle(
     synopsis_primary: Optional[Media] = None
     for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
         for attempt in range(8):
+            if not _tier_candidates(round_pool, tiers, difficulty, selected_ids):
+                break
             candidate = _choose_tiered(
                 base_seed, "redacted_synopsis", round_pool, tiers, difficulty, selected_ids, attempt=attempt
             )
@@ -1310,8 +1310,8 @@ async def _assemble_daily_puzzle(
                 synopsis_rounds.append(synopsis_round)
                 synopsis_primary = synopsis_primary or synopsis_media
                 break
-    if not synopsis_rounds or synopsis_primary is None:
-        raise ValueError("Unable to build redacted synopsis rounds")
+    if len(synopsis_rounds) != len(ROUND_DIFFICULTIES) or synopsis_primary is None:
+        raise ValueError("Unable to build three redacted synopsis rounds with different anime")
     # Legacy top-level fields mirror round 1 for clients that predate rounds.
     synopsis_game = _build_synopsis(synopsis_primary)
     synopsis_game.rounds = synopsis_rounds
@@ -1331,7 +1331,7 @@ async def _assemble_daily_puzzle(
             if len(entries) >= CHARACTERS_PER_ROUND:
                 break
             excluded = selected_ids | tried_for_characters
-            if len(excluded) >= len(round_pool):
+            if not _tier_candidates(round_pool, tiers, 1, excluded):
                 break
             candidate = _choose_tiered(
                 # Every character round uses popular shows; the round difficulty
@@ -1345,7 +1345,7 @@ async def _assemble_daily_puzzle(
             if edge is not None:
                 entries.append(_character_entry(character_media, edge, difficulty))
                 character_media_by_id[character_media.id] = character_media
-        if len(entries) < 2:
+        if len(entries) < CHARACTERS_PER_ROUND:
             character_rounds = []
             break
         character_rounds.append(CharacterGuessRound(order=order, difficulty=difficulty, entries=entries))
@@ -1372,27 +1372,8 @@ async def _assemble_daily_puzzle(
             ),
             solution=_build_solution(character_media_by_id[first_entry.mediaId]),
         )
-    else:
-        # Too few pictured characters in the pool: fall back to the legacy
-        # single-anime game rather than failing the whole daily set.
-        logger.warning("Falling back to single-anime character rounds for %s", day)
-        for attempt in range(max(len(pool), 1)):
-            candidate = _choose_media_from_pool(
-                base_seed, "character_silhouette", pool, selected_ids, attempt=attempt
-            )
-            character_media = await _load_media_details(candidate.id, cache, settings)
-            game = _build_character_guess_game(character_media)
-            if not game:
-                continue
-            remember(character_media)
-            character_bundle = CharacterSilhouettePuzzleBundle(
-                mediaId=character_media.id,
-                puzzle=game,
-                solution=_build_solution(character_media),
-            )
-            break
     if not character_bundle:
-        raise ValueError("Unable to build character silhouette puzzle")
+        raise ValueError("Unable to build twelve character cards with different anime")
 
     guess_bundle: Optional[GuessOpeningPuzzleBundle] = None
     opening_rounds: List[GuessOpeningRound] = []
@@ -1408,6 +1389,11 @@ async def _assemble_daily_puzzle(
             selected_for_opening: set[int] = set()
             for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
                 for attempt in range(12):
+                    if not _tier_candidates(
+                        candidate_pool, opening_tiers, difficulty,
+                        selected_ids | selected_for_opening | tried_ids,
+                    ):
+                        break
                     candidate = _choose_tiered(
                         base_seed,
                         "guess_the_opening",

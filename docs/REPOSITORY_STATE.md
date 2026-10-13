@@ -249,7 +249,7 @@ create PRs and the Portainer polling switch are one-time manual steps; see
 
 Poster Zoomed, Redacted Synopsis, Character Silhouette and Guess the Opening now
 play an Easy, Medium and Hard round, each a different anime from the matching
-third of a 400-entry popularity ranking (sequels excluded). Each round takes one
+third of the popularity ranking (sequels excluded). Each round takes one
 submission and shows a results screen; every round is worth up to 1,000 points
 and optional hints are deducted from it. Shared pieces live in
 `apps/web/src/components/rounds` (`useRoundGame`, `RoundUI`, `scoring`).
@@ -259,6 +259,27 @@ accepts `target_character_id` (the old featured-character lookup called a
 function that did not exist). Anidle returned to a one-column-per-attribute
 table and limits studios to main animation studios. The profile difficulty
 preference no longer changes any game (it used to skip to a later round).
+
+### Daily anime uniqueness follow-up — 2026-10-13
+
+New daily generation never falls back to reusing an excluded anime ID when a
+popularity tier or the full pool runs out. The same daily exclusion set covers
+Anidle, all poster/synopsis rounds, all twelve character cards, and all opening
+rounds: a complete five-mode set uses 22 distinct anime IDs. Character cards
+draw from popular shows across all three rounds, with difficulty set by the art
+treatment. Each character round requires four different anime; the legacy
+single-anime character fallback is no longer used for daily generation.
+
+Insufficient content fails generation before a snapshot is stored. Guess the
+Opening remains optional and is omitted when three unused playable anime cannot
+be found. Existing published snapshots remain unchanged. This uniqueness rule
+applies within a daily set; it does not permanently exclude anime from later
+dates or treat every related franchise entry as the same AniList media ID.
+
+Validation: 81 backend tests passed, three opt-in tests skipped in a disposable
+container. Regressions cover all 22 selections across five date seeds, pool
+exhaustion, missing character imagery with no stored snapshot, and an optional
+opening pool with only two unused anime. No production backfill was performed.
 
 ## Navigation for future work
 

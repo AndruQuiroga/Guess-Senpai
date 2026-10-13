@@ -9,12 +9,12 @@ from app.db.models import DailyPuzzleSet
 from app.puzzles import engine
 from app.puzzles.models import DailyProgressPayload, GameProgressPayload
 from app.services import progress
-from test_puzzles_engine import DummyCache, make_character_silhouette, make_media
+from test_puzzles_engine import DummyCache, _media_with_character
 
 
 @pytest.fixture
 def local_generation(monkeypatch):
-    pool = [make_media(2000 + i, f"Fixture {i}") for i in range(12)]
+    pool = [_media_with_character(2000 + i, f"Fixture {i}", 1000 - i) for i in range(48)]
 
     async def popular(*args):
         return pool
@@ -28,8 +28,45 @@ def local_generation(monkeypatch):
     monkeypatch.setattr(engine, "_load_popular_pool", popular)
     monkeypatch.setattr(engine, "_load_media_details", details)
     monkeypatch.setattr(engine, "_get_cache", cache)
-    monkeypatch.setattr(engine, "_build_character_guess_game", make_character_silhouette)
     return pool
+
+
+@pytest.mark.asyncio
+async def test_insufficient_character_anime_never_publish_a_repeated_set(local_generation, monkeypatch):
+    # Missing artwork must fail generation, never invoke the old fallback
+    # that filled every round from a single anime.
+    for media in local_generation:
+        media.characters = None
+
+    def forbidden_legacy_fallback(*args):
+        raise AssertionError("Daily generation must not use the single-anime fallback")
+
+    monkeypatch.setattr(engine, "_build_character_guess_game", forbidden_legacy_fallback)
+    today = datetime.now(timezone.utc).date()
+    with pytest.raises(ValueError, match="twelve character cards with different anime"):
+        await engine.publish_daily_puzzle(today)
+    async with get_session_factory()() as session:
+        assert await session.get(DailyPuzzleSet, today) is None
+
+
+@pytest.mark.asyncio
+async def test_short_opening_pool_is_disabled_instead_of_repeating_anime(local_generation, monkeypatch):
+    from test_puzzles_engine import make_guess_opening
+
+    # Seven anime for the other modes and twelve character cards leave only
+    # two anime for three openings. Neither may be reused to fill round 3.
+    del local_generation[21:]
+    attempted = []
+
+    async def opening(media, cache, **kwargs):
+        attempted.append(media.id)
+        return make_guess_opening(media, **kwargs)
+
+    monkeypatch.setattr(engine, "_build_guess_opening_round", opening)
+    result = await engine.publish_daily_puzzle(datetime.now(timezone.utc).date(), include_guess_opening=True)
+    assert result.guess_the_opening_enabled is False
+    assert result.games.guess_the_opening is None
+    assert len(attempted) == len(set(attempted)) == 2
 
 
 @pytest.mark.asyncio
