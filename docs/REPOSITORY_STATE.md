@@ -276,10 +276,41 @@ be found. Existing published snapshots remain unchanged. This uniqueness rule
 applies within a daily set; it does not permanently exclude anime from later
 dates or treat every related franchise entry as the same AniList media ID.
 
-Validation: 81 backend tests passed, three opt-in tests skipped in a disposable
-container. Regressions cover all 22 selections across five date seeds, pool
+Validation after integrating the AniList caching changes from main: 97 backend
+tests passed, four opt-in tests skipped in a disposable container. Regressions
+cover all 22 selections across five date seeds, pool
 exhaustion, missing character imagery with no stored snapshot, and an optional
 opening pool with only two unused anime. No production backfill was performed.
+
+### AniList request budget — 2026-10-13
+
+AniList allows 30–90 requests per minute per IP and caps `perPage` at 50, so
+the popularity ranking contains 200 entries (four pages of 50). On the
+`claude/anilist-efficiency` branch the popularity pool query returns full
+details records (characters, studios, links) and seeds the per-anime cache, so
+a cold daily set costs four AniList requests and further days generated the
+same UTC day (archive backfill) cost none. Per-anime misses are batched
+(`id_in`, 50 per request) for search warming, verify, stats and Anidle
+evaluation; unknown ids and searches (including empty results) are cached.
+`services/anilist.gql_request` paces from `X-RateLimit-*` headers, honours
+`Retry-After` within a per-call wait budget (about 4 s interactively, longer
+under `rate_limit_patience`, which the backfill uses) and coalesces identical
+in-flight anonymous requests. Tests block AniList network access by default.
+
+Reviewed against merged PR #195 on 2026-10-13: legacy republishing and rules-v3
+progress identity are preserved. Exhausted rate-limit counters expire at the
+reported reset (or after a minute); long Retry-After values are preserved.
+Search cache keys preserve punctuation and mixed scripts. The limiter and
+in-flight coalescing remain process-local; API and operator backfill processes
+can still share an upstream IP budget and encounter 429 responses.
+
+Validation: 90 backend tests passed with three opt-in tests skipped in a
+disposable container. Two public upstream smoke tests passed separately,
+including a full 50-record pool page, equivalent batch details, title search,
+evaluation and processed poster imagery. Request-count tests use fake upstream
+responses: four calls for a cold daily set, none for fourteen further archive
+dates on the same warm cache. Production deployment/backfill was not performed
+as part of this review.
 
 ## Navigation for future work
 
