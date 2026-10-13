@@ -24,12 +24,39 @@ The initial deployment branch is `codex/deploy-portainer`. After the deployment
 PR is merged, change the Portainer Git reference to `refs/heads/main` and verify
 the fetched definition before the next release.
 
-For updates, build/test first, then use Portainer's Git redeploy operation with
-the new `IMAGE_TAG`, preserving all other stack variables and registry settings.
-Do not run a competing `docker stack deploy`. Review migrations and database
-backups before changing the API tag. The API entry point waits for PostgreSQL,
-runs Alembic, and starts a single Uvicorn worker. This is a fresh-database rollout;
-an existing unversioned database requires the separate adoption procedure.
+## GitOps releases
+
+`infra/stack.yml` pins both application images to one `sha-<commit>` tag; it is
+the only record of what production runs. Portainer polls `main` and redeploys
+the stack when that file changes. GitHub never connects to Portainer.
+
+1. Merge application changes to `main`. The workflow tests them and publishes
+   `sha-<merge commit>` images.
+2. Its `release-pr` job then updates one rolling PR on `release/production`
+   that re-pins `infra/stack.yml` to that build, listing the commits since the
+   current production tag and flagging any `apps/api/alembic` changes.
+3. Review it (migrations run automatically when the API starts, so confirm a
+   recent backup first when the PR warns about them) and merge. Portainer
+   deploys it within its polling interval.
+4. Roll back by reverting the release merge, only when the older image is
+   compatible with the migrated schema.
+
+Merging a release PR does not rebuild images (`paths-ignore`). A build whose
+commit is no longer the newest code on `main` leaves the PR to the newer build.
+
+One-time setup:
+- Repository Settings → Actions → General → enable "Allow GitHub Actions to
+  create and approve pull requests" so `GITHUB_TOKEN` can open the release PR.
+- Portainer stack `guesssenpai` → Git settings: reference `refs/heads/main`,
+  enable automatic updates by polling (for example every 5 minutes), keep
+  re-pull image off (tags are immutable), then remove the obsolete `IMAGE_TAG`
+  stack variable. The stack file no longer reads it.
+
+Do not run a competing `docker stack deploy` or edit the stack's images in
+Portainer; change `infra/stack.yml` through a PR instead. The API entry point
+waits for PostgreSQL, runs Alembic, and starts a single Uvicorn worker. This is
+a fresh-database rollout; an existing unversioned database requires the
+separate adoption procedure.
 
 ## Storage and availability
 

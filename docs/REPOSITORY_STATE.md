@@ -235,6 +235,16 @@ signed in. Account progress synchronization remains separate QA. The earlier
 callback code/state cannot be reused. Merge PR #189 to align main's application
 code with this hotfix.
 
+### GitOps release PRs — 2026-10-13
+
+`infra/stack.yml` now pins the image tag in Git instead of reading a Portainer
+`IMAGE_TAG` variable; it was pinned to the running `sha-03c585b…` build. After
+each validated `main` build, the workflow's `release-pr` job updates a rolling
+`release/production` PR that re-pins both images. Merging it is the deploy,
+picked up by Portainer's Git polling. The repository setting allowing Actions to
+create PRs and the Portainer polling switch are one-time manual steps; see
+[production operations](../infra/README.md#gitops-releases).
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.

@@ -2,6 +2,8 @@ name: Validate and publish deployment images
 on:
   push:
     branches: [main, codex/deploy-portainer]
+    # Merging a release PR only re-pins infra/stack.yml; its images already exist.
+    paths-ignore: [infra/stack.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -71,3 +73,72 @@ jobs:
             SITE_URL=https://guesssenpai.mustache.network
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+  # GitOps release: Portainer polls main and deploys whatever infra/stack.yml
+  # pins. Each validated main build updates one rolling release PR that re-pins
+  # both images; merging it is the production deploy.
+  release-pr:
+    needs: [images]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-pr
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Skip if newer code reached main
+        id: fresh
+        run: |
+          # Later release merges only touch infra/stack.yml; any other change
+          # means a newer build will open the release PR instead.
+          if git diff --quiet "${GITHUB_SHA}" HEAD -- . ':(exclude)infra/stack.yml'; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "main has moved past ${GITHUB_SHA}; leaving the release PR to the newer build."
+          fi
+      - name: Pin infra/stack.yml to this build
+        id: pin
+        if: steps.fresh.outputs.latest == 'true'
+        run: |
+          previous=$(grep -oE 'guesssenpai-api:sha-[0-9a-f]{40}' infra/stack.yml | head -1 | cut -d- -f3)
+          sed -i -E "s#(guesssenpai-(web|api)):sha-[0-9a-f]{40}#\1:sha-${GITHUB_SHA}#" infra/stack.yml
+          echo "previous=${previous}" >> "$GITHUB_OUTPUT"
+          echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          {
+            echo 'body<<RELEASE_EOF'
+            echo "Deploys \`sha-${GITHUB_SHA}\` (web and API) to https://guesssenpai.mustache.network."
+            echo
+            echo "Images passed tests and were published by [run ${GITHUB_RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})."
+            echo "Portainer polls \`main\` and redeploys within its update interval after this PR is merged. Roll back by reverting the merge."
+            echo
+            if [ -n "$previous" ]; then
+              echo "**Changes since production** ([compare](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_SHA})):"
+              echo
+              git log --no-merges --format='- %s (%h)' "${previous}..${GITHUB_SHA}" -- . ':(exclude)infra/stack.yml' | head -50
+              echo
+              migrations=$(git diff --name-only "${previous}" "${GITHUB_SHA}" -- apps/api/alembic)
+              if [ -n "$migrations" ]; then
+                echo "> [!WARNING]"
+                echo "> Database migrations run automatically when the API starts. Review them and confirm a recent backup before merging:"
+                echo "$migrations" | sed 's/^/> - `/; s/$/`/'
+              else
+                echo "No database migration changes."
+              fi
+            fi
+            echo RELEASE_EOF
+          } >> "$GITHUB_OUTPUT"
+      - uses: peter-evans/create-pull-request@v7
+        if: steps.fresh.outputs.latest == 'true'
+        with:
+          branch: release/production
+          base: main
+          commit-message: "Release sha-${{ github.sha }} to production"
+          title: "Release ${{ steps.pin.outputs.short }} to production"
+          body: ${{ steps.pin.outputs.body }}
+          add-paths: infra/stack.yml
+          delete-branch: true
