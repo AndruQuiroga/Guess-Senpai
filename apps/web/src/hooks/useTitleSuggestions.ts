@@ -9,7 +9,11 @@ export interface TitleSuggestion {
   title: string;
 }
 
+export type SuggestionSource = "titles" | "characters";
+
 interface Options {
+  /** Which index to search: anime titles (default) or character names. */
+  source?: SuggestionSource;
   debounceMs?: number;
   limit?: number;
   minLength?: number;
@@ -27,8 +31,12 @@ interface TitleSuggestionResponse {
 const CACHE_LIMIT = 300;
 const suggestionCache = new Map<string, TitleSuggestion[]>();
 
-function cacheKey(query: string, limit: number): string {
-  return `${limit}:${query.toLowerCase().replace(/\s+/g, " ")}`;
+function cacheKey(
+  query: string,
+  limit: number,
+  source: SuggestionSource = "titles",
+): string {
+  return `${source}:${limit}:${query.toLowerCase().replace(/\s+/g, " ")}`;
 }
 
 function rememberSuggestions(key: string, results: TitleSuggestion[]): void {
@@ -47,7 +55,12 @@ export function clearTitleSuggestionCache(): void {
 
 export function useTitleSuggestions(
   query: string,
-  { debounceMs = 300, limit = 8, minLength = 2 }: Options = {},
+  {
+    source = "titles",
+    debounceMs = 300,
+    limit = 8,
+    minLength = 2,
+  }: Options = {},
 ) {
   const [suggestions, setSuggestions] = useState<TitleSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,7 +70,7 @@ export function useTitleSuggestions(
   const normalizedQuery = useMemo(() => query.trim(), [query]);
 
   useEffect(() => {
-    const key = cacheKey(normalizedQuery, limit);
+    const key = cacheKey(normalizedQuery, limit, source);
     const cached =
       normalizedQuery.length >= minLength
         ? suggestionCache.get(key)
@@ -95,7 +108,7 @@ export function useTitleSuggestions(
         limit: String(limit),
       });
 
-      fetch(`${API_BASE}/puzzles/search-titles?${searchParams.toString()}`, {
+      fetch(`${API_BASE}/puzzles/search-${source}?${searchParams.toString()}`, {
         credentials: "include",
         signal: controller.signal,
       })
@@ -125,7 +138,7 @@ export function useTitleSuggestions(
         controllerRef.current = null;
       }
     };
-  }, [debounceMs, limit, minLength, normalizedQuery]);
+  }, [debounceMs, limit, minLength, normalizedQuery, source]);
 
   return {
     suggestions,

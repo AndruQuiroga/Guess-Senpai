@@ -184,6 +184,7 @@ query PopularPool($page: Int!, $perPage: Int!) {
       coverImage { extraLarge large medium color }
       bannerImage
       isAdult
+      relations { edges { relationType } }
     }
   }
 }
@@ -227,6 +228,7 @@ query TopRated($page: Int!, $perPage: Int!) {
       coverImage { extraLarge large medium color }
       bannerImage
       isAdult
+      relations { edges { relationType } }
     }
   }
 }
@@ -270,6 +272,7 @@ query TopPopular($page: Int!, $perPage: Int!) {
       coverImage { extraLarge large medium color }
       bannerImage
       isAdult
+      relations { edges { relationType } }
     }
   }
 }
@@ -315,6 +318,7 @@ query SeasonalPopular($page: Int!, $perPage: Int!, $season: MediaSeason!, $seaso
       coverImage { extraLarge large medium color }
       bannerImage
       isAdult
+      relations { edges { relationType } }
     }
   }
 }
@@ -668,7 +672,7 @@ async def fetch_opening_pool(
 
     season, season_year = _resolve_season(target_day)
     cache_key = (
-        f"anilist:opening:{target_day.isoformat()}"
+        f"anilist:opening:v2:{target_day.isoformat()}"
         f":{top_rated_per_page}:{top_popular_per_page}:{seasonal_per_page}"
     )
 

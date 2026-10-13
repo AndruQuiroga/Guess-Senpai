@@ -1,4 +1,5 @@
 import type { DailyProgress, GameKey, GameProgress } from "../types/progress";
+import { ROUND_POINTS } from "../components/rounds/scoring";
 import { getGameOutcome } from "./gameAction";
 
 /**
@@ -6,15 +7,18 @@ import { getGameOutcome } from "./gameAction";
  * records already stored for today. It is not verified by the server, so it is
  * not suitable for leaderboards until scoring moves server-side.
  *
- * - Every playable mode is worth up to POINTS_PER_GAME.
- * - Unsolved, exhausted and not-started modes score 0.
- * - Anidle (rules v2): solved on attempt a of L (default 8) scores
- *   1000 * (L - a + 1) / L, so attempt 1 is 1000 and attempt 8 is 125.
- * - Every other mode: each round (Synopsis is a single round) scores
+ * - Every playable mode is worth up to POINTS_PER_GAME: three rounds of
+ *   ROUND_POINTS (1,000) each.
+ * - Round games (rounds v3) score the points each played round earned, even
+ *   before the last round is played.
+ * - Anidle (rules v2): solved on attempt a of L scores
+ *   POINTS_PER_GAME * (L - a + 1) / L; unsolved and exhausted score 0.
+ * - Older round records without points: each round scores
  *   max(25%, 100% - 25% * misses) of its share, where a miss is a wrong guess
  *   or an extra hint stage. The mode score is the mean over its rounds.
  */
-export const POINTS_PER_GAME = 1000;
+export const ROUNDS_PER_GAME = 3;
+export const POINTS_PER_GAME = ROUND_POINTS * ROUNDS_PER_GAME;
 export const DEFAULT_ANIDLE_ATTEMPTS = 8;
 export const MISS_PENALTY = 0.25;
 export const MIN_SOLVED_EFFICIENCY = 0.25;
@@ -81,6 +85,18 @@ export function scoreGame(
   progress?: GameProgress | null,
 ): number {
   if (!progress || typeof progress !== "object") return 0;
+  if (gameKey !== "anidle") {
+    const scored = (progress.rounds ?? []).filter(
+      (round) => typeof round?.points === "number",
+    );
+    if (scored.length > 0) {
+      const earned = scored.reduce(
+        (sum, round) => sum + (round.points ?? 0),
+        0,
+      );
+      return Math.min(POINTS_PER_GAME, Math.max(0, Math.round(earned)));
+    }
+  }
   if (getGameOutcome(progress) !== "solved") return 0;
   return gameKey === "anidle"
     ? scoreAnidle(progress)

@@ -126,7 +126,9 @@ def _extract_studio_names(media: Media) -> List[str]:
             continue
         bucket = primary if getattr(edge, "isMain", False) else secondary
         bucket.append(name)
-    return _dedupe_preserve_order(list(primary) + list(secondary))
+    # Non-main edges are producers and licensors (often eight or more); only
+    # fall back to a couple of them when AniList marks no main studio.
+    return _dedupe_preserve_order(primary or secondary[:2])
 
 
 def _build_scalar_feedback(

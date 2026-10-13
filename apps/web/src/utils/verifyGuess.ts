@@ -14,6 +14,8 @@ export interface GuessVerificationResult {
 interface VerifyGuessOptions {
   characterGuess?: string | null;
   characterId?: number | null;
+  /** The card's character, so its name is checked against that character. */
+  targetCharacterId?: number | null;
   season?: string | null;
   seasonYear?: number | null;
 }
@@ -34,6 +36,7 @@ export async function verifyGuess(
       guess_media_id: guessMediaId ?? null,
       character_guess: options.characterGuess ?? null,
       guess_character_id: options.characterId ?? null,
+      target_character_id: options.targetCharacterId ?? null,
       season: options.season ?? null,
       season_year: options.seasonYear ?? null,
     }),
@@ -99,8 +102,7 @@ export async function verifyGuess(
     match: payload.match ?? null,
     animeMatch,
     characterMatch,
-    characterName:
-      payload.characterName ?? payload.character ?? null,
+    characterName: payload.characterName ?? payload.character ?? null,
     characterId:
       typeof payload.characterId === "number"
         ? payload.characterId

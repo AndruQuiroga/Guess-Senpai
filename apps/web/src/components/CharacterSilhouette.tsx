@@ -1,329 +1,521 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import {
+  createRef,
+  useCallback,
+  useMemo,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from "react";
 
-import type { GameProgress } from "../hooks/usePuzzleProgress";
-import type { CharacterSilhouetteGame } from "../types/puzzles";
-import NextPuzzleButton from "./NextPuzzleButton";
-import { CharacterCard } from "./games/character-silhouette/CharacterCard";
-import { RoundSummaryModal } from "./games/character-silhouette/RoundSummaryModal";
-import { useCharacterSilhouetteGame } from "./games/character-silhouette/useCharacterSilhouetteGame";
-import type { FeedbackState } from "./games/character-silhouette/types";
+import type { GameProgress } from "../types/progress";
+import type {
+  CharacterGuessEntry,
+  CharacterGuessRound,
+  CharacterSilhouetteGame,
+} from "../types/puzzles";
 import { verifyGuess } from "../utils/verifyGuess";
+import {
+  ART_LEVELS,
+  ART_MODE_LABELS,
+  CharacterArt,
+  artModeFor,
+} from "./games/CharacterArt";
+import {
+  TitleGuessField,
+  type TitleGuessFieldHandle,
+} from "./games/TitleGuessField";
+import {
+  GameSummary,
+  HintButton,
+  LegacyFinished,
+  RoundResult,
+  RoundTabs,
+  VERDICT,
+} from "./rounds/RoundUI";
+import {
+  buildOutcome,
+  difficultyLabel,
+  line,
+  ROUND_POINTS,
+  formatPoints,
+  type ScoreLine,
+} from "./rounds/scoring";
+import { useRoundGame, type RoundGameState } from "./rounds/useRoundGame";
+
+export const SHARPEN_HINT_COST = 60;
+
+interface CardHints {
+  [cardIndex: string]: number;
+}
+
+function cardHints(answers: Record<string, unknown>): CardHints {
+  const raw = answers.cardHints;
+  return raw && typeof raw === "object" ? (raw as CardHints) : {};
+}
 
 interface Props {
-  mediaId: number;
   payload: CharacterSilhouetteGame;
+  /** Fallback anime for cards from older payloads without their own id. */
+  mediaId: number;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
-  registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
 }
 
-function clampRound(target: number, totalRounds: number): number {
-  if (!Number.isFinite(target)) return 0;
-  if (totalRounds <= 0) return 0;
-  return Math.max(0, Math.min(totalRounds - 1, Math.floor(target)));
-}
-
 export default function CharacterSilhouette({
-  mediaId,
   payload,
+  mediaId,
   initialProgress,
   onProgressChange,
-  registerRoundController,
   nextSlug,
 }: Props) {
-  const roundsData = Array.isArray(payload.rounds) ? payload.rounds : [];
+  const rounds = payload.rounds.filter((round) => round.entries.length > 0);
+  const game = useRoundGame({
+    roundCount: rounds.length,
+    initialProgress,
+    onProgressChange,
+    puzzleKey: rounds
+      .map((round) =>
+        round.entries.map((entry) => entry.character.id).join(","),
+      )
+      .join(":"),
+  });
+  const tabs = rounds.map((round) => ({
+    label: difficultyLabel(round.difficulty, round.order),
+  }));
 
-  const {
-    rounds,
-    activeRoundIndex,
-    setActiveRoundIndex,
-    totalEntries,
-    totalSolved,
-    completed,
-    progress,
-    summaryRoundIndex,
-    setSummaryRoundIndex,
-    updateEntryValue,
-    setEntrySubmitting,
-    setEntryFeedback,
-    applyGuessResult,
-  } = useCharacterSilhouetteGame({ rounds: roundsData, initialProgress });
+  if (rounds.length === 0) {
+    return (
+      <p className="text-muted">Guess the Character is unavailable today.</p>
+    );
+  }
+  if (game.legacyFinished) return <LegacyFinished nextSlug={nextSlug} />;
 
-  const totalRounds = rounds.length > 0 ? rounds.length : 1;
-  const activeRoundState = rounds[activeRoundIndex] ?? rounds[0];
-  const activeRoundData = roundsData[activeRoundIndex] ?? roundsData[0] ?? null;
-
-  const highestCompletedIndex = useMemo(() => {
-    let index = -1;
-    rounds.forEach((round, idx) => {
-      if (round.completed) {
-        index = idx;
-      }
-    });
-    return index;
-  }, [rounds]);
-
-  const unlockedThreshold = useMemo(
-    () => Math.min(highestCompletedIndex + 1, totalRounds - 1),
-    [highestCompletedIndex, totalRounds],
+  return (
+    <div className="space-y-5">
+      <RoundTabs
+        rounds={tabs}
+        records={game.records}
+        view={game.view}
+        canView={game.canView}
+        onSelect={game.goTo}
+      />
+      {game.view >= rounds.length ? (
+        <GameSummary
+          title="Guess the Character"
+          nextSlug={nextSlug}
+          rows={rounds.map((round, index) => ({
+            label: `Round ${index + 1} · ${tabs[index].label}`,
+            answer: round.entries
+              .map((entry) => entry.characterAnswer)
+              .join(", "),
+            coverImage: round.entries[0]?.character.image,
+            points: game.records[index]?.outcome?.points ?? 0,
+          }))}
+        />
+      ) : (
+        <CharacterRound
+          key={game.view}
+          index={game.view}
+          round={rounds[game.view]}
+          fallbackMediaId={mediaId}
+          label={`Round ${game.view + 1} · ${tabs[game.view].label}`}
+          game={game}
+          isLast={game.view === rounds.length - 1}
+        />
+      )}
+    </div>
   );
+}
 
-  useEffect(() => {
-    onProgressChange(progress);
-  }, [progress, onProgressChange]);
+interface CardDraft {
+  name: string;
+  anime: string;
+}
 
-  useEffect(() => {
-    if (!registerRoundController) return;
-    registerRoundController((round) => {
-      setActiveRoundIndex(clampRound(round - 1, totalRounds));
-    });
-  }, [registerRoundController, setActiveRoundIndex, totalRounds]);
-
-  const handleAnimeChange = useCallback(
-    (roundIndex: number, entryIndex: number, value: string) => {
-      updateEntryValue(roundIndex, entryIndex, "anime", value);
-    },
-    [updateEntryValue],
+function CharacterRound({
+  index,
+  round,
+  fallbackMediaId,
+  label,
+  game,
+  isLast,
+}: {
+  index: number;
+  round: CharacterGuessRound;
+  fallbackMediaId: number;
+  label: string;
+  game: RoundGameState;
+  isLast: boolean;
+}) {
+  const record = game.records[index];
+  const entries = round.entries;
+  const stored = record.answers.cards as CardDraft[] | undefined;
+  const [drafts, setDrafts] = useState<CardDraft[]>(() =>
+    entries.map((_, card) => ({
+      name: stored?.[card]?.name ?? "",
+      anime: stored?.[card]?.anime ?? "",
+    })),
   );
-
-  const handleCharacterChange = useCallback(
-    (roundIndex: number, entryIndex: number, value: string) => {
-      updateEntryValue(roundIndex, entryIndex, "character", value);
-    },
-    [updateEntryValue],
+  const nameRefs = useMemo(
+    () => entries.map(() => createRef<TitleGuessFieldHandle>()),
+    [entries],
   );
-
-  const handleValidationError = useCallback(
-    (roundIndex: number, entryIndex: number, feedback: FeedbackState) => {
-      setEntryFeedback(roundIndex, entryIndex, feedback);
-    },
-    [setEntryFeedback],
+  const animeRefs = useMemo(
+    () => entries.map(() => createRef<TitleGuessFieldHandle>()),
+    [entries],
   );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmitGuess = useCallback(
-    async (
-      roundIndex: number,
-      entryIndex: number,
-      selection: { value: string; suggestionId?: number },
-      characterValue: string,
-    ) => {
-      const roundState = rounds[roundIndex];
-      const roundDataSource = roundsData[roundIndex];
-      const entryState = roundState?.entries?.[entryIndex];
-      const entryData = roundDataSource?.entries?.[entryIndex];
-      if (!roundState || !entryState || !entryData) return;
-      if (entryState.completed || entryState.submitting) return;
+  const hintsByCard = cardHints(record.answers);
+  const perCard = Math.floor(ROUND_POINTS / entries.length);
+  const half = Math.floor(perCard / 2);
 
-      const animeGuess = selection.value.trim();
-      const characterGuess = characterValue.trim();
-      if (!animeGuess || !characterGuess) {
-        setEntryFeedback(roundIndex, entryIndex, {
-          type: "error",
-          message:
-            "Provide both the anime title and character name to continue.",
-        });
+  const update = (card: number, patch: Partial<CardDraft>) =>
+    setDrafts((prev) =>
+      prev.map((draft, at) => (at === card ? { ...draft, ...patch } : draft)),
+    );
+
+  const checkAll = useCallback(
+    async (event?: FormEvent) => {
+      event?.preventDefault();
+      if (busy) return;
+      if (drafts.every((draft) => !draft.name.trim() && !draft.anime.trim())) {
+        setError("Fill in at least one card first.");
         return;
       }
-
-      setEntrySubmitting(roundIndex, entryIndex, true);
-      setEntryFeedback(roundIndex, entryIndex, null);
-
+      setBusy(true);
+      setError(null);
       try {
-        const result = await verifyGuess(
-          mediaId,
-          animeGuess,
-          selection.suggestionId,
-          {
-            characterGuess,
-            characterId: entryData.character.id,
-          },
+        const results = await Promise.all(
+          entries.map(async (entry, card) => {
+            const nameSel = nameRefs[card].current?.submit() ?? null;
+            const animeSel = animeRefs[card].current?.submit() ?? null;
+            const name = (nameSel?.value ?? drafts[card].name).trim();
+            const anime = (animeSel?.value ?? drafts[card].anime).trim();
+            if (!name && !anime) {
+              return { name, anime, nameOk: false, animeOk: false };
+            }
+            const result = await verifyGuess(
+              entry.mediaId ?? fallbackMediaId,
+              anime,
+              animeSel?.suggestionId,
+              {
+                characterGuess: name || null,
+                characterId: nameSel?.suggestionId ?? null,
+                targetCharacterId: entry.character.id,
+              },
+            );
+            return {
+              name,
+              anime,
+              nameOk: Boolean(name) && result.characterMatch === true,
+              animeOk: Boolean(anime) && result.animeMatch,
+            };
+          }),
         );
-
-        applyGuessResult(roundIndex, entryIndex, {
-          anime: animeGuess,
-          character: characterGuess,
-          animeMatch: result.animeMatch,
-          characterMatch:
-            typeof result.characterMatch === "boolean"
-              ? result.characterMatch
-              : result.characterMatch === null
-                ? null
-                : false,
-          resolvedAnime: result.animeMatch
-            ? (result.match ?? entryData.animeAnswer ?? animeGuess)
-            : undefined,
-          resolvedCharacter:
-            result.characterMatch === true
-              ? (result.characterName ??
-                entryData.characterAnswer ??
-                characterGuess)
-              : undefined,
+        const lines: ScoreLine[] = [];
+        let hintCost = 0;
+        results.forEach((result, card) => {
+          const entry = entries[card];
+          const cardLines = [
+            line(
+              `#${card + 1} Character`,
+              result.name,
+              entry.characterAnswer,
+              result.nameOk ? "correct" : "wrong",
+              half,
+            ),
+            line(
+              `#${card + 1} Anime`,
+              result.anime,
+              entry.animeAnswer,
+              result.animeOk ? "correct" : "wrong",
+              perCard - half,
+            ),
+          ];
+          lines.push(...cardLines);
+          // A card's sharpen hints only cost what that card earned.
+          const earned = cardLines.reduce((sum, item) => sum + item.points, 0);
+          hintCost += Math.min(
+            earned,
+            (hintsByCard[card] ?? 0) * SHARPEN_HINT_COST,
+          );
         });
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to verify your guess. Please try again.";
-        setEntryFeedback(roundIndex, entryIndex, {
-          type: "error",
-          message,
+        game.submitRound(index, {
+          answers: {
+            ...record.answers,
+            cards: results.map(({ name, anime }) => ({ name, anime })),
+          },
+          guesses: results.flatMap(({ name, anime }) =>
+            [name, anime].filter(Boolean),
+          ),
+          outcome: buildOutcome(lines, hintCost, perCard * entries.length),
         });
-        setEntrySubmitting(roundIndex, entryIndex, false);
+      } catch (caught) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Couldn't check your answers. Try again.",
+        );
+      } finally {
+        setBusy(false);
       }
     },
     [
-      applyGuessResult,
-      mediaId,
-      rounds,
-      roundsData,
-      setEntryFeedback,
-      setEntrySubmitting,
+      animeRefs,
+      busy,
+      drafts,
+      entries,
+      fallbackMediaId,
+      game,
+      half,
+      hintsByCard,
+      index,
+      nameRefs,
+      perCard,
+      record.answers,
     ],
   );
 
-  const handleRoundSummaryContinue = useCallback(() => {
-    if (summaryRoundIndex === null) return;
-    const nextIndex = Math.min(summaryRoundIndex + 1, totalRounds - 1);
-    setSummaryRoundIndex(null);
-    if (summaryRoundIndex < totalRounds - 1) {
-      setActiveRoundIndex(nextIndex);
-    }
-  }, [
-    setActiveRoundIndex,
-    setSummaryRoundIndex,
-    summaryRoundIndex,
-    totalRounds,
-  ]);
-
-  const roundHeadline =
-    activeRoundState?.label ?? `Round ${activeRoundIndex + 1}`;
-  const roundDescription = activeRoundState?.description ?? null;
+  if (record.submitted && record.outcome) {
+    const lines = record.outcome.lines;
+    return (
+      <RoundResult
+        roundLabel={label}
+        outcome={record.outcome}
+        answerTitle={`${entries.length} characters`}
+        breakdown={false}
+        onNext={game.advance}
+        nextLabel={isLast ? "See final score" : "Next round"}
+        media={
+          <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {entries.map((entry, card) => (
+              <RevealedCard
+                key={entry.character.id}
+                number={card + 1}
+                entry={entry}
+                name={lines[card * 2]}
+                anime={lines[card * 2 + 1]}
+                sharpened={hintsByCard[card] ?? 0}
+              />
+            ))}
+          </ul>
+        }
+      />
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-lg border border-line-strong bg-panel-raised p-5  ">
-        <div className="flex flex-wrap items-center gap-3">
-          {rounds.map((round, index) => {
-            const isActive = index === activeRoundIndex;
-            const isCompleted = round.completed;
-            const isDisabled = index > unlockedThreshold + 0.0001;
-            const label = round.label || `Round ${index + 1}`;
-            return (
-              <button
-                key={round.order ?? index}
-                type="button"
-                onClick={() => !isDisabled && setActiveRoundIndex(index)}
-                disabled={isDisabled}
-                className={[
-                  "inline-flex items-center gap-2 min-h-11 rounded-md border px-3 py-1.5 text-sm font-semibold transition",
-                  isActive
-                    ? "border-signal bg-signal-soft text-paper "
-                    : isCompleted
-                      ? "border-correct bg-correct-soft text-correct-ink"
-                      : "border-line-strong bg-panel-raised text-paper hover:border-signal hover:text-paper",
-                  isDisabled ? "cursor-not-allowed opacity-50" : "",
-                ].join(" ")}
-              >
-                <span>{label}</span>
-                {isCompleted ? (
-                  <span aria-hidden className="text-sm">
-                    ✓
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="grid gap-4 text-paper sm:grid-cols-2">
-          <div className="space-y-1">
-            <p className="text-sm uppercase tracking-[0.24em] text-muted">
-              Characters solved
-            </p>
-            <p className="text-2xl font-display font-semibold">
-              {totalSolved} / {totalEntries}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm uppercase tracking-[0.24em] text-muted">
-              Current stage
-            </p>
-            <p className="text-sm text-paper">
-              Round {activeRoundIndex + 1} of {totalRounds}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-line-strong bg-panel-raised p-6  ">
-        <div className="mb-6 space-y-2">
-          <h3 className="text-xl font-display font-semibold text-paper">
-            {roundHeadline}
-          </h3>
-          {roundDescription ? (
-            <p className="text-sm text-paper">{roundDescription}</p>
-          ) : (
-            <p className="text-sm text-paper">
-              Match each silhouette to the correct character and anime to reveal
-              the lineup.
-            </p>
-          )}
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {activeRoundData?.entries?.map((entry, index) => {
-            const state = activeRoundState?.entries?.[index];
-            if (!state) return null;
-            return (
-              <CharacterCard
-                key={state.id}
-                index={index}
-                roundIndex={activeRoundIndex}
-                entry={entry}
-                state={state}
-                onAnimeChange={(value) =>
-                  handleAnimeChange(activeRoundIndex, index, value)
-                }
-                onCharacterChange={(value) =>
-                  handleCharacterChange(activeRoundIndex, index, value)
-                }
-                onSubmit={(selection, characterValue) =>
-                  handleSubmitGuess(
-                    activeRoundIndex,
-                    index,
-                    selection,
-                    characterValue,
-                  )
-                }
-                onValidationError={(feedback) =>
-                  handleValidationError(activeRoundIndex, index, feedback)
+    <form onSubmit={checkAll} className="space-y-5">
+      <p className="text-sm text-muted">
+        Name each character and their anime, then check them all at once. Each
+        card is worth {perCard} points (half for the name, half for the anime).
+      </p>
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        {entries.map((entry, card) => {
+          const sharpened = Math.min(ART_LEVELS - 1, hintsByCard[card] ?? 0);
+          const mode = artModeFor(round.difficulty, card);
+          return (
+            <li
+              key={entry.character.id}
+              className="space-y-3 rounded-lg border border-line-strong bg-panel p-3"
+            >
+              <div className="relative overflow-hidden rounded-md border border-line">
+                <CharacterArt
+                  src={entry.character.image}
+                  mode={mode}
+                  level={sharpened}
+                  seed={entry.character.id}
+                  label={`Character ${card + 1}, obscured (${ART_MODE_LABELS[mode].toLowerCase()})`}
+                />
+                <span className="absolute left-2 top-2 rounded bg-ink px-2 py-0.5 text-xs font-bold text-paper">
+                  #{card + 1}
+                  {mode !== "shadow" ? ` · ${ART_MODE_LABELS[mode]}` : ""}
+                </span>
+              </div>
+              <HintButton
+                label="Sharpen"
+                cost={SHARPEN_HINT_COST}
+                disabled={sharpened >= ART_LEVELS - 1}
+                used="Clearest"
+                onClick={() =>
+                  game.takeHint(index, {
+                    cardHints: { ...hintsByCard, [card]: sharpened + 1 },
+                  })
                 }
               />
-            );
-          })}
-        </div>
-
-        {completed ? (
-          <div className="mt-8 flex justify-end">
-            <NextPuzzleButton nextSlug={nextSlug} />
-          </div>
-        ) : null}
-      </div>
-
-      {summaryRoundIndex !== null ? (
-        <RoundSummaryModal
-          roundIndex={summaryRoundIndex}
-          roundState={rounds[summaryRoundIndex]}
-          roundData={roundsData[summaryRoundIndex] ?? null}
-          totalRounds={totalRounds}
-          totalSolved={totalSolved}
-          totalEntries={totalEntries}
-          onContinue={handleRoundSummaryContinue}
-        />
+              <CardField
+                id={`character-${index}-${card}-name`}
+                label="Character name"
+                source="characters"
+                fieldRef={nameRefs[card]}
+                value={drafts[card].name}
+                onChange={(name) => update(card, { name })}
+                disabled={busy}
+              />
+              <CardField
+                id={`character-${index}-${card}-anime`}
+                label="Anime title"
+                source="titles"
+                fieldRef={animeRefs[card]}
+                value={drafts[card].anime}
+                onChange={(anime) => update(card, { anime })}
+                disabled={busy}
+              />
+            </li>
+          );
+        })}
+      </ul>
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+        >
+          {error}
+        </p>
       ) : null}
+      <button
+        type="submit"
+        disabled={busy}
+        className="button button-primary w-full sm:w-auto disabled:opacity-60"
+      >
+        {busy ? "Checking…" : "Check all"}
+      </button>
+    </form>
+  );
+}
+
+function CardField({
+  id,
+  label,
+  source,
+  fieldRef,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  source: "titles" | "characters";
+  fieldRef: RefObject<TitleGuessFieldHandle>;
+  value: string;
+  onChange(value: string): void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="text-xs font-semibold text-muted">
+        {label}
+      </label>
+      <TitleGuessField
+        ref={fieldRef}
+        id={id}
+        source={source}
+        value={value}
+        onValueChange={onChange}
+        // Enter in a card field moves on instead of checking every card.
+        onSubmit={() => undefined}
+        disabled={disabled}
+        placeholder={label}
+        ariaLabel={label}
+        suggestionsLabel={`${label} suggestions`}
+        suggestionLimit={6}
+      />
     </div>
+  );
+}
+
+function AnswerRow({ label, line }: { label: string; line?: ScoreLine }) {
+  if (!line) return null;
+  const verdict = VERDICT[line.verdict];
+  return (
+    <div className="space-y-0.5">
+      <dt className="flex items-baseline justify-between gap-2 text-[0.65rem] font-bold uppercase tracking-wide text-muted">
+        {label}
+        <span className="tabular-nums normal-case tracking-normal">
+          {formatPoints(line.points)} / {formatPoints(line.max)}
+        </span>
+      </dt>
+      <dd className="text-sm">
+        <span className={`mr-1 font-bold ${verdict.tone}`} aria-hidden>
+          {verdict.icon}
+        </span>
+        <span className="sr-only">{verdict.text}: </span>
+        {line.verdict === "correct" ? (
+          <span className="font-semibold text-paper">{line.answer}</span>
+        ) : (
+          <>
+            <span
+              className={line.guess ? "text-muted line-through" : "text-muted"}
+            >
+              {line.guess || "No answer"}
+            </span>
+            <span className="block font-semibold text-paper">
+              <span className="sr-only">Answer: </span>
+              {line.answer}
+            </span>
+          </>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+/** A revealed card with its own answers, so results sit under each guess. */
+function RevealedCard({
+  number,
+  entry,
+  name,
+  anime,
+  sharpened,
+}: {
+  number: number;
+  entry: CharacterGuessEntry;
+  name?: ScoreLine;
+  anime?: ScoreLine;
+  sharpened: number;
+}) {
+  const right = [name, anime].filter(
+    (item) => item?.verdict === "correct",
+  ).length;
+  const tone =
+    right === 2
+      ? "border-correct"
+      : right === 1
+        ? "border-close"
+        : "border-line";
+  return (
+    <li className={`space-y-3 rounded-lg border-2 bg-ink p-3 ${tone}`}>
+      <div className="relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={entry.character.image}
+          alt={entry.characterAnswer}
+          className="aspect-[3/4] w-full rounded-md object-cover"
+        />
+        <span className="absolute left-2 top-2 rounded bg-ink px-2 py-0.5 text-xs font-bold text-paper">
+          #{number}
+        </span>
+      </div>
+      <dl className="space-y-2">
+        <AnswerRow label="Character" line={name} />
+        <AnswerRow label="Anime" line={anime} />
+      </dl>
+      {sharpened > 0 ? (
+        <p className="text-xs text-muted">
+          Sharpened {sharpened}×: −
+          {formatPoints(
+            Math.min(
+              (name?.points ?? 0) + (anime?.points ?? 0),
+              sharpened * SHARPEN_HINT_COST,
+            ),
+          )}
+        </p>
+      ) : null}
+    </li>
   );
 }

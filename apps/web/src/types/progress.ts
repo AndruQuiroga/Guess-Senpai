@@ -27,6 +27,14 @@ export interface GameRoundProgress {
   posterImageUrl?: string;
   feedbackType?: RoundFeedbackType;
   feedbackMessage?: string;
+  /** Rounds v3: points scored by this round's single submission. */
+  points?: number;
+  /** Rounds v3: hints taken before submitting. */
+  hints?: number;
+  /** Rounds v3: what the player submitted, keyed by field. */
+  answers?: Record<string, unknown>;
+  /** Rounds v3: the checked outcome shown on the results screen. */
+  result?: Record<string, unknown>;
 }
 
 export interface GameProgress {

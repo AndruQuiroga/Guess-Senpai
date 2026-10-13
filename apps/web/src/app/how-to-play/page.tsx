@@ -13,9 +13,8 @@ export default function HowToPlayPage() {
         </h1>
         <p className="text-lg leading-relaxed text-muted">
           GuessSenpai delivers daily anime challenges, with an optional opening
-          mode when clips are available. Each puzzle has its own rules, and the
-          new Character Silhouette mode asks you to lock in both the featured
-          anime and the highlighted character before the spotlights turn on.
+          mode when clips are available. Each puzzle has its own rules, and most
+          play an Easy, Medium and Hard round with points.
         </p>
       </header>
 
@@ -89,21 +88,24 @@ export default function HowToPlayPage() {
         <PanelSection innerClassName="space-y-6">
           <div className="space-y-2">
             <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
-              Character Silhouette
+              Guess the Character
             </h2>
             <p className="text-sm uppercase tracking-[0.24em] text-signal-text">
-              Dual-guess spotlight
+              Name the lineup
             </p>
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
-            <li>Four silhouettes from the same anime appear in each round.</li>
             <li>
-              Submit both the anime title and the character&apos;s name to clear
-              a card.
+              Each round shows four hidden characters, each from a different
+              anime.
             </li>
             <li>
-              Correct anime guesses without the right character keep the card
-              locked until you nail both answers.
+              Fill in every character&apos;s name and anime, then check them all
+              at once. Each card shows its own result.
+            </li>
+            <li>
+              Easy and Medium show shadows; Hard mixes a close-up, a pixel
+              mosaic and scrambled tiles. Sharpen a card for a points cost.
             </li>
           </ul>
         </PanelSection>
@@ -136,16 +138,17 @@ export default function HowToPlayPage() {
           </h2>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
-              Each daily mode is worth up to 1,000 points, so the maximum is
-              1,000 × the modes available today.
+              Each daily mode is worth up to 3,000 points, so the maximum is
+              3,000 × the modes available today.
             </li>
             <li>
-              Anidle: solving on guess 1 earns 1,000 and each extra guess costs
-              125, down to 125 on guess 8.
+              Round modes have Easy, Medium and Hard rounds worth up to 1,000
+              each. Every round takes one answer; hints you choose to take come
+              off that round.
             </li>
             <li>
-              Other modes: every round earns full marks, minus 25% for each
-              wrong guess or extra hint, never below 25% once solved.
+              Anidle: solving on guess 1 earns 3,000, and each extra guess costs
+              a twentieth of that.
             </li>
             <li>
               Unsolved or out-of-guesses modes score 0. The score is computed on

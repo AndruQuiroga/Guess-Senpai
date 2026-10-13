@@ -128,6 +128,9 @@ class GuessVerificationPayload(BaseModel):
     guess_media_id: Optional[int] = None
     character_guess: Optional[str] = None
     guess_character_id: Optional[int] = None
+    # The character on the card being checked; without it the anime's default
+    # featured character is used (legacy single-character play).
+    target_character_id: Optional[int] = None
     season: Optional[str] = None
     season_year: Optional[int] = None
 
@@ -166,9 +169,10 @@ def _normalize_season_label(value: Optional[str]) -> Optional[str]:
 async def get_poster_image(
     media_id: int,
     hints: int = Query(default=0, ge=0, description="Number of hints revealed"),
+    difficulty: int = Query(default=0, ge=0, le=3, description="Round difficulty (1-3) for the tiered zoom ladder"),
 ) -> Response:
     try:
-        content, mime = await puzzle_engine.generate_poster_image(media_id, hints)
+        content, mime = await puzzle_engine.generate_poster_image(media_id, hints, difficulty)
     except puzzle_engine.PosterImageError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return Response(content=content, media_type=mime)
@@ -295,12 +299,12 @@ async def get_stats(request: Request) -> PuzzleStatsPayload:
 @router.post("/verify", response_model=GuessVerificationResponse)
 async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationResponse:
     guess = payload.guess.strip()
-    if not guess:
-        raise HTTPException(status_code=400, detail="Guess cannot be empty")
-
     character_guess = (
         payload.character_guess.strip() if payload.character_guess else None
     )
+    # A card may be checked for its character alone (anime left blank).
+    if not guess and not character_guess and payload.guess_character_id is None:
+        raise HTTPException(status_code=400, detail="Guess cannot be empty")
 
     cache = await get_cache(settings.redis_url)
     try:
@@ -376,7 +380,21 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
     )
 
     if evaluate_character:
-        target_edge = puzzle_engine._select_character_edge(media)
+        target_edge = None
+        if payload.target_character_id is not None:
+            target_edge = next(
+                (
+                    edge
+                    for edge in (media.characters.edges if media.characters else [])
+                    if edge.node and edge.node.id == payload.target_character_id
+                ),
+                None,
+            )
+            if target_edge is None:
+                raise HTTPException(status_code=404, detail="Character not found for this anime")
+        else:
+            # Legacy single-character play: the anime's featured character.
+            target_edge = puzzle_engine._featured_character_edge(media, set())
         if target_edge and target_edge.node:
             resolved_character_id = target_edge.node.id
             resolved_character = (

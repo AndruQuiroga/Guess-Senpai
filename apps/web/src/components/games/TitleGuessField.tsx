@@ -13,7 +13,10 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import { useTitleSuggestions } from "../../hooks/useTitleSuggestions";
+import {
+  useTitleSuggestions,
+  type SuggestionSource,
+} from "../../hooks/useTitleSuggestions";
 
 export interface TitleGuessSelection {
   value: string;
@@ -38,6 +41,8 @@ interface TitleGuessFieldProps {
   className?: string;
   minQueryLength?: number;
   suggestionLimit?: number;
+  /** Search anime titles (default) or character names. */
+  source?: SuggestionSource;
   debounceMs?: number;
   loadingText?: string;
   emptyText?: string;
@@ -60,6 +65,7 @@ export const TitleGuessField = forwardRef<
     className,
     minQueryLength = 2,
     suggestionLimit = 8,
+    source = "titles",
     debounceMs = 300,
     loadingText = "Searching…",
     emptyText = "No matches found",
@@ -80,6 +86,7 @@ export const TitleGuessField = forwardRef<
     disabled ? "" : value,
     {
       debounceMs,
+      source,
       limit: suggestionLimit,
       minLength: minQueryLength,
     },

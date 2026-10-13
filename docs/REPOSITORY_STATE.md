@@ -245,6 +245,21 @@ picked up by Portainer's Git polling. The repository setting allowing Actions to
 create PRs and the Portainer polling switch are one-time manual steps; see
 [production operations](../infra/README.md#gitops-releases).
 
+### Rounds v3 game rework — 2026-10-13
+
+Poster Zoomed, Redacted Synopsis, Character Silhouette and Guess the Opening now
+play an Easy, Medium and Hard round, each a different anime from the matching
+third of a 400-entry popularity ranking (sequels excluded). Each round takes one
+submission and shows a results screen; every round is worth up to 1,000 points
+and optional hints are deducted from it. Shared pieces live in
+`apps/web/src/components/rounds` (`useRoundGame`, `RoundUI`, `scoring`).
+Round progress stores `points`, `hints`, `answers` and `result`; games finished
+in the old format show a "finished before the update" note. `/puzzles/verify`
+accepts `target_character_id` (the old featured-character lookup called a
+function that did not exist). Anidle returned to a one-column-per-attribute
+table and limits studios to main animation studios. The profile difficulty
+preference no longer changes any game (it used to skip to a later round).
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.

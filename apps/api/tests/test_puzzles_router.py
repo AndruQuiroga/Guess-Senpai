@@ -249,8 +249,8 @@ async def test_verify_guess_requires_dual_match(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(puzzle_engine, "_load_media_details", fake_load_media_details)
     monkeypatch.setattr(
         puzzle_engine,
-        "_select_character_edge",
-        lambda _media: target_character,
+        "_featured_character_edge",
+        lambda _media, _excluded: target_character,
         raising=False,
     )
     monkeypatch.setattr(character_index, "load_character_aliases", fake_load_aliases)
@@ -393,3 +393,57 @@ async def test_search_titles_caches_remote_results(monkeypatch: pytest.MonkeyPat
     assert [item.title for item in second.results] == ["Attack on Titan"]
     assert remote_calls["value"] == 1
     assert warmed == [remote_media.id]
+
+
+@pytest.mark.asyncio
+async def test_verify_guess_checks_the_card_character(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services.anilist import MediaCharacters
+
+    def edge(character_id: int, name: str) -> MediaCharacterEdge:
+        return MediaCharacterEdge(
+            role="MAIN",
+            node=Character(
+                id=character_id,
+                name=CharacterName(full=name, userPreferred=name, native=None),
+                image=CharacterImage(large=f"https://cdn.example.com/{character_id}.jpg"),
+            ),
+        )
+
+    media = make_media(321, "Ensemble Show")
+    media.characters = MediaCharacters(edges=[edge(1, "First Lead"), edge(2, "Second Lead")])
+
+    class DummyCache:
+        async def remember(self, _key, _ttl, creator):  # type: ignore[override]
+            return await creator()
+
+    async def fake_get_cache(_url):  # type: ignore[override]
+        return DummyCache()
+
+    async def fake_load_media_details(media_id: int, _cache, _settings):
+        return media
+
+    async def no_aliases(_session, _character_id):  # type: ignore[override]
+        return []
+
+    monkeypatch.setattr(puzzles_router, "get_cache", fake_get_cache)
+    monkeypatch.setattr(puzzle_engine, "_load_media_details", fake_load_media_details)
+    monkeypatch.setattr(character_index, "load_character_aliases", no_aliases)
+
+    # The second card's character, with the anime left blank.
+    response = await puzzles_router.verify_guess(
+        GuessVerificationPayload(media_id=321, guess="", character_guess="second lead", target_character_id=2)
+    )
+    assert response.character_match is True
+    assert response.anime_match is False
+    assert response.character == "Second Lead"
+
+    wrong_card = await puzzles_router.verify_guess(
+        GuessVerificationPayload(media_id=321, guess="Ensemble Show", character_guess="First Lead", target_character_id=2)
+    )
+    assert wrong_card.anime_match is True
+    assert wrong_card.character_match is False
+
+    with pytest.raises(Exception):
+        await puzzles_router.verify_guess(
+            GuessVerificationPayload(media_id=321, guess="x", character_guess="y", target_character_id=99)
+        )

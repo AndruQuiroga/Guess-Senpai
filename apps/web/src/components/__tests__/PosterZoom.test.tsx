@@ -1,399 +1,251 @@
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 
 import PosterZoom from "../PosterZoom";
-import type { GameProgress } from "../../hooks/usePuzzleProgress";
-import type { PosterZoomGame } from "../../types/puzzles";
-
-const useTitleSuggestionsMock = vi.hoisted(() => vi.fn());
+import type { GameProgress } from "../../types/progress";
+import type { PosterZoomGame, PosterZoomRound } from "../../types/puzzles";
 
 vi.mock("../../hooks/useTitleSuggestions", () => ({
-  useTitleSuggestions: useTitleSuggestionsMock,
+  useTitleSuggestions: () => ({ suggestions: [], loading: false, error: null }),
 }));
 
 const verifyGuessMock = vi.hoisted(() => vi.fn());
-
 vi.mock("../../utils/verifyGuess", () => ({
   verifyGuess: (...args: unknown[]) => verifyGuessMock(...args),
 }));
 
+function round(
+  order: number,
+  mediaId: number,
+  answer: string,
+): PosterZoomRound {
+  return {
+    order,
+    difficulty: order,
+    mediaId,
+    answer,
+    meta: {
+      genres: ["Action", "Drama"],
+      year: 2004,
+      season: "Fall 2004",
+      format: "TV",
+    },
+    cropStages: [],
+    solution: {
+      titles: { userPreferred: answer },
+      coverImage: `https://img.example/${mediaId}.jpg`,
+      aniListUrl: `https://anilist.co/anime/${mediaId}`,
+      streamingLinks: [],
+    },
+  };
+}
+
+const payload: PosterZoomGame = {
+  spec: [],
+  rounds: [
+    round(1, 11, "Bleach"),
+    round(2, 22, "Toradora!"),
+    round(3, 33, "Elfen Lied"),
+  ],
+};
+
+const posterSrc = () =>
+  (screen.getByAltText(/Zoomed-in crop/) as HTMLImageElement).getAttribute(
+    "src",
+  );
+
 describe("PosterZoom rounds", () => {
   beforeEach(() => {
-    useTitleSuggestionsMock.mockReturnValue({
-      suggestions: [
-        { id: 101, title: "Naruto" },
-        { id: 202, title: "Bleach" },
-        { id: 303, title: "Wrong Guess" },
-        { id: 404, title: "One Piece" },
-      ],
-      loading: false,
-      error: null,
-    });
-    verifyGuessMock.mockReset();
+    verifyGuessMock.mockResolvedValue({ correct: true, animeMatch: true });
+  });
+  afterEach(() => vi.clearAllMocks());
+
+  it("starts on the Easy round with a zoomed crop and no free metadata", () => {
+    render(<PosterZoom payload={payload} onProgressChange={vi.fn()} />);
+    expect(
+      screen.getByRole("button", { name: /Round 1 · Easy/ }),
+    ).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("button", { name: /Round 2/ })).toBeDisabled();
+    expect(posterSrc()).toContain(
+      "/puzzles/poster/11/image?hints=0&difficulty=1",
+    );
+    // Season, year and genres are never shown for free.
+    expect(screen.queryByText("Fall 2004")).toBeNull();
+    expect(screen.queryByText("Action")).toBeNull();
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+  it("charges for hints and scores title, season and year in one submission", async () => {
+    const progress = vi.fn();
+    render(<PosterZoom payload={payload} onProgressChange={progress} />);
 
-  it("steps through every round and submits combined season/year guesses", async () => {
-    verifyGuessMock
-      .mockResolvedValueOnce({
-        correct: true,
-        anime_match: true,
-        match: "Naruto",
-      })
-      .mockResolvedValueOnce({ correct: false, anime_match: false })
-      .mockResolvedValueOnce({
-        correct: true,
-        anime_match: true,
-        match: "Bleach",
-      })
-      .mockResolvedValueOnce({
-        correct: true,
-        anime_match: true,
-        match: "One Piece",
-        seasonMatch: true,
-        seasonYearMatch: true,
-      });
-
-    const payload: PosterZoomGame = {
-      spec: [
-        { difficulty: 1, hints: ["genres", "season", "format"] },
-        { difficulty: 2, hints: ["genres", "year"] },
-        { difficulty: 3, hints: ["genres"] },
-      ],
-      rounds: [
-        {
-          order: 1,
-          difficulty: 1,
-          mediaId: 11,
-          answer: "Naruto",
-          meta: {
-            genres: ["Action"],
-            year: 2002,
-            season: "Spring",
-            format: "TV",
-          },
-          cropStages: [],
-        },
-        {
-          order: 2,
-          difficulty: 2,
-          mediaId: 22,
-          answer: "Bleach",
-          meta: {
-            genres: ["Action"],
-            year: 2004,
-            season: "Fall",
-            format: "TV",
-          },
-          cropStages: [],
-        },
-        {
-          order: 3,
-          difficulty: 3,
-          mediaId: 33,
-          answer: "One Piece",
-          meta: {
-            genres: ["Adventure"],
-            year: 2010,
-            season: "Spring",
-            format: "TV",
-          },
-          cropStages: [],
-        },
-      ],
-    };
-
-    const onProgressChange = vi.fn();
-    const user = userEvent.setup();
-
-    render(
-      <PosterZoom payload={payload} onProgressChange={onProgressChange} />,
+    fireEvent.click(screen.getByRole("button", { name: /Zoom out/ }));
+    expect(posterSrc()).toContain("hints=1");
+    expect(progress).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        rounds: expect.arrayContaining([
+          expect.objectContaining({ round: 1, hints: 1 }),
+        ]),
+      }),
     );
 
-    const input = screen.getByLabelText("Poster Zoom guess");
-    const submitButton = screen.getByRole("button", { name: /submit guess/i });
-    const seasonSelect = screen.getByLabelText("Release season");
-    const yearInput = screen.getByLabelText("Release year");
-    const round2Button = screen.getByRole("button", { name: "Round 2" });
-    const round3Button = screen.getByRole("button", { name: "Round 3" });
-
-    expect(round2Button).toBeDisabled();
-    expect(round3Button).toBeDisabled();
-
-    await user.type(input, "Naruto");
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledTimes(1);
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Poster anime title" }),
+      {
+        target: { value: "Bleach" },
+      },
+    );
+    fireEvent.change(screen.getByLabelText(/Season/), {
+      target: { value: "FALL" },
     });
-    expect(verifyGuessMock).toHaveBeenNthCalledWith(1, 11, "Naruto", 101, {
-      season: undefined,
-      seasonYear: undefined,
+    fireEvent.change(screen.getByLabelText(/Year/), {
+      target: { value: "2005" },
     });
-    expect(round2Button).not.toBeDisabled();
-    const afterRoundOne = onProgressChange.mock.calls.at(-1)?.[0];
-    expect(afterRoundOne.round).toBe(2);
-    expect(afterRoundOne.rounds?.[0]).toMatchObject({
-      round: 1,
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+
+    // 600 title + 200 season + 100 (year off by one) − 150 zoom hint.
+    expect(await screen.findByText("+750")).toBeInTheDocument();
+    expect(verifyGuessMock).toHaveBeenCalledWith(11, "Bleach", undefined);
+    expect(screen.getByAltText("Cover art for Bleach")).toHaveAttribute(
+      "src",
+      "https://img.example/11.jpg",
+    );
+    const last = progress.mock.calls.at(-1)?.[0] as GameProgress;
+    expect(last.completed).toBe(false);
+    expect(last.round).toBe(2);
+    expect(last.rounds?.[0]).toMatchObject({
       completed: true,
-      guesses: ["Naruto"],
-      feedbackType: "success",
+      points: 750,
+      hints: 1,
     });
 
-    await user.clear(input);
-    await user.type(input, "Wrong Guess");
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledTimes(2);
-    });
-    expect(verifyGuessMock).toHaveBeenNthCalledWith(2, 22, "Wrong Guess", 303, {
-      season: undefined,
-      seasonYear: undefined,
-    });
-    await screen.findByText("Not quite. Keep trying!");
-    const afterMiss = onProgressChange.mock.calls.at(-1)?.[0];
-    expect(afterMiss.rounds?.[1]).toMatchObject({
-      round: 2,
-      completed: false,
-      stage: 2,
-      guesses: ["Wrong Guess"],
-    });
-
-    await user.clear(input);
-    await user.type(input, "Bleach");
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledTimes(3);
-    });
-    expect(verifyGuessMock).toHaveBeenNthCalledWith(3, 22, "Bleach", 202, {
-      season: undefined,
-      seasonYear: undefined,
-    });
-    expect(round3Button).not.toBeDisabled();
-    const afterRoundTwo = onProgressChange.mock.calls.at(-1)?.[0];
-    expect(afterRoundTwo.round).toBe(3);
-    expect(afterRoundTwo.rounds?.[1]).toMatchObject({
-      round: 2,
-      completed: true,
-      feedbackType: "success",
-    });
-    expect(afterRoundTwo.rounds?.[1]?.guesses).toEqual([
-      "Wrong Guess",
-      "Bleach",
-    ]);
-
-    await user.selectOptions(seasonSelect, "Spring");
-    await user.clear(yearInput);
-    await user.type(yearInput, "2010");
-    await user.clear(input);
-    await user.type(input, "One Piece");
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledTimes(4);
-    });
-    expect(verifyGuessMock).toHaveBeenNthCalledWith(4, 33, "One Piece", 404, {
-      season: "SPRING",
-      seasonYear: 2010,
-    });
-    const finalProgress = onProgressChange.mock.calls.at(-1)?.[0];
-    expect(finalProgress.completed).toBe(true);
-    expect(finalProgress.rounds?.map((round) => round?.completed)).toEqual([
-      true,
-      true,
-      true,
-    ]);
-    const lastRound = finalProgress.rounds?.[2];
-    expect(lastRound).toMatchObject({
-      round: 3,
-      guesses: ["One Piece"],
-      seasonGuess: "SPRING",
-      seasonYearGuess: 2010,
-      feedbackType: "success",
-    });
+    fireEvent.click(screen.getByRole("button", { name: /Next round/ }));
+    expect(posterSrc()).toContain(
+      "/puzzles/poster/22/image?hints=0&difficulty=2",
+    );
   });
 
-  it("restores persisted progress across rounds", async () => {
-    verifyGuessMock.mockResolvedValueOnce({
-      correct: true,
-      anime_match: true,
-      match: "One Piece",
+  it("refuses a completely blank answer without spending the round", async () => {
+    const progress = vi.fn();
+    render(<PosterZoom payload={payload} onProgressChange={progress} />);
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "at least one answer",
+    );
+    expect(verifyGuessMock).not.toHaveBeenCalled();
+    expect(progress).not.toHaveBeenCalled();
+  });
+
+  it("resumes on the first unplayed round and ends on a summary", async () => {
+    const outcome = (points: number) => ({
+      lines: [
+        {
+          label: "Title",
+          guess: "x",
+          answer: "y",
+          verdict: "correct",
+          points,
+          max: 600,
+        },
+      ],
+      hintPenalty: 0,
+      points,
+      max: 1000,
     });
-
-    const payload: PosterZoomGame = {
-      spec: [
-        { difficulty: 1, hints: ["genres", "season", "format"] },
-        { difficulty: 2, hints: ["genres", "year"] },
-        { difficulty: 3, hints: ["genres"] },
-      ],
-      rounds: [
-        {
-          order: 1,
-          difficulty: 1,
-          mediaId: 11,
-          answer: "Naruto",
-          meta: {
-            genres: ["Action"],
-            year: 2002,
-            season: "Spring",
-            format: "TV",
-          },
-          cropStages: [],
-        },
-        {
-          order: 2,
-          difficulty: 2,
-          mediaId: 22,
-          answer: "Bleach",
-          meta: {
-            genres: ["Action"],
-            year: 2004,
-            season: "Fall",
-            format: "TV",
-          },
-          cropStages: [],
-        },
-        {
-          order: 3,
-          difficulty: 3,
-          mediaId: 33,
-          answer: "One Piece",
-          meta: {
-            genres: ["Adventure"],
-            year: 2010,
-            season: "Spring",
-            format: "TV",
-          },
-          cropStages: [],
-        },
-      ],
-    };
-
     const initialProgress: GameProgress = {
       completed: false,
       round: 3,
-      guesses: ["Naruto", "Bleach"],
+      guesses: ["a", "b"],
       rounds: [
         {
           round: 1,
-          guesses: ["Naruto"],
-          titleGuesses: ["Naruto"],
-          yearGuesses: [2002],
-          stage: 3,
+          guesses: ["a"],
           completed: true,
-          hintUsed: true,
-          resolvedTitle: "Naruto",
-          resolvedYear: 2002,
-          seasonGuess: "SPRING",
-          seasonYearGuess: 2002,
-          mediaId: 11,
-          posterImageBase: "http://localhost:8000/puzzles/poster/11/image",
-          posterImageUrl:
-            "http://localhost:8000/puzzles/poster/11/image?hints=2",
-          feedbackType: "success",
-          feedbackMessage: "Poster solved! Naruto",
+          points: 600,
+          result: outcome(600),
         },
         {
           round: 2,
-          guesses: ["Bleach"],
-          titleGuesses: ["Bleach"],
-          stage: 3,
+          guesses: ["b"],
           completed: true,
-          hintUsed: true,
-          resolvedTitle: "Bleach",
-          mediaId: 22,
-          posterImageBase: "http://localhost:8000/puzzles/poster/22/image",
-          posterImageUrl:
-            "http://localhost:8000/puzzles/poster/22/image?hints=2",
-          feedbackType: "success",
-          feedbackMessage: "Poster solved! Bleach",
-        },
-        {
-          round: 3,
-          guesses: ["One Piece"],
-          titleGuesses: ["One Piece"],
-          yearGuesses: [2010],
-          stage: 2,
-          completed: false,
-          hintUsed: true,
-          seasonGuess: "SPRING",
-          seasonYearGuess: 2010,
-          feedbackType: "partial" as const,
-          feedbackMessage: "Title correct! Check the release year.",
-          resolvedTitle: "One Piece",
-          mediaId: 33,
-          posterImageBase: "http://localhost:8000/puzzles/poster/33/image",
-          posterImageUrl:
-            "http://localhost:8000/puzzles/poster/33/image?hints=1",
+          points: 400,
+          result: outcome(400),
         },
       ],
     };
-
-    const onProgressChange = vi.fn();
-    const user = userEvent.setup();
-
     render(
       <PosterZoom
         payload={payload}
         initialProgress={initialProgress}
-        onProgressChange={onProgressChange}
+        onProgressChange={vi.fn()}
       />,
     );
+    expect(posterSrc()).toContain("/poster/33/");
 
-    await waitFor(() => {
-      expect(onProgressChange).toHaveBeenCalled();
-    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Poster anime title" }),
+      {
+        target: { value: "Elfen Lied" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /See final score/ }),
+    );
 
-    const hydrated = onProgressChange.mock.calls.at(-1)?.[0];
-    expect(hydrated.round).toBe(3);
-    expect(hydrated.rounds?.[0]).toMatchObject({
-      round: 1,
-      completed: true,
-      guesses: ["Naruto"],
-    });
-    expect(hydrated.rounds?.[1]).toMatchObject({
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Poster Zoomed complete" }),
+      ).toBeInTheDocument(),
+    );
+    // 600 + 400 + 600 (title only, no season or year).
+    expect(screen.getByText("1,600")).toBeInTheDocument();
+  });
+
+  it("picks up saved progress that arrives after the game mounted", () => {
+    const view = render(
+      <PosterZoom payload={payload} onProgressChange={vi.fn()} />,
+    );
+    expect(posterSrc()).toContain("/poster/11/");
+    const saved: GameProgress = {
+      completed: false,
       round: 2,
-      completed: true,
-      guesses: ["Bleach"],
-    });
-    expect(hydrated.rounds?.[2]).toMatchObject({
-      round: 3,
-      stage: 2,
-      feedbackType: "partial",
-      seasonGuess: "SPRING",
-      seasonYearGuess: 2010,
-    });
+      guesses: ["a"],
+      rounds: [
+        {
+          round: 1,
+          guesses: ["a"],
+          completed: true,
+          points: 800,
+          result: { lines: [], hintPenalty: 0, points: 800, max: 1000 },
+        },
+      ],
+    };
+    view.rerender(
+      <PosterZoom
+        payload={payload}
+        initialProgress={saved}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    expect(posterSrc()).toContain("/poster/22/");
+    expect(
+      screen.getByRole("button", { name: /Round 1 · Easy/ }),
+    ).toHaveTextContent("800");
+  });
 
-    const input = screen.getByLabelText("Poster Zoom guess");
-    const seasonSelect = screen.getByLabelText("Release season");
-    const yearInput = screen.getByLabelText("Release year");
-    expect(input).toHaveValue("One Piece");
-    expect(seasonSelect).toHaveValue("Spring");
-    expect(yearInput).toHaveValue("2010");
-
-    await user.click(screen.getByRole("button", { name: /submit guess/i }));
-
-    await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledTimes(1);
-    });
-    expect(verifyGuessMock).toHaveBeenCalledWith(33, "One Piece", 404, {
-      season: "SPRING",
-      seasonYear: 2010,
-    });
-
-    const completed = onProgressChange.mock.calls.at(-1)?.[0];
-    expect(completed.completed).toBe(true);
-    expect(completed.rounds?.[2]).toMatchObject({
-      completed: true,
-      seasonGuess: "SPRING",
-      seasonYearGuess: 2010,
-    });
+  it("shows a finished-before-update note for legacy progress", () => {
+    render(
+      <PosterZoom
+        payload={payload}
+        initialProgress={{
+          completed: true,
+          round: 3,
+          guesses: ["a"],
+          rounds: [],
+        }}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/before the new round format/)).toBeInTheDocument();
   });
 });

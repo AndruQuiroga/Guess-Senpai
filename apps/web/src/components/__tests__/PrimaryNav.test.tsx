@@ -33,7 +33,7 @@ const baseGames: NavGame[] = [
   },
   {
     slug: "character-silhouette",
-    title: "Character Silhouette",
+    title: "Guess the Character",
     href: "/games/character-silhouette",
     status: "solved",
   },
@@ -63,7 +63,7 @@ describe("PrimaryNav", () => {
       within(sidebar).getByRole("link", { name: /Poster Zoomed/ }),
     ).toHaveTextContent("In progress");
     expect(
-      within(sidebar).getByRole("link", { name: /Character Silhouette/ }),
+      within(sidebar).getByRole("link", { name: /Guess the Character/ }),
     ).toHaveTextContent("Solved");
     expect(
       within(sidebar).getByRole("link", { name: /Redacted Synopsis/ }),
