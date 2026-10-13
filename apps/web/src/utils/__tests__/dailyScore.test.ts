@@ -89,7 +89,7 @@ describe("scoreGame: round based modes", () => {
     ).toBe(0);
   });
 
-  it("uses wrong guesses beyond solved cards for Character Silhouette", () => {
+  it("uses wrong guesses beyond solved cards for legacy character records", () => {
     const clean = {
       completed: true,
       round: 3,

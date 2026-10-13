@@ -29,7 +29,7 @@ export function CharacterSilhouettePage({
 }: Props) {
   return (
     <RoundGamePage
-      title="Character Silhouette"
+      title="Guess the Character"
       slug="character-silhouette"
       roundCount={
         payload.rounds.filter((round) => round.entries.length > 0).length

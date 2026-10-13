@@ -195,8 +195,15 @@ describe("CharacterSilhouette check-all rounds", () => {
       characterId: null,
       targetCharacterId: 2,
     });
-    // Revealed art on the results screen.
-    expect(screen.getByAltText("Edward Elric")).toBeInTheDocument();
+    // Results sit under each card instead of a table above them.
+    expect(screen.queryByRole("table")).toBeNull();
+    const second = screen.getByAltText("Edward Elric").closest("li")!;
+    expect(second).toHaveTextContent("Wrong Name");
+    expect(second).toHaveTextContent("Answer: Edward Elric");
+    expect(second).toHaveTextContent("Wrong: Wrong Name");
+    const first = screen.getByAltText("Lelouch").closest("li")!;
+    expect(first).toHaveTextContent("Correct: Lelouch");
+    expect(first).toHaveTextContent("Correct: Code Geass");
     const last = progress.mock.calls.at(-1)?.[0] as GameProgress;
     expect(last.rounds?.[0]).toMatchObject({ completed: true, points: 500 });
   });

@@ -111,7 +111,7 @@ export function HintButton({
   );
 }
 
-const VERDICT: Record<
+export const VERDICT: Record<
   ScoreLine["verdict"],
   { icon: string; text: string; tone: string }
 > = {
@@ -203,6 +203,7 @@ export function RoundResult({
   coverImage,
   aniListUrl,
   media,
+  breakdown = true,
   onNext,
   nextLabel,
 }: {
@@ -214,6 +215,11 @@ export function RoundResult({
   aniListUrl?: string | null;
   /** Game-specific reveal (full synopsis, characters, playable opening). */
   media?: ReactNode;
+  /**
+   * Show the answer block and per-question table. Off when `media` already
+   * shows each answer in place (the character cards).
+   */
+  breakdown?: boolean;
   onNext(): void;
   nextLabel: string;
 }) {
@@ -258,42 +264,53 @@ export function RoundResult({
         </p>
       </div>
 
-      <div
-        className={
-          coverImage
-            ? "grid gap-5 sm:grid-cols-[9rem_minmax(0,1fr)]"
-            : "space-y-4"
-        }
-      >
-        {coverImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={coverImage}
-            alt={`Cover art for ${answerTitle}`}
-            className="aspect-[2/3] w-32 rounded-md border border-line object-cover sm:w-full"
-          />
-        ) : null}
-        <div className="min-w-0 space-y-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted">
-              Answer
-            </p>
-            <p className="text-xl font-semibold text-paper">{answerTitle}</p>
-            {subtitle ? <p className="text-sm text-muted">{subtitle}</p> : null}
-            {aniListUrl ? (
-              <a
-                href={aniListUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-signal-text underline"
-              >
-                View on AniList
-              </a>
-            ) : null}
+      {breakdown ? (
+        <div
+          className={
+            coverImage
+              ? "grid gap-5 sm:grid-cols-[9rem_minmax(0,1fr)]"
+              : "space-y-4"
+          }
+        >
+          {coverImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={coverImage}
+              alt={`Cover art for ${answerTitle}`}
+              className="aspect-[2/3] w-32 rounded-md border border-line object-cover sm:w-full"
+            />
+          ) : null}
+          <div className="min-w-0 space-y-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-muted">
+                Answer
+              </p>
+              <p className="text-xl font-semibold text-paper">{answerTitle}</p>
+              {subtitle ? (
+                <p className="text-sm text-muted">{subtitle}</p>
+              ) : null}
+              {aniListUrl ? (
+                <a
+                  href={aniListUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-signal-text underline"
+                >
+                  View on AniList
+                </a>
+              ) : null}
+            </div>
+            <ScoreTable outcome={outcome} />
           </div>
-          <ScoreTable outcome={outcome} />
         </div>
-      </div>
+      ) : outcome.hintPenalty > 0 ? (
+        <p className="text-sm text-muted">
+          Hints used:{" "}
+          <span className="tabular-nums text-wrong-ink">
+            −{formatPoints(outcome.hintPenalty)}
+          </span>
+        </p>
+      ) : null}
 
       {media}
 

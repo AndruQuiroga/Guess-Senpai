@@ -13,9 +13,8 @@ export default function HowToPlayPage() {
         </h1>
         <p className="text-lg leading-relaxed text-muted">
           GuessSenpai delivers daily anime challenges, with an optional opening
-          mode when clips are available. Each puzzle has its own rules, and the
-          new Character Silhouette mode asks you to lock in both the featured
-          anime and the highlighted character before the spotlights turn on.
+          mode when clips are available. Each puzzle has its own rules, and most
+          play an Easy, Medium and Hard round with points.
         </p>
       </header>
 
@@ -89,21 +88,24 @@ export default function HowToPlayPage() {
         <PanelSection innerClassName="space-y-6">
           <div className="space-y-2">
             <h2 className="text-2xl font-display font-semibold tracking-tight text-paper">
-              Character Silhouette
+              Guess the Character
             </h2>
             <p className="text-sm uppercase tracking-[0.24em] text-signal-text">
-              Dual-guess spotlight
+              Name the lineup
             </p>
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
-            <li>Four silhouettes from the same anime appear in each round.</li>
             <li>
-              Submit both the anime title and the character&apos;s name to clear
-              a card.
+              Each round shows four hidden characters, each from a different
+              anime.
             </li>
             <li>
-              Correct anime guesses without the right character keep the card
-              locked until you nail both answers.
+              Fill in every character&apos;s name and anime, then check them all
+              at once. Each card shows its own result.
+            </li>
+            <li>
+              Easy and Medium show shadows; Hard mixes a close-up, a pixel
+              mosaic and scrambled tiles. Sharpen a card for a points cost.
             </li>
           </ul>
         </PanelSection>

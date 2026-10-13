@@ -32,12 +32,14 @@ import {
   LegacyFinished,
   RoundResult,
   RoundTabs,
+  VERDICT,
 } from "./rounds/RoundUI";
 import {
   buildOutcome,
   difficultyLabel,
   line,
   ROUND_POINTS,
+  formatPoints,
   type ScoreLine,
 } from "./rounds/scoring";
 import { useRoundGame, type RoundGameState } from "./rounds/useRoundGame";
@@ -86,7 +88,7 @@ export default function CharacterSilhouette({
 
   if (rounds.length === 0) {
     return (
-      <p className="text-muted">Character Silhouette is unavailable today.</p>
+      <p className="text-muted">Guess the Character is unavailable today.</p>
     );
   }
   if (game.legacyFinished) return <LegacyFinished nextSlug={nextSlug} />;
@@ -102,7 +104,7 @@ export default function CharacterSilhouette({
       />
       {game.view >= rounds.length ? (
         <GameSummary
-          title="Character Silhouette"
+          title="Guess the Character"
           nextSlug={nextSlug}
           rows={rounds.map((round, index) => ({
             label: `Round ${index + 1} · ${tabs[index].label}`,
@@ -280,22 +282,25 @@ function CharacterRound({
   );
 
   if (record.submitted && record.outcome) {
-    const cards = (record.answers.cards as CardDraft[] | undefined) ?? [];
+    const lines = record.outcome.lines;
     return (
       <RoundResult
         roundLabel={label}
         outcome={record.outcome}
         answerTitle={`${entries.length} characters`}
-        subtitle={entries.map((entry) => entry.animeAnswer).join(" · ")}
+        breakdown={false}
         onNext={game.advance}
         nextLabel={isLast ? "See final score" : "Next round"}
         media={
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {entries.map((entry, card) => (
               <RevealedCard
                 key={entry.character.id}
+                number={card + 1}
                 entry={entry}
-                draft={cards[card]}
+                name={lines[card * 2]}
+                anime={lines[card * 2 + 1]}
+                sharpened={hintsByCard[card] ?? 0}
               />
             ))}
           </ul>
@@ -424,28 +429,91 @@ function CardField({
   );
 }
 
-function RevealedCard({
-  entry,
-  draft,
-}: {
-  entry: CharacterGuessEntry;
-  draft?: CardDraft;
-}) {
+function AnswerRow({ label, line }: { label: string; line?: ScoreLine }) {
+  if (!line) return null;
+  const verdict = VERDICT[line.verdict];
   return (
-    <li className="space-y-2 rounded-md border border-line bg-ink p-3">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={entry.character.image}
-        alt={entry.characterAnswer}
-        className="aspect-[3/4] w-full rounded-sm object-cover"
-      />
-      <p className="text-sm font-semibold text-paper">
-        {entry.characterAnswer}
-      </p>
-      <p className="text-xs text-muted">{entry.animeAnswer}</p>
-      {draft && (draft.name || draft.anime) ? (
+    <div className="space-y-0.5">
+      <dt className="flex items-baseline justify-between gap-2 text-[0.65rem] font-bold uppercase tracking-wide text-muted">
+        {label}
+        <span className="tabular-nums normal-case tracking-normal">
+          {formatPoints(line.points)} / {formatPoints(line.max)}
+        </span>
+      </dt>
+      <dd className="text-sm">
+        <span className={`mr-1 font-bold ${verdict.tone}`} aria-hidden>
+          {verdict.icon}
+        </span>
+        <span className="sr-only">{verdict.text}: </span>
+        {line.verdict === "correct" ? (
+          <span className="font-semibold text-paper">{line.answer}</span>
+        ) : (
+          <>
+            <span
+              className={line.guess ? "text-muted line-through" : "text-muted"}
+            >
+              {line.guess || "No answer"}
+            </span>
+            <span className="block font-semibold text-paper">
+              <span className="sr-only">Answer: </span>
+              {line.answer}
+            </span>
+          </>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+/** A revealed card with its own answers, so results sit under each guess. */
+function RevealedCard({
+  number,
+  entry,
+  name,
+  anime,
+  sharpened,
+}: {
+  number: number;
+  entry: CharacterGuessEntry;
+  name?: ScoreLine;
+  anime?: ScoreLine;
+  sharpened: number;
+}) {
+  const right = [name, anime].filter(
+    (item) => item?.verdict === "correct",
+  ).length;
+  const tone =
+    right === 2
+      ? "border-correct"
+      : right === 1
+        ? "border-close"
+        : "border-line";
+  return (
+    <li className={`space-y-3 rounded-lg border-2 bg-ink p-3 ${tone}`}>
+      <div className="relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={entry.character.image}
+          alt={entry.characterAnswer}
+          className="aspect-[3/4] w-full rounded-md object-cover"
+        />
+        <span className="absolute left-2 top-2 rounded bg-ink px-2 py-0.5 text-xs font-bold text-paper">
+          #{number}
+        </span>
+      </div>
+      <dl className="space-y-2">
+        <AnswerRow label="Character" line={name} />
+        <AnswerRow label="Anime" line={anime} />
+      </dl>
+      {sharpened > 0 ? (
         <p className="text-xs text-muted">
-          You said: {[draft.name, draft.anime].filter(Boolean).join(" · ")}
+          Sharpened {sharpened}×: −
+          {formatPoints(
+            Math.min(
+              (name?.points ?? 0) + (anime?.points ?? 0),
+              sharpened * SHARPEN_HINT_COST,
+            ),
+          )}
         </p>
       ) : null}
     </li>

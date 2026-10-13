@@ -127,22 +127,22 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
   },
   {
     slug: "character-silhouette",
-    title: "Character Silhouette",
-    tagline: "Spot every member of the lineup as the lights turn up.",
+    title: "Guess the Character",
+    tagline: "Name every hidden character and the anime they come from.",
     accentColor: "from-purple-400 via-indigo-400 to-sky-500",
     release: "always",
     playable: true,
     comingSoon: false,
     gameKey: "character_silhouette",
     description:
-      "Identify the anime and every featured character as the silhouettes sharpen across multiple reveal rounds.",
+      "Three rounds of four hidden characters, each from a different anime. Name them all, then check them at once.",
     preview: {
       summary:
-        "Tackle three escalating rounds of silhouettes—four cards per round—locking in both the character and anime before the lights come up.",
+        "Easy, Medium and Hard lineups of four hidden characters. Name each one and their anime, then check them all at once.",
       rules: [
         "Three rounds of four shadowed characters, each from a different anime.",
         "Fill in every character's name and anime, then check them all at once.",
-        "Sharpen a card for a points cost; everyone is revealed on the results screen.",
+        "Sharpen a card for a points cost; each card shows its own result after checking.",
       ],
       media: {
         type: "image",

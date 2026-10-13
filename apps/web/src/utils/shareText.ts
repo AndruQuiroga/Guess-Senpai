@@ -12,7 +12,7 @@ const GAME_DESCRIPTORS: Array<{
 }> = [
   { label: "Anidle", key: "anidle", totalRounds: 3 },
   { label: "Poster Zoomed", key: "poster_zoomed", totalRounds: 3 },
-  { label: "Character Silhouette", key: "character_silhouette", totalRounds: 3 },
+  { label: "Guess the Character", key: "character_silhouette", totalRounds: 3 },
   { label: "Redacted Synopsis", key: "redacted_synopsis", totalRounds: 3 },
   { label: "Guess the Opening", key: "guess_the_opening", totalRounds: 3 },
 ];
@@ -122,7 +122,10 @@ function buildRoundStates(
     return rounds;
   }
 
-  const unlockedRounds = Math.max(1, Math.min(totalRounds, progress.round ?? 1));
+  const unlockedRounds = Math.max(
+    1,
+    Math.min(totalRounds, progress.round ?? 1),
+  );
 
   for (let index = 1; index <= totalRounds; index += 1) {
     if (index < unlockedRounds) {
@@ -251,7 +254,9 @@ export function buildShareEvent(
     }
 
     const rounds = buildRoundStates(totalRounds, gameProgress);
-    const clearedRounds = rounds.filter((round) => round.state === "cleared").length;
+    const clearedRounds = rounds.filter(
+      (round) => round.state === "cleared",
+    ).length;
 
     if (!gameProgress) {
       return {
@@ -276,9 +281,8 @@ export function buildShareEvent(
         clearedFromProgress,
         rounds.filter((round) => round.state === "cleared").length,
       );
-      const { totalAttempts, attemptSummary } = collectPosterAttemptBreakdown(
-        posterRounds,
-      );
+      const { totalAttempts, attemptSummary } =
+        collectPosterAttemptBreakdown(posterRounds);
       const totalRoundLabel = totalRounds === 1 ? "round" : "rounds";
       const clearedRoundLabel = resolvedCleared === 1 ? "round" : "rounds";
 
@@ -293,7 +297,9 @@ export function buildShareEvent(
         key,
         label,
         totalRounds,
-        status: gameProgress.completed ? ("completed" as const) : ("in_progress" as const),
+        status: gameProgress.completed
+          ? ("completed" as const)
+          : ("in_progress" as const),
         rounds,
         attempts: totalAttempts > 0 ? totalAttempts : undefined,
         summary,
@@ -359,7 +365,8 @@ export function buildShareEvent(
 export function formatShareEventMessage(event: ShareEventData): string {
   const lines: string[] = [];
   lines.push(`GuessSenpai — ${event.formattedDate}`);
-  if (event.puzzleId) lines.push(`Puzzle ${event.puzzleId} · rules ${event.rulesVersion ?? "1"}`);
+  if (event.puzzleId)
+    lines.push(`Puzzle ${event.puzzleId} · rules ${event.rulesVersion ?? "1"}`);
 
   event.games.forEach((game) => {
     lines.push(game.summary);
