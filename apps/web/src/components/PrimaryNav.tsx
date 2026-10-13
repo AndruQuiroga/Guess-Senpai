@@ -10,6 +10,7 @@ import { NavIcon } from "./nav/NavIcon";
 import { StatusMark } from "./nav/StatusMark";
 import { useDailyScore } from "./nav/useDailyScore";
 import { useNavGames, type NavGame } from "./nav/useNavGames";
+import { PRACTICE_MODES, UNLIMITED_ANIDLE_HREF } from "../config/games";
 import { formatDailyScore, type DailyScore } from "../utils/dailyScore";
 import { GAME_STATUS_TEXT, type GameStatus } from "../utils/gameAction";
 
@@ -42,6 +43,16 @@ function archiveHref(archiveDate: string) {
 
 const isArchive = (pathname: string) =>
   matchesPath(pathname, "/archive", false);
+
+const isUnlimited = (pathname: string) =>
+  matchesPath(pathname, UNLIMITED_ANIDLE_HREF, false);
+
+/** Daily Anidle owns /games/anidle/*, except the separate Unlimited route. */
+const isGameActive = (pathname: string, href: string) =>
+  matchesPath(pathname, href, false) && !isUnlimited(pathname);
+
+const [UNLIMITED] = PRACTICE_MODES;
+const UNLIMITED_LABEL = "Unlimited";
 
 /**
  * Persistent navigation. From md up it is a left sidebar listing every playable
@@ -90,7 +101,11 @@ function DesktopSidebar({
         <ul aria-labelledby="sidebar-games-heading" className="space-y-1">
           {games.map((game) => (
             <li key={game.slug}>
-              <NavLink href={game.href} className="w-full !items-center py-2">
+              <NavLink
+                href={game.href}
+                isActive={(pathname) => isGameActive(pathname, game.href)}
+                className="w-full !items-center py-2"
+              >
                 <NavIcon name={game.slug} />
                 <span className="flex min-w-0 flex-col leading-tight">
                   <span className="truncate">{game.title}</span>
@@ -102,6 +117,23 @@ function DesktopSidebar({
             </li>
           ))}
         </ul>
+
+        <div className="mt-3 space-y-1 border-t border-line-subtle pt-3">
+          <p
+            id="sidebar-practice-heading"
+            className="px-3 pb-1 text-sm font-semibold text-muted"
+          >
+            Practice
+          </p>
+          <NavLink
+            href={UNLIMITED.href ?? UNLIMITED_ANIDLE_HREF}
+            aria-describedby="sidebar-practice-heading"
+            className="w-full"
+          >
+            <NavIcon name="unlimited" />
+            {UNLIMITED_LABEL}
+          </NavLink>
+        </div>
 
         <div className="mt-3 space-y-1 border-t border-line-subtle pt-3">
           <NavLink
@@ -212,17 +244,31 @@ function MobileNav({
       <nav aria-label="Primary (compact)" className="px-4 pb-3">
         <ul
           ref={rowRef}
-          className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="relative -mx-4 flex snap-x gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {chip("/", "Today", pathname === "/")}
           {games.map((game) =>
             chip(
               game.href,
               game.title,
-              matchesPath(pathname, game.href, false),
+              isGameActive(pathname, game.href),
               game.status,
             ),
           )}
+          <li className="shrink-0">
+            <Link
+              href={UNLIMITED.href ?? UNLIMITED_ANIDLE_HREF}
+              aria-current={isUnlimited(pathname) ? "page" : undefined}
+              className={`${chipBase} border-dashed ${
+                isUnlimited(pathname)
+                  ? "border-signal bg-panel-raised text-paper"
+                  : "border-line-strong bg-ink text-muted hover:bg-hover hover:text-paper"
+              }`}
+            >
+              <NavIcon name="unlimited" className="h-4 w-4" />
+              {UNLIMITED_LABEL}
+            </Link>
+          </li>
           {chip(archiveHref(archiveDate), "Archive", isArchive(pathname))}
           {chip(
             "/how-to-play",

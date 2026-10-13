@@ -15,13 +15,15 @@ from ..core.database import get_session_factory
 from ..puzzles import engine as puzzle_engine
 from ..puzzles.engine import UserContext, _choose_answer, _title_variants, get_daily_puzzle
 from ..puzzles.models import (
+    AnidlePracticeResponse,
     DailyProgressPayload,
     DailyPuzzleResponse,
     PuzzleStatsPayload,
     RecentMediaSummary,
     StreakPayload,
+    UtcDatetime,
 )
-from ..services import character_index, title_index
+from ..services import anidle_practice, character_index, title_index
 from ..services.cache import get_cache
 from ..services.progress import (
     load_daily_progress,
@@ -111,7 +113,7 @@ class ArchiveIndexResponse(BaseModel):
 
 class DailyAvailabilityResponse(BaseModel):
     date: date
-    reset_at: datetime
+    reset_at: UtcDatetime
     published: bool
     available_modes: list[str]
     guess_the_opening_enabled: bool
@@ -437,6 +439,24 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
         season_match=season_match,
         season_year_match=season_year_match,
     )
+
+
+@router.get(
+    "/anidle/practice",
+    response_model=AnidlePracticeResponse,
+    summary="Fetch a fresh Unlimited Anidle practice game",
+)
+async def get_anidle_practice(
+    exclude: Optional[List[int]] = Query(
+        default=None,
+        max_length=anidle_practice.MAX_EXCLUDED_IDS,
+        description="Recently played media ids to avoid repeating",
+    ),
+) -> AnidlePracticeResponse:
+    try:
+        return await anidle_practice.build_practice_game(exclude)
+    except (ValueError, LookupError) as exc:
+        raise HTTPException(status_code=503, detail="No practice puzzle available right now") from exc
 
 
 @router.post("/anidle/evaluate", response_model=AnidleGuessEvaluationResponse)

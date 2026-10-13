@@ -17,6 +17,11 @@ interface Props {
   registerRoundController?: (fn: (round: number) => void) => void;
   nextSlug?: string | null;
   accountDifficulty?: number;
+  /** Cover of the answer, shown on the result card when no guess revealed it. */
+  answerCoverImage?: string | null;
+  /** Unlimited mode: shows "New puzzle" on the result card. */
+  onNewPuzzle?: () => void;
+  newPuzzleBusy?: boolean;
 }
 
 /** Thin composition: input first, hints below it, then the result and grid. */
@@ -27,6 +32,9 @@ export default function Anidle({
   onProgressChange,
   registerRoundController,
   nextSlug,
+  answerCoverImage,
+  onNewPuzzle,
+  newPuzzleBusy,
 }: Props) {
   const game = useAnidleGame({
     mediaId,
@@ -36,7 +44,10 @@ export default function Anidle({
     registerRoundController,
   });
   const views = game.evaluations as (AnidleEvaluationView | null)[];
-  const answerCover = views.find((entry) => entry?.correct)?.coverImage ?? null;
+  const answerCover =
+    views.find((entry) => entry?.correct)?.coverImage ??
+    answerCoverImage ??
+    null;
 
   return (
     <div className="space-y-5 text-paper">
@@ -62,6 +73,8 @@ export default function Anidle({
           evaluations={game.evaluations}
           nextSlug={nextSlug}
           coverImage={answerCover}
+          onNewPuzzle={onNewPuzzle}
+          newPuzzleBusy={newPuzzleBusy}
         />
       ) : null}
       <GuessGrid

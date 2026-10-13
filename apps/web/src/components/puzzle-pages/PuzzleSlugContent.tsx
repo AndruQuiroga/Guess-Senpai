@@ -120,7 +120,11 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
-        const anidleBundle = bundle as { mediaId: number; puzzle: AnidleGame };
+        const anidleBundle = bundle as {
+          mediaId: number;
+          puzzle: AnidleGame;
+          solution?: { coverImage?: string | null };
+        };
         return (
           <AnidlePage
             slug={slug.slug}
@@ -132,6 +136,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.anidle}
             nextSlug={nextSlug}
+            answerCoverImage={anidleBundle.solution?.coverImage ?? null}
           />
         );
       }

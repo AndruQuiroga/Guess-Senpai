@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 import { AnidlePage } from "../../../components/puzzle-pages/AnidlePage";
-import type {
-  AnidleGuessEvaluation,
-  AnidleGuessHistoryEntry,
-  ScalarFeedback,
+import {
+  CURRENT_ANIDLE_EVALUATION_VERSION,
+  type AnidleGuessEvaluation,
+  type AnidleGuessHistoryEntry,
+  type ScalarFeedback,
 } from "../../../types/anidle";
 import type { GameProgress } from "../../../types/progress";
 import type { AnidleGame } from "../../../types/puzzles";
@@ -69,6 +70,8 @@ const EVALUATIONS: AnidleGuessEvaluation[] = [
     tags: list(["Psychic"], ["Super Power", "Parody", "Seinen", "Gag Humor"]),
     studios: list([], ["Madhouse"]),
     source: list([], ["Web Manga"]),
+    episodes: scalar(12, 12),
+    format: list(["TV"], []),
   },
   {
     title: "Fullmetal Alchemist: Brotherhood",
@@ -80,6 +83,8 @@ const EVALUATIONS: AnidleGuessEvaluation[] = [
     tags: list([], ["Military", "Alchemy", "War"]),
     studios: list([], ["Bones"]),
     source: list(["Manga"], []),
+    episodes: scalar(64, 12),
+    format: list(["TV"], []),
   },
   {
     title: "Kaguya-sama: Love is War",
@@ -91,6 +96,8 @@ const EVALUATIONS: AnidleGuessEvaluation[] = [
     tags: list([], ["Love Triangle", "School"]),
     studios: list([], ["A-1 Pictures"]),
     source: list(["Manga"], []),
+    episodes: scalar(12, 12),
+    format: list([], ["Movie"]),
   },
   {
     title: "Mob Psycho 100",
@@ -102,6 +109,8 @@ const EVALUATIONS: AnidleGuessEvaluation[] = [
     tags: list(["Psychic", "Coming of Age"], []),
     studios: list(["Bones"], []),
     source: list(["Web Manga"], []),
+    episodes: scalar(12, 12),
+    format: list(["TV"], []),
   },
 ];
 
@@ -110,7 +119,7 @@ function entry(index: number, id: number): AnidleGuessHistoryEntry {
     guess: EVALUATIONS[index].title,
     guessMediaId: id,
     evaluation: EVALUATIONS[index],
-    evaluationVersion: 1,
+    evaluationVersion: CURRENT_ANIDLE_EVALUATION_VERSION,
   };
 }
 

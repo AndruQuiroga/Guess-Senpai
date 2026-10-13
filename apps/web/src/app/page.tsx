@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { DailyRolloverNotice } from "../components/DailyRolloverNotice";
 import { GameTile } from "../components/GameTile";
+import { UNLIMITED_ANIDLE_HREF } from "../config/games";
 import { useAccount, useAccountStreak } from "../hooks/useAccount";
 import {
   useDailyAvailability,
@@ -118,6 +119,16 @@ function Today({ date }: { date: string }) {
           </li>
         ))}
       </ul>
+
+      <p className="text-base text-muted">
+        Want more?{" "}
+        <Link
+          href={UNLIMITED_ANIDLE_HREF}
+          className="font-semibold text-paper underline"
+        >
+          Play Unlimited Anidle →
+        </Link>
+      </p>
 
       {!loading && !accountError && !account.authenticated && (
         <p className="text-sm text-muted">

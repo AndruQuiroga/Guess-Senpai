@@ -16,13 +16,25 @@ interface ResultCardProps {
   evaluations: (AnidleGuessEvaluation | null)[];
   nextSlug?: string | null;
   coverImage?: string | null;
+  /**
+   * Unlimited practice: the primary action is a "New puzzle" button instead of
+   * the link to the next daily mode, and the share text is not about today.
+   */
+  onNewPuzzle?: () => void;
+  newPuzzleBusy?: boolean;
 }
 
 export function buildShareText(
   solved: boolean,
   attempts: number,
   maxAttempts: number | null,
+  practice = false,
 ): string {
+  if (practice) {
+    return solved
+      ? `I solved an Unlimited Anidle puzzle in ${attempts} ${attempts === 1 ? "guess" : "guesses"}.`
+      : `Unlimited Anidle: ${attempts}/${maxAttempts} guesses, answer revealed.`;
+  }
   if (solved) {
     return `I solved today's Anidle puzzle in ${attempts} ${attempts === 1 ? "guess" : "guesses"}.`;
   }
@@ -38,6 +50,8 @@ export function ResultCard({
   evaluations,
   nextSlug,
   coverImage,
+  onNewPuzzle,
+  newPuzzleBusy = false,
 }: ResultCardProps) {
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const headline = solved
@@ -51,7 +65,12 @@ export function ResultCard({
   );
 
   const share = async () => {
-    const text = buildShareText(solved, attempts, maxAttempts);
+    const text = buildShareText(
+      solved,
+      attempts,
+      maxAttempts,
+      Boolean(onNewPuzzle),
+    );
     try {
       if (navigator.share) {
         await navigator.share({ text });
@@ -116,14 +135,26 @@ export function ResultCard({
         >
           Share result
         </button>
-        <Link
-          href={nextSlug ? `/games/${nextSlug}` : "/"}
-          className="button button-primary"
-        >
-          {nextSlug ? "Next puzzle" : "Back to Today"}
-          {nextTitle ? <span className="sr-only">: {nextTitle}</span> : null}
-          <span aria-hidden>→</span>
-        </Link>
+        {onNewPuzzle ? (
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={onNewPuzzle}
+            disabled={newPuzzleBusy}
+          >
+            New puzzle
+            <span aria-hidden>→</span>
+          </button>
+        ) : (
+          <Link
+            href={nextSlug ? `/games/${nextSlug}` : "/"}
+            className="button button-primary"
+          >
+            {nextSlug ? "Next puzzle" : "Back to Today"}
+            {nextTitle ? <span className="sr-only">: {nextTitle}</span> : null}
+            <span aria-hidden>→</span>
+          </Link>
+        )}
       </div>
       {shareMessage ? (
         <p role="status" className="text-sm text-muted">

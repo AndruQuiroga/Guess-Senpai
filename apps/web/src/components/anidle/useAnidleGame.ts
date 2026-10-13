@@ -230,6 +230,12 @@ export function useAnidleGame({
         }
         const resolvedCorrect =
           evaluation.correct || normalizedGuess === normalizedAnswer;
+        if (rules && evaluation.matched === false && !resolvedCorrect) {
+          setErrorMessage(
+            "We couldn't find that anime. Pick a title from the suggestions.",
+          );
+          return;
+        }
         const evaluationRecord: AnidleGuessEvaluation = resolvedCorrect
           ? { ...evaluation, correct: true }
           : evaluation;

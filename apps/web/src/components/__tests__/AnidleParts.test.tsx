@@ -42,6 +42,8 @@ function evaluation(
     ],
     studios: [{ value: "Bones", status: "miss" }],
     source: [{ value: "Manga", status: "match" }],
+    episodes: { guess: 12, target: 24, status: "lower" },
+    format: [{ value: "TV", status: "match" }],
     ...overrides,
   };
 }
@@ -72,6 +74,68 @@ describe("scalar and list tiles", () => {
     expect(listTile(evaluation().source, 1).tone).toBe("correct");
     expect(listTile(evaluation().studios, 2).tone).toBe("wrong");
     expect(listTile([], 2).tone).toBe("wrong");
+  });
+});
+
+describe("episodes and format columns", () => {
+  it("points the episodes arrow toward the answer and tones closeness", () => {
+    expect(scalarTile("episodes", evaluation().episodes!)).toMatchObject({
+      tone: "wrong",
+      icon: "↑",
+      value: "12",
+    });
+    expect(
+      scalarTile("episodes", { guess: 22, target: 24, status: "lower" }),
+    ).toMatchObject({ tone: "close", icon: "↑" });
+    expect(
+      scalarTile("episodes", { guess: 24, target: 24, status: "match" }),
+    ).toMatchObject({ tone: "correct", icon: "✓" });
+  });
+
+  it("scores format as correct or wrong", () => {
+    expect(listTile(evaluation().format!, 1).tone).toBe("correct");
+    expect(listTile([{ value: "Movie", status: "miss" }], 1).tone).toBe(
+      "wrong",
+    );
+  });
+
+  it("renders the cells, the wrong format value and the cover thumbnail", () => {
+    render(
+      <GuessGrid
+        evaluations={[
+          evaluation({
+            format: [{ value: "Movie", status: "miss" }],
+            coverImage: "https://img.example/cover.jpg",
+          }),
+        ]}
+      />,
+    );
+    const row = screen.getAllByRole("row")[1];
+    expect(within(row).getAllByRole("cell")).toHaveLength(9);
+    expect(
+      within(row).getByText("Episodes 12: the answer is higher"),
+    ).toBeInTheDocument();
+    expect(within(row).getByText("Movie")).toBeInTheDocument();
+    expect(within(row).getByText("Format: 0 of 1 match")).toBeInTheDocument();
+    const cover = row.querySelector("img");
+    expect(cover).toHaveAttribute("src", "https://img.example/cover.jpg");
+    expect(
+      within(screen.getAllByRole("row")[0]).getByText("Episodes"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getAllByRole("row")[0]).getByText("Format"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a no-data tile for guesses saved before the new columns existed", () => {
+    render(
+      <GuessGrid
+        evaluations={[evaluation({ episodes: undefined, format: undefined })]}
+      />,
+    );
+    const row = screen.getAllByRole("row")[1];
+    expect(within(row).getByText("Episodes: no data")).toBeInTheDocument();
+    expect(within(row).getByText("Format: No data")).toBeInTheDocument();
   });
 });
 

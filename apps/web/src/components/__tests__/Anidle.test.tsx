@@ -390,6 +390,33 @@ describe("Anidle hydration", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("does not spend an attempt on a title that matches no anime", async () => {
+    evaluateAnidleGuessMock.mockImplementationOnce(async () => ({
+      ...stored(1).anidleHistory![0].evaluation!,
+      title: "zzqq",
+      matched: false,
+    }));
+    render(
+      <Anidle
+        mediaId={88}
+        payload={finitePayload}
+        initialProgress={stored(7)}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "zzqq" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit Guess" }));
+    expect(
+      await screen.findByText(/couldn't find that anime/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveValue("zzqq");
+    expect(
+      screen.queryByText("Out of guesses · Answer revealed"),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps legacy long play unlimited with hints at ten misses", () => {
     render(
       <Anidle

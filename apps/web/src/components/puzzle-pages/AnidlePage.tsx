@@ -19,6 +19,7 @@ interface Props {
   difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
+  answerCoverImage?: string | null;
 }
 
 const COMPARE_RULE =
@@ -50,6 +51,7 @@ export function AnidlePage({
   difficultyHint,
   onProgressChange,
   nextSlug,
+  answerCoverImage,
 }: Props) {
   const controller = useRef<((round: number) => void) | null>(null);
   const [controllerReady, setControllerReady] = useState(false);
@@ -157,6 +159,7 @@ export function AnidlePage({
           onProgressChange={handleProgressChange}
           registerRoundController={registerController}
           nextSlug={nextSlug}
+          answerCoverImage={answerCoverImage}
           accountDifficulty={selectedDifficulty}
         />
       </GameShell>

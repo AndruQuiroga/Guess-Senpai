@@ -36,8 +36,11 @@ export interface GamePreviewContent {
  *   (the single source of truth). Hidden from lists otherwise.
  * - "unreleased": not built yet. Never shown in user-facing lists and has no
  *   playable route; direct visits get a friendly "not available yet" page.
+ * - "practice": always playable, but not part of the daily set. It has no
+ *   gameKey, daily status, score or streak, and lives in PRACTICE_MODES (not
+ *   GAMES_DIRECTORY) so daily lists never include it.
  */
-export type GameRelease = "always" | "daily" | "unreleased";
+export type GameRelease = "always" | "daily" | "unreleased" | "practice";
 
 export interface GameDirectoryEntry {
   slug: string;
@@ -50,6 +53,8 @@ export interface GameDirectoryEntry {
   /** Legacy flag; only true for "unreleased" modes. */
   comingSoon: boolean;
   gameKey?: GameKey;
+  /** Route override for modes that do not live at /games/<slug>. */
+  href?: string;
   description?: string;
   preview: GamePreviewContent;
 }
@@ -304,6 +309,32 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         description: "A dramatic typeset pull-quote waiting for attribution.",
         icon: "💬",
       },
+    },
+  },
+];
+
+export const UNLIMITED_ANIDLE_HREF = "/games/anidle/unlimited";
+
+/** Practice modes, listed apart from the daily modes (nav, Today link). */
+export const PRACTICE_MODES: GameDirectoryEntry[] = [
+  {
+    slug: "unlimited-anidle",
+    title: "Unlimited Anidle",
+    tagline: "Practice with a fresh random anime every round.",
+    accentColor: "from-amber-400 via-orange-500 to-rose-500",
+    release: "practice",
+    playable: true,
+    comingSoon: false,
+    href: UNLIMITED_ANIDLE_HREF,
+    description:
+      "Anidle without the daily limit. Not counted toward your streak or daily score.",
+    preview: {
+      summary:
+        "Same rules as the daily Anidle, with a new random puzzle whenever you finish one.",
+      rules: [
+        "Find one exact anime title in 8 accepted guesses.",
+        "Nothing here counts toward your streak or daily score.",
+      ],
     },
   },
 ];

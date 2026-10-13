@@ -4,7 +4,9 @@ import {
   LIST_COLUMNS,
   SCALAR_COLUMNS,
   TONE_CLASS,
+  listFeedback,
   listTile,
+  scalarFeedback,
   scalarTile,
   type AnidleEvaluationView,
   type Tone,
@@ -17,7 +19,12 @@ import {
  * header row. Both are driven by one set of grid classes.
  */
 const XL_COLUMNS =
-  "xl:grid-cols-[minmax(9rem,1.5fr)_repeat(3,minmax(4.25rem,0.8fr))_repeat(2,minmax(6rem,1.4fr))_minmax(4.5rem,1fr)_minmax(4rem,0.8fr)]";
+  "xl:grid-cols-[minmax(9rem,1.5fr)_minmax(3.5rem,0.7fr)_minmax(3.75rem,0.8fr)_minmax(5.25rem,1fr)_minmax(5rem,0.9fr)_minmax(3.75rem,0.8fr)_minmax(4.25rem,0.9fr)_repeat(2,minmax(5.5rem,1.4fr))_minmax(4.5rem,1fr)]";
+const LIST_SPAN = {
+  2: "col-span-2",
+  3: "col-span-3",
+  6: "col-span-6",
+} as const;
 const ROW_GRID = `grid grid-cols-6 gap-1.5 xl:items-stretch ${XL_COLUMNS}`;
 const STAGGER_MS = 90;
 
@@ -133,7 +140,10 @@ function GridRow({ evaluation, attempt, animate }: GridRowProps) {
         </div>
       </div>
       {SCALAR_COLUMNS.map((column) => {
-        const tile = scalarTile(column.key, evaluation[column.key]);
+        const tile = scalarTile(
+          column.key,
+          scalarFeedback(evaluation, column.key),
+        );
         return (
           <Tile
             key={column.key}
@@ -156,18 +166,30 @@ function GridRow({ evaluation, attempt, animate }: GridRowProps) {
         );
       })}
       {LIST_COLUMNS.map((column) => {
-        const tile = listTile(evaluation[column.key], column.cap);
+        const tile = listTile(listFeedback(evaluation, column.key), column.cap);
         return (
           <Tile
             key={column.key}
             tone={tile.tone}
             label={`${column.label}: ${tile.label}`}
-            span="col-span-3"
+            span={LIST_SPAN[column.span]}
             caption={column.label}
             animateIndex={next()}
           >
             {tile.total === 0 ? (
               <span>—</span>
+            ) : column.cap === 1 ? (
+              // Single-value columns (format, source) always show the value.
+              <span className="flex flex-wrap gap-1">
+                <span
+                  className={`${CHIP} ${
+                    tile.matched.length ? "text-correct-ink" : "text-wrong-ink"
+                  }`}
+                >
+                  {tile.matched.length ? "✓ " : ""}
+                  {tile.matched[0] ?? tile.unmatched[0]}
+                </span>
+              </span>
             ) : (
               <span className="flex flex-wrap gap-1">
                 {tile.matched.map((value) => (
@@ -261,12 +283,12 @@ export function GuessGrid({
           >
             <div role="columnheader">Title</div>
             {SCALAR_COLUMNS.map((column) => (
-              <div role="columnheader" key={column.key}>
+              <div role="columnheader" className="truncate" key={column.key}>
                 {column.label}
               </div>
             ))}
             {LIST_COLUMNS.map((column) => (
-              <div role="columnheader" key={column.key}>
+              <div role="columnheader" className="truncate" key={column.key}>
                 {column.label}
               </div>
             ))}

@@ -48,7 +48,13 @@ export function normalizeScalarFeedback(value: unknown): ScalarFeedback {
         ? record.target_season
         : null;
 
-  return { guess, target, status, guessSeason, targetSeason } satisfies ScalarFeedback;
+  return {
+    guess,
+    target,
+    status,
+    guessSeason,
+    targetSeason,
+  } satisfies ScalarFeedback;
 }
 
 export function normalizeListFeedback(value: unknown): ListFeedbackItem[] {
@@ -64,7 +70,10 @@ export function normalizeListFeedback(value: unknown): ListFeedbackItem[] {
 
       const record = item as { value?: unknown; status?: unknown };
       const label = typeof record.value === "string" ? record.value : null;
-      const status = record.status === "match" || record.status === "miss" ? record.status : "miss";
+      const status =
+        record.status === "match" || record.status === "miss"
+          ? record.status
+          : "miss";
 
       if (!label) {
         return null;
@@ -73,6 +82,33 @@ export function normalizeListFeedback(value: unknown): ListFeedbackItem[] {
       return { value: label, status } satisfies ListFeedbackItem;
     })
     .filter((item): item is ListFeedbackItem => Boolean(item));
+}
+
+/** Optional fields added after v1: episodes, format and cover art. */
+export function normalizeExtraEvaluationFields(
+  record: Record<string, unknown>,
+): Pick<
+  AnidleGuessEvaluation,
+  "episodes" | "format" | "coverImage" | "matched"
+> {
+  const extra: Pick<
+    AnidleGuessEvaluation,
+    "episodes" | "format" | "coverImage" | "matched"
+  > = {};
+  if (record.episodes && typeof record.episodes === "object") {
+    extra.episodes = normalizeScalarFeedback(record.episodes);
+  }
+  if (Array.isArray(record.format)) {
+    extra.format = normalizeListFeedback(record.format);
+  }
+  const cover = record.coverImage ?? record.cover_image;
+  if (typeof cover === "string" && cover) {
+    extra.coverImage = cover;
+  }
+  if (record.matched === false) {
+    extra.matched = false;
+  }
+  return extra;
 }
 
 export function normalizeAnidleEvaluation(
@@ -101,17 +137,20 @@ export function normalizeAnidleEvaluation(
       ? record.title
       : typeof record["guess"] === "string"
         ? (record["guess"] as string)
-        : fallbackTitle ?? "";
+        : (fallbackTitle ?? "");
 
   return {
     title,
     correct: Boolean(record.correct),
     year: normalizeScalarFeedback(record.year),
-    averageScore: normalizeScalarFeedback(record.averageScore ?? record["average_score"]),
+    averageScore: normalizeScalarFeedback(
+      record.averageScore ?? record["average_score"],
+    ),
     popularity: normalizeScalarFeedback(record.popularity),
     genres: normalizeListFeedback(record.genres),
     tags: normalizeListFeedback(record.tags),
     studios: normalizeListFeedback(record.studios),
     source: normalizeListFeedback(record.source),
+    ...normalizeExtraEvaluationFields(record),
   } satisfies AnidleGuessEvaluation;
 }

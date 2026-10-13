@@ -138,6 +138,50 @@ describe("PrimaryNav", () => {
     ).toBeNull();
   });
 
+  it("lists Unlimited under the daily modes with no daily status", () => {
+    render(<PrimaryNav archiveDate="2026-10-12" />);
+    const sidebar = screen.getByRole("navigation", { name: "Primary" });
+    const compact = screen.getByRole("navigation", {
+      name: "Primary (compact)",
+    });
+    for (const nav of [sidebar, compact]) {
+      const unlimited = within(nav).getByRole("link", { name: "Unlimited" });
+      expect(unlimited).toHaveAttribute("href", "/games/anidle/unlimited");
+      for (const status of [/New/, /In progress/, /Solved/, /Out of guesses/]) {
+        expect(unlimited).not.toHaveTextContent(status);
+      }
+      const links = within(nav).getAllByRole("link");
+      expect(links.indexOf(unlimited)).toBeGreaterThan(
+        links.indexOf(within(nav).getByRole("link", { name: /Redacted/ })),
+      );
+    }
+  });
+
+  it("marks Unlimited, not daily Anidle, as current on the unlimited route", () => {
+    pathname.value = "/games/anidle/unlimited";
+    render(<PrimaryNav archiveDate="2026-10-12" />);
+    for (const label of ["Primary", "Primary (compact)"]) {
+      const nav = screen.getByRole("navigation", { name: label });
+      const current = within(nav)
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page");
+      expect(current).toHaveLength(1);
+      expect(current[0]).toHaveTextContent("Unlimited");
+    }
+  });
+
+  it("still marks daily Anidle as current on its own route", () => {
+    pathname.value = "/games/anidle";
+    render(<PrimaryNav archiveDate="2026-10-12" />);
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    const current = within(nav)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current") === "page");
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveTextContent("Anidle");
+    expect(current[0]).not.toHaveTextContent("Unlimited");
+  });
+
   it("shows today's score in the sidebar and compact bar, and hides it while unknown", () => {
     const { rerender } = render(<PrimaryNav archiveDate="2026-10-12" />);
     expect(screen.queryByText("2,450 / 4,000")).toBeNull();

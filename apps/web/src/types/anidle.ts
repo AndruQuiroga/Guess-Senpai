@@ -25,6 +25,13 @@ export interface AnidleGuessEvaluation {
   tags: ListFeedbackItem[];
   studios: ListFeedbackItem[];
   source: ListFeedbackItem[];
+  /** Added in evaluation version 2; absent on older saved guesses. */
+  episodes?: ScalarFeedback;
+  format?: ListFeedbackItem[];
+  /** Cover art of the guessed anime. */
+  coverImage?: string | null;
+  /** False when the guess matched no known anime (not a spent attempt). */
+  matched?: boolean;
 }
 
 export interface AnidleGuessHistoryEntry {
@@ -35,4 +42,4 @@ export interface AnidleGuessHistoryEntry {
   evaluatedAt?: string | null;
 }
 
-export const CURRENT_ANIDLE_EVALUATION_VERSION = 1;
+export const CURRENT_ANIDLE_EVALUATION_VERSION = 2;

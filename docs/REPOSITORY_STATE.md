@@ -1,6 +1,8 @@
 # GuessSenpai repository state
 
 Reviewed: 2026-10-12. Baseline: `f55f08f` (merge of PR #186).
+Updated 2026-10-13 for the `redesign/ink-and-signal` branch; see
+"Redesign branch" below and the `docs/STAGE_*_HANDOFF.md` notes.
 Baseline notes below are supplemented by [Review corrections](REVIEW_CORRECTIONS.md),
 which records local regression, migration, build, and browser validation. This is
 not confirmation of a production deployment.
@@ -25,12 +27,14 @@ Docker Compose defines web, API, Redis, and PostgreSQL services.
 
 | Area | Evidence in code | Boundary |
 | --- | --- | --- |
-| Anidle | Component, evaluator, API evaluation and batch endpoints, tests | Metadata comparison and progressive hints; directory copy incorrectly describes OP/ED mashups |
+| Anidle | `components/anidle/*` (useAnidleGame, GuessGrid, HintStrip, AttemptMeter, ResultCard), evaluator, API evaluation and batch endpoints, tests | v2 rules: 8 accepted guesses, hints after 2/4/6 misses; unmatched, repeated and failed guesses are free; legacy snapshots keep v1 rules |
+| Unlimited Anidle | `GET /puzzles/anidle/practice`, `services/anidle_practice.py`, `/games/anidle/unlimited` | Practice only: random v2 game, local tally, never touches daily progress, streak or score |
 | Poster Zoomed | Multi-round components, image processing endpoint, tests | Requires external media; real image quality and release guessing need runtime validation |
 | Redacted Synopsis | Redaction engine, component and tests | Depends on upstream descriptions |
 | Character Silhouette | Character pools, rounds/cards, name search, tests | Filters character imagery; content availability can affect generated rounds |
-| Guess the Opening | AnimeThemes integration, frontend component and tests | Runtime availability flag and successful clip lookup determine availability; static directory defaults to coming soon |
-| Mystery Voice, Emoji Synopsis, Quote Quiz | Directory entries, illustrations, placeholder page | Advertised future modes, not implemented games |
+| Guess the Opening | AnimeThemes integration, frontend component and tests | `release: "daily"`; listed only when daily availability reports a playable clip set |
+| Mystery Voice, Emoji Synopsis, Quote Quiz | Directory entries with `release: "unreleased"`, illustrations | Hidden from all lists; direct routes show a "not available yet" page |
+| Daily score | `utils/dailyScore.ts`, sidebar / mobile bar / Today | Client-side presentation (1,000 per mode); not competitive or server-verified |
 | Daily puzzles | UTC-date keyed PostgreSQL snapshots with rules version, reset time, availability, and stable set/mode IDs | First publication still depends on upstream metadata; published dates remain immutable, unavailable past dates are not backfilled |
 | Accounts | AniList OAuth state, signed session identifier, database-backed sessions, refresh/logout/me | Requires configured credentials and database; no independent email/password account system found |
 | Progress and streaks | Browser hooks, API endpoints and SQL repositories | Client-supplied progress is not an authoritative competitive score system |
@@ -152,6 +156,31 @@ pnpm -C apps/web build
 6. Wire notification scheduling and verify offline/account cache behavior if
    these features are part of the intended launch.
 
+## Redesign branch (2026-10-13)
+
+Commits on `redesign/ink-and-signal` after `f55f08f`:
+
+- **Integration:** Codex review corrections and the Sol agents' work (daily snapshots,
+  migrations, Anidle v2 rules, AnimeThemes fix, artwork), plus out-of-guesses
+  status shown outside the game. Stops tracking `node_modules`/`.next`.
+- **UI shell:** persistent sidebar (md+) / mode chips (mobile) with per-game status;
+  Today is a grid of equal tiles; `GameShell` is title + "?" rules + status slot.
+  Glass/blur styling is removed; colours come from tokens in `globals.css` mapped
+  to semantic Tailwind names (`ink`, `panel`, `line`, `paper`, `muted`, `signal`,
+  `correct`, `close`, `wrong`); fonts are Bricolage Grotesque + DM Sans.
+- **Anidle:** input-first layout, inline redaction bars, comparison tile grid with
+  episodes/format/cover, mobile cards, result card.
+- **Daily score, Unlimited Anidle, cleanup:** dead components removed; `reset_at`
+  is serialised with an explicit `Z`; the daily countdown targets 00:00 UTC.
+
+Validation on the branch head: backend 55 passed / 3 opt-in skipped (disposable
+container), frontend 24 files / 119 tests, `tsc --noEmit` clean, and manual browser
+checks at 1280 and 390 against live public AniList reads. Still unverified: signed-in
+AniList OAuth, real-backup migration adoption, offline/reconnect, screen reader and
+tablet widths. Run tests as `node node_modules/vitest/vitest.mjs run` and
+`node node_modules/typescript/bin/tsc --noEmit --incremental false` from `apps/web`
+if pnpm hits the Windows profile-path `EPERM`.
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.
@@ -159,7 +188,8 @@ pnpm -C apps/web build
 - API surface: `apps/api/src/app/routers`.
 - External data, sessions, search and persistence: `apps/api/src/app/services`.
 - SQL schema/migrations: `apps/api/src/app/db/models.py`, `apps/api/alembic`.
-- Pages: `apps/web/src/app`; game UI: `apps/web/src/components`.
+- Pages: `apps/web/src/app`; game UI: `apps/web/src/components` (Anidle parts in `components/anidle`, nav in `components/nav`).
+- Design tokens: `apps/web/src/styles/globals.css` `:root`, mapped in `apps/web/tailwind.config.ts`.
 - Product availability/copy: `apps/web/src/config/games.ts` and game slug definitions.
 - Account/progress/preferences/live behavior: `apps/web/src/hooks`.
 - Worker source: `apps/web/src/service-worker.ts`; Next config emits the public JS.

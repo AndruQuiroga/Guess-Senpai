@@ -9,6 +9,7 @@ export type NavIconName =
   | "guess-the-opening"
   | "archive"
   | "how-to-play"
+  | "unlimited"
   | "account"
   | "game";
 
@@ -61,6 +62,9 @@ const PATHS: Record<NavIconName, ReactNode> = {
       <circle cx="12" cy="12" r="8.5" />
       <path d="M9.6 9.6a2.4 2.4 0 1 1 3.4 2.2c-.7.4-1 .9-1 1.7M12 16.6v.1" />
     </>
+  ),
+  unlimited: (
+    <path d="M12 12c-1.6-2.4-3-3.5-4.8-3.5a3.5 3.5 0 0 0 0 7c1.8 0 3.2-1.1 4.8-3.5Zm0 0c1.6 2.4 3 3.5 4.8 3.5a3.5 3.5 0 0 0 0-7c-1.8 0-3.2 1.1-4.8 3.5Z" />
   ),
   account: (
     <>

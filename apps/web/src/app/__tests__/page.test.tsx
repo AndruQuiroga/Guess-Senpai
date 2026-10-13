@@ -115,7 +115,7 @@ describe("Today page", () => {
       },
     };
     render(<HomePage />);
-    expect(screen.getByRole("link", { name: /Anidle/ })).toHaveTextContent(
+    expect(screen.getByRole("link", { name: /^Anidle/ })).toHaveTextContent(
       "Solved",
     );
     expect(
@@ -139,6 +139,15 @@ describe("Today page", () => {
     render(<HomePage />);
     const link = screen.getByRole("link", { name: "Today 1,000 / 4,000" });
     expect(link).toHaveAttribute("href", "/how-to-play#daily-score");
+  });
+
+  it("links Unlimited Anidle below the tiles, outside the daily list and score", () => {
+    render(<HomePage />);
+    const link = screen.getByRole("link", { name: /Play Unlimited Anidle/ });
+    expect(link).toHaveAttribute("href", "/games/anidle/unlimited");
+    const daily = screen.getByRole("list", { name: "Daily puzzles" });
+    expect(daily).not.toContainElement(link);
+    expect(screen.getByText(/Want more?/)).toBeInTheDocument();
   });
 
   it("adds Guess the Opening only when today's availability enables it", () => {

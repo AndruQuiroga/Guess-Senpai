@@ -1,11 +1,22 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime, timezone
+from typing import Annotated, Any, Dict, List, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from ..services.anilist import Title
+
+
+def ensure_utc(value: datetime) -> datetime:
+    """Return an aware UTC datetime. SQLite drops tzinfo on read; treat naive values as UTC."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+# Serialises with an explicit offset ("Z") so browsers never parse it as local time.
+UtcDatetime = Annotated[datetime, AfterValidator(ensure_utc)]
 
 
 class RoundSpec(BaseModel):
@@ -161,6 +172,14 @@ class AnidlePuzzleBundle(BaseModel):
     solution: SolutionPayload
 
 
+class AnidlePracticeResponse(BaseModel):
+    """A throwaway Unlimited Anidle game. Never published or stored server side."""
+
+    practice_id: str
+    rules_version: str = "2"
+    anidle: AnidlePuzzleBundle
+
+
 class PosterZoomPuzzleBundle(BaseModel):
     mediaId: int
     puzzle: PosterZoomGame
@@ -242,7 +261,7 @@ class DailyPuzzleResponse(BaseModel):
     date: date
     puzzle_id: str
     rules_version: str
-    reset_at: datetime
+    reset_at: UtcDatetime
     available_modes: List[str] = Field(default_factory=list)
     mode_puzzle_ids: Dict[str, str] = Field(default_factory=dict)
     games: GamesPayload
