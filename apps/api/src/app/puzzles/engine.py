@@ -54,6 +54,7 @@ from .models import (
     PosterZoomPuzzleBundle,
     PosterZoomRound,
     RedactedSynopsisGame,
+    RedactedSynopsisRound,
     RedactedSynopsisSegment,
     RedactedSynopsisPuzzleBundle,
     RoundSpec,
@@ -77,6 +78,26 @@ POSTER_ROUNDS = [
 ]
 
 MAX_POSTER_HINTS = max(0, len(POSTER_ROUNDS) - 1)
+
+# Rounds v3: every round-based mode plays an Easy, Medium and Hard round, each a
+# different anime drawn from the matching third of the popularity ranking.
+ROUND_DIFFICULTIES: Tuple[int, ...] = (1, 2, 3)
+
+# Zoom per reveal stage (start, after one zoom-out hint, after two).
+POSTER_ZOOM_SCALES: dict[int, Tuple[float, ...]] = {
+    1: (1.9, 1.5, 1.2),
+    2: (2.5, 1.9, 1.45),
+    3: (3.2, 2.4, 1.75),
+}
+
+# Seconds of the opening a round may play: skips the cold open and stops
+# before most credit sequences reach the title card.
+OPENING_CLIP_WINDOW: Tuple[float, float] = (10.0, 40.0)
+
+CHARACTERS_PER_ROUND = 4
+
+# Popularity ranking depth (pages of 100); Hard draws from its bottom third.
+POPULAR_POOL_PAGES = 4
 
 if hasattr(Image, "Resampling"):
     POSTER_RESAMPLE = Image.Resampling.LANCZOS  # type: ignore[attr-defined]
@@ -288,7 +309,7 @@ def _offset_from_digest(digest: bytes, index: int, margin: float) -> tuple[float
     return offset_x, offset_y
 
 
-def _build_poster_crop_stages(media: Media) -> List[PosterCropStage]:
+def _build_poster_crop_stages(media: Media, difficulty: int = 0) -> List[PosterCropStage]:
     cover = media.coverImage
     image_ref = ""
     if cover:
@@ -300,6 +321,16 @@ def _build_poster_crop_stages(media: Media) -> List[PosterCropStage]:
         )
     seed = f"poster:{media.id}:{image_ref}"
     digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    tiered = POSTER_ZOOM_SCALES.get(difficulty)
+    if tiered:
+        # Rounds v3 never zooms out to the whole poster (titles are printed on
+        # most covers); the full art is only shown on the results screen.
+        margins = (0.22, 0.16, 0.1)
+        return [
+            PosterCropStage(scale=scale, offset_x=x, offset_y=y)
+            for index, scale in enumerate(tiered)
+            for x, y in [_offset_from_digest(digest, index, margins[min(index, 2)])]
+        ]
     scales = [1.65, 1.25, 1.0]
     stages: List[PosterCropStage] = []
     for index, scale in enumerate(scales):
@@ -334,7 +365,7 @@ def _poster_release_season(media: Media) -> Optional[str]:
 
 
 def _build_poster_round(*, media: Media, order: int, difficulty: int) -> PosterZoomRound:
-    crop_stages = _build_poster_crop_stages(media)
+    crop_stages = _build_poster_crop_stages(media, difficulty)
     release_year = _poster_release_year(media)
     meta = PosterZoomMeta(
         genres=[g for g in media.genres if g],
@@ -349,6 +380,7 @@ def _build_poster_round(*, media: Media, order: int, difficulty: int) -> PosterZ
         answer=_choose_answer(media),
         meta=meta,
         cropStages=crop_stages,
+        solution=_build_solution(media),
     )
 
 
@@ -576,6 +608,7 @@ def _render_poster_variant(
     hint_round: int,
     total_rounds: int,
     crop_stage: Optional[PosterCropStage],
+    max_blur: float = 12.0,
 ) -> Tuple[bytes, str]:
     clarity = _compute_clarity_level(hint_round, total_rounds)
 
@@ -584,7 +617,7 @@ def _render_poster_variant(
             poster = poster.convert("RGB")
             if crop_stage is not None:
                 poster = _apply_crop_stage(poster, crop_stage)
-            blur_radius = (1.0 - clarity) * 12.0
+            blur_radius = (1.0 - clarity) * max_blur
             if blur_radius > 0:
                 poster = poster.filter(ImageFilter.GaussianBlur(radius=blur_radius))
             sharpness_factor = 0.4 + (clarity * 0.6)
@@ -597,11 +630,14 @@ def _render_poster_variant(
     return output.getvalue(), "image/jpeg"
 
 
-async def generate_poster_image(media_id: int, hints: int) -> Tuple[bytes, str]:
+async def generate_poster_image(media_id: int, hints: int, difficulty: int = 0) -> Tuple[bytes, str]:
+    """Render a poster stage. `difficulty` 1-3 uses the rounds-v3 zoom ladder."""
     cache = await _get_cache()
+    tier = difficulty if difficulty in POSTER_ZOOM_SCALES else 0
     requested_hints = _normalize_hint_count(hints)
     bucket = min(requested_hints, MAX_POSTER_HINTS)
-    cache_key = f"poster-image:{media_id}:{bucket}"
+    prefix = f"poster-image:{media_id}" + (f":d{tier}" if tier else "")
+    cache_key = f"{prefix}:{bucket}"
 
     cached = await cache.get(cache_key)
     cached_image = _deserialize_cached_image(cached)
@@ -609,11 +645,11 @@ async def generate_poster_image(media_id: int, hints: int) -> Tuple[bytes, str]:
         return cached_image
 
     media = await _load_media_details(media_id, cache, settings)
-    crop_stages = _build_poster_crop_stages(media)
+    crop_stages = _build_poster_crop_stages(media, tier)
     total_rounds = max(1, max(len(crop_stages), len(POSTER_ROUNDS)))
     max_hint_count = max(0, total_rounds - 1)
     effective_hints = min(bucket, max_hint_count)
-    final_cache_key = f"poster-image:{media_id}:{effective_hints}"
+    final_cache_key = f"{prefix}:{effective_hints}"
 
     if final_cache_key != cache_key:
         cached = await cache.get(final_cache_key)
@@ -633,6 +669,8 @@ async def generate_poster_image(media_id: int, hints: int) -> Tuple[bytes, str]:
         hint_round,
         total_rounds,
         crop_stage,
+        # Tiered rounds rely on zoom; keep only a light blur on early stages.
+        max_blur=3.0 if tier else 12.0,
     )
 
     try:
@@ -874,6 +912,7 @@ async def _build_guess_opening_round(
     *,
     order: Optional[int] = None,
     total_rounds: Optional[int] = None,
+    difficulty: Optional[int] = None,
 ) -> Optional[GuessOpeningRound]:
     cache_key = f"animethemes:clip:{media.id}"
 
@@ -897,14 +936,23 @@ async def _build_guess_opening_round(
         roundOrder=order,
         roundTotal=total_rounds,
     )
+    length = clip_model.length_seconds or 90
+    window_start, window_end = OPENING_CLIP_WINDOW
+    if length <= window_end:
+        # Short clips: keep a 30-second window as late as the clip allows.
+        window_end = float(length)
+        window_start = max(0.0, window_end - (OPENING_CLIP_WINDOW[1] - OPENING_CLIP_WINDOW[0]))
     clip_payload = OpeningClip(
         audioUrl=clip_model.audio_url or clip_model.video_url,
         videoUrl=clip_model.video_url,
         mimeType="audio/mpeg" if clip_model.audio_url and clip_model.audio_url.endswith(".mp3") else None,
-        lengthSeconds=clip_model.length_seconds or 90,
+        lengthSeconds=length,
+        startSeconds=window_start,
+        endSeconds=window_end,
     )
     return GuessOpeningRound(
         order=order or 1,
+        difficulty=difficulty,
         mediaId=media.id,
         spec=[round_spec.model_copy(deep=True) for round_spec in OPENING_ROUNDS],
         answer=_choose_answer(media),
@@ -915,10 +963,11 @@ async def _build_guess_opening_round(
 
 
 async def _load_popular_pool(day: date, cache: CacheBackend, settings: Settings) -> List[Media]:
-    cache_key = f"anilist:popular:{day.isoformat()}"
+    # v2: four pages (deeper Hard tier) with relation types for sequel filtering.
+    cache_key = f"anilist:popular:v2:{day.isoformat()}"
 
     async def creator() -> List[dict]:
-        media = await anilist.fetch_popular_pool()
+        media = await anilist.fetch_popular_pool(pages=POPULAR_POOL_PAGES)
         return [m.model_dump(mode="json") for m in media]
 
     raw_media = await cache.remember(cache_key, settings.anilist_cache_ttl_seconds, creator)
@@ -1069,6 +1118,111 @@ def _choose_media_from_pool(
     return _select_media(seed, filtered)
 
 
+def _is_sequel(media: Media) -> bool:
+    """True when AniList lists a prequel (a later season or follow-up)."""
+    edges = (media.relations or {}).get("edges") or []
+    return any(isinstance(edge, dict) and edge.get("relationType") == "PREQUEL" for edge in edges)
+
+
+def _popularity_tiers(ranking: Sequence[Media]) -> dict[int, set[int]]:
+    """Split the popularity ranking into thirds: 1 = most popular (Easy)."""
+    ordered = sorted(ranking, key=lambda media: (-(media.popularity or 0), media.id))
+    size = max(1, math.ceil(len(ordered) / 3))
+    return {
+        tier: {media.id for media in ordered[(tier - 1) * size : tier * size]}
+        for tier in ROUND_DIFFICULTIES
+    }
+
+
+def _tier_candidates(
+    pool: Sequence[Media],
+    tiers: dict[int, set[int]],
+    difficulty: int,
+    excluded_ids: set[int],
+) -> List[Media]:
+    """Pool members in the round's tier, widening to neighbours when it runs dry."""
+    order = {1: (1, 2, 3), 2: (2, 1, 3), 3: (3, 2, 1)}.get(difficulty, (difficulty,))
+    for tier in order:
+        members = [
+            media for media in pool if media.id in tiers.get(tier, set()) and media.id not in excluded_ids
+        ]
+        if members:
+            return members
+    return [media for media in pool if media.id not in excluded_ids] or list(pool)
+
+
+def _choose_tiered(
+    base_seed: str,
+    label: str,
+    pool: Sequence[Media],
+    tiers: dict[int, set[int]],
+    difficulty: int,
+    excluded_ids: set[int],
+    *,
+    attempt: int = 0,
+) -> Media:
+    if not pool:
+        raise ValueError("Candidate pool is empty")
+    candidates = _tier_candidates(pool, tiers, difficulty, excluded_ids)
+    return _select_media(f"{base_seed}:{label}:d{difficulty}:{attempt}", candidates)
+
+
+def _build_synopsis_round(media: Media, *, order: int, difficulty: int) -> Optional[RedactedSynopsisRound]:
+    _, segments, masked_indices, _ = _redact_description(media)
+    if not segments or not masked_indices:
+        return None
+    return RedactedSynopsisRound(
+        order=order,
+        difficulty=difficulty,
+        mediaId=media.id,
+        answer=_choose_answer(media),
+        segments=segments,
+        masked_word_indices=masked_indices,
+        solution=_build_solution(media),
+    )
+
+
+def _featured_character_edge(media: Media, excluded_ids: set[int]) -> Optional[MediaCharacterEdge]:
+    """A main character with real artwork, falling back to any pictured one."""
+    edges = [
+        edge
+        for edge in (media.characters.edges if media.characters else [])
+        if edge.node
+        and edge.node.id not in excluded_ids
+        and edge.node.image
+        and (edge.node.image.large or edge.node.image.medium)
+        and "default.jpg" not in (edge.node.image.large or edge.node.image.medium or "")
+    ]
+    if not edges:
+        return None
+    mains = [edge for edge in edges if (edge.role or "").upper() == "MAIN"]
+    return (mains or edges)[0]
+
+
+def _character_entry(media: Media, edge: MediaCharacterEdge, difficulty: int) -> CharacterGuessEntry:
+    image = edge.node.image
+    name = edge.node.name.full or edge.node.name.userPreferred or edge.node.name.native or "Unknown"
+    cover = media.coverImage
+    return CharacterGuessEntry(
+        character=CharacterSilhouetteCharacter(
+            id=edge.node.id,
+            name=name,
+            image=(image.large or image.medium) if image else "",
+            role=_normalize_role(edge.role),
+        ),
+        characterAnswer=name,
+        characterAliases=_character_name_variants(edge),
+        animeAnswer=_choose_answer(media),
+        animeAliases=_title_variants(media),
+        reveal=CharacterGuessReveal(
+            label=("Easy", "Medium", "Hard")[max(0, min(2, difficulty - 1))],
+            filter="none",
+        ),
+        mediaId=media.id,
+        animeCover=(cover.extraLarge or cover.large or cover.medium) if cover else None,
+    )
+
+
 def _puzzle_cache_key(day: date, user: Optional[UserContext], include_guess_opening: bool) -> str:
     suffix = f"user:{user.user_id}" if user else "anon"
     opening_flag = "oped:1" if include_guess_opening else "oped:0"
@@ -1109,114 +1263,123 @@ async def _assemble_daily_puzzle(
         solution=_build_solution(anidle_media),
     )
 
-    poster_candidates = _select_poster_candidates(
-        day=day,
-        pool=[media for media in pool if media.id not in selected_ids] or pool,
-        required=max(1, len(POSTER_ROUNDS))
-        if POSTER_ROUNDS
-        else 1,
-    )
+    # Easy/Medium/Hard rounds draw from thirds of the full popularity ranking,
+    # so a personalised pool keeps the same difficulty meaning.
+    # Sequels are skipped: their answer is one specific season, which a
+    # player naming the show would miss.
+    round_pool = [media for media in pool if not _is_sequel(media)] or pool
+    tiers = _popularity_tiers([media for media in popular_pool if not _is_sequel(media)] or popular_pool or pool)
+
+    def remember(media: Media) -> None:
+        selected_ids.add(media.id)
+        if media.id not in recorded_ids:
+            recorded_ids.append(media.id)
+
     poster_rounds: List[PosterZoomRound] = []
-    poster_primary: Optional[Media] = None
-    for index, candidate in enumerate(poster_candidates, start=1):
+    for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
+        candidate = _choose_tiered(base_seed, "poster_zoomed", round_pool, tiers, difficulty, selected_ids)
         poster_media = await _load_media_details(candidate.id, cache, settings)
-        selected_ids.add(poster_media.id)
-        if poster_media.id not in recorded_ids:
-            recorded_ids.append(poster_media.id)
-        if poster_primary is None:
-            poster_primary = poster_media
-        spec_index = min(index - 1, len(POSTER_ROUNDS) - 1) if POSTER_ROUNDS else 0
-        difficulty = POSTER_ROUNDS[spec_index].difficulty if POSTER_ROUNDS else 1
-        poster_rounds.append(
-            _build_poster_round(
-                media=poster_media,
-                order=index,
-                difficulty=difficulty,
-            )
-        )
-
-    if not poster_rounds and pool:
-        fallback_media = await _load_media_details(pool[0].id, cache, settings)
-        selected_ids.add(fallback_media.id)
-        if fallback_media.id not in recorded_ids:
-            recorded_ids.append(fallback_media.id)
-        poster_primary = fallback_media
-        poster_rounds.append(
-            _build_poster_round(
-                media=fallback_media,
-                order=1,
-                difficulty=POSTER_ROUNDS[0].difficulty if POSTER_ROUNDS else 1,
-            )
-        )
-
-    if not poster_rounds:
-        raise ValueError("Unable to build poster zoom rounds")
-
-    poster_primary = poster_primary or await _load_media_details(
-        poster_rounds[0].mediaId, cache, settings
-    )
+        remember(poster_media)
+        poster_rounds.append(_build_poster_round(media=poster_media, order=order, difficulty=difficulty))
 
     poster_bundle = PosterZoomPuzzleBundle(
         mediaId=poster_rounds[0].mediaId,
         puzzle=PosterZoomGame(spec=POSTER_ROUNDS, rounds=poster_rounds),
-        solution=_build_solution(poster_primary),
+        solution=poster_rounds[0].solution,
     )
 
-    synopsis_candidate = _choose_media_from_pool(
-        base_seed, "redacted_synopsis", pool, selected_ids
-    )
-    synopsis_media = await _load_media_details(synopsis_candidate.id, cache, settings)
-    selected_ids.add(synopsis_media.id)
-    if synopsis_media.id not in recorded_ids:
-        recorded_ids.append(synopsis_media.id)
+    synopsis_rounds: List[RedactedSynopsisRound] = []
+    synopsis_primary: Optional[Media] = None
+    for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
+        for attempt in range(8):
+            candidate = _choose_tiered(
+                base_seed, "redacted_synopsis", round_pool, tiers, difficulty, selected_ids, attempt=attempt
+            )
+            synopsis_media = await _load_media_details(candidate.id, cache, settings)
+            synopsis_round = _build_synopsis_round(synopsis_media, order=order, difficulty=difficulty)
+            remember(synopsis_media)
+            if synopsis_round:
+                synopsis_rounds.append(synopsis_round)
+                synopsis_primary = synopsis_primary or synopsis_media
+                break
+    if not synopsis_rounds or synopsis_primary is None:
+        raise ValueError("Unable to build redacted synopsis rounds")
+    # Legacy top-level fields mirror round 1 for clients that predate rounds.
+    synopsis_game = _build_synopsis(synopsis_primary)
+    synopsis_game.rounds = synopsis_rounds
     synopsis_bundle = RedactedSynopsisPuzzleBundle(
-        mediaId=synopsis_media.id,
-        puzzle=_build_synopsis(synopsis_media),
-        solution=_build_solution(synopsis_media),
+        mediaId=synopsis_primary.id,
+        puzzle=synopsis_game,
+        solution=synopsis_rounds[0].solution,
     )
 
     character_bundle: Optional[CharacterSilhouettePuzzleBundle] = None
-    attempted_character_ids: set[int] = set()
-    max_character_attempts = max(len(pool), 1)
-    for attempt in range(max_character_attempts):
-        candidate = _choose_media_from_pool(
-            base_seed,
-            "character_silhouette",
-            pool,
-            selected_ids,
-            attempt=attempt,
-            attempted_ids=attempted_character_ids,
-        )
-        character_media = await _load_media_details(candidate.id, cache, settings)
-        attempted_character_ids.add(character_media.id)
-        game = _build_character_guess_game(character_media)
-        if not game:
-            continue
-        selected_ids.add(character_media.id)
-        if character_media.id not in recorded_ids:
-            recorded_ids.append(character_media.id)
-        character_bundle = CharacterSilhouettePuzzleBundle(
-            mediaId=character_media.id,
-            puzzle=game,
-            solution=_build_solution(character_media),
-        )
-        break
+    character_rounds: List[CharacterGuessRound] = []
+    character_media_by_id: dict[int, Media] = {}
+    tried_for_characters: set[int] = set()
+    for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
+        entries: List[CharacterGuessEntry] = []
+        for attempt in range(CHARACTERS_PER_ROUND * 4):
+            if len(entries) >= CHARACTERS_PER_ROUND:
+                break
+            excluded = selected_ids | tried_for_characters
+            if len(excluded) >= len(round_pool):
+                break
+            candidate = _choose_tiered(
+                base_seed, f"character_silhouette:{order}", round_pool, tiers, difficulty, excluded, attempt=attempt
+            )
+            tried_for_characters.add(candidate.id)
+            character_media = await _load_media_details(candidate.id, cache, settings)
+            edge = _featured_character_edge(character_media, set())
+            if edge is not None:
+                entries.append(_character_entry(character_media, edge, difficulty))
+                character_media_by_id[character_media.id] = character_media
+        if len(entries) < 2:
+            character_rounds = []
+            break
+        character_rounds.append(CharacterGuessRound(order=order, difficulty=difficulty, entries=entries))
 
-    if not character_bundle:
-        for fallback_media in (anidle_media, poster_media, synopsis_media):
-            game = _build_character_guess_game(fallback_media)
+    if character_rounds:
+        for round_payload in character_rounds:
+            for entry in round_payload.entries:
+                remember(character_media_by_id[entry.mediaId])
+        first_entry = character_rounds[0].entries[0]
+        character_bundle = CharacterSilhouettePuzzleBundle(
+            mediaId=first_entry.mediaId,
+            puzzle=CharacterSilhouetteGame(
+                spec=[
+                    CharacterSilhouetteRound(
+                        difficulty=round_payload.difficulty,
+                        label=("Easy", "Medium", "Hard")[round_payload.difficulty - 1],
+                        filter="none",
+                    )
+                    for round_payload in character_rounds
+                ],
+                answer=first_entry.animeAnswer,
+                character=first_entry.character,
+                rounds=character_rounds,
+            ),
+            solution=_build_solution(character_media_by_id[first_entry.mediaId]),
+        )
+    else:
+        # Too few pictured characters in the pool: fall back to the legacy
+        # single-anime game rather than failing the whole daily set.
+        logger.warning("Falling back to single-anime character rounds for %s", day)
+        for attempt in range(max(len(pool), 1)):
+            candidate = _choose_media_from_pool(
+                base_seed, "character_silhouette", pool, selected_ids, attempt=attempt
+            )
+            character_media = await _load_media_details(candidate.id, cache, settings)
+            game = _build_character_guess_game(character_media)
             if not game:
                 continue
-            selected_ids.add(fallback_media.id)
-            if fallback_media.id not in recorded_ids:
-                recorded_ids.append(fallback_media.id)
+            remember(character_media)
             character_bundle = CharacterSilhouettePuzzleBundle(
-                mediaId=fallback_media.id,
+                mediaId=character_media.id,
                 puzzle=game,
-                solution=_build_solution(fallback_media),
+                solution=_build_solution(character_media),
             )
             break
-
     if not character_bundle:
         raise ValueError("Unable to build character silhouette puzzle")
 
@@ -1233,35 +1396,36 @@ async def _assemble_daily_puzzle(
         except Exception:
             logger.exception("Failed to load dedicated opening pool")
     if include_guess_opening:
-        candidate_pool = opening_pool or pool
+        candidate_pool = [m for m in (opening_pool or pool) if not _is_sequel(m)] or opening_pool or pool
         if candidate_pool:
-            required_rounds = 3
-            attempted_ids: set[int] = set()
+            required_rounds = len(ROUND_DIFFICULTIES)
+            opening_tiers = _popularity_tiers(candidate_pool)
+            tried_ids: set[int] = set()
             selected_for_opening: set[int] = set()
-            max_attempts = max(len(candidate_pool) * required_rounds, required_rounds * 3)
-            attempt_counter = 0
-            while len(opening_rounds) < required_rounds and attempt_counter < max_attempts:
-                candidate = _choose_media_from_pool(
-                    base_seed,
-                    f"guess_the_opening:{len(opening_rounds)}",
-                    candidate_pool,
-                    selected_ids.union(selected_for_opening),
-                    attempt=attempt_counter,
-                    attempted_ids=attempted_ids,
-                )
-                attempt_counter += 1
-                opening_media = await _load_media_details(candidate.id, cache, settings)
-                attempted_ids.add(opening_media.id)
-                opening_round = await _build_guess_opening_round(
-                    opening_media,
-                    cache,
-                    order=len(opening_rounds) + 1,
-                    total_rounds=required_rounds,
-                )
-                if not opening_round:
-                    continue
-                opening_rounds.append(opening_round)
-                selected_for_opening.add(opening_round.mediaId)
+            for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
+                for attempt in range(12):
+                    candidate = _choose_tiered(
+                        base_seed,
+                        "guess_the_opening",
+                        candidate_pool,
+                        opening_tiers,
+                        difficulty,
+                        selected_ids | selected_for_opening | tried_ids,
+                        attempt=attempt,
+                    )
+                    tried_ids.add(candidate.id)
+                    opening_media = await _load_media_details(candidate.id, cache, settings)
+                    opening_round = await _build_guess_opening_round(
+                        opening_media,
+                        cache,
+                        order=order,
+                        total_rounds=required_rounds,
+                        difficulty=difficulty,
+                    )
+                    if opening_round:
+                        opening_rounds.append(opening_round)
+                        selected_for_opening.add(opening_round.mediaId)
+                        break
             if len(opening_rounds) == required_rounds:
                 selected_ids.update(selected_for_opening)
                 for round_payload in opening_rounds:

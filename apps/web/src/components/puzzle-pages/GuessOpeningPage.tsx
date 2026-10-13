@@ -1,120 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import GuessOpening from "../GuessOpening";
-import { GameShell } from "../GameShell";
+import GuessOpening, {
+  ARTIST_HINT_COST,
+  VIDEO_HINT_COST,
+} from "../GuessOpening";
+import { ROUND_RULES, RoundGamePage } from "./RoundGamePage";
 import type { GameProgress } from "../../types/progress";
-import { GuessOpeningGame } from "../../types/puzzles";
+import type { GuessOpeningGame } from "../../types/puzzles";
 
 interface Props {
-  mediaId: number;
   payload: GuessOpeningGame;
   progress?: GameProgress;
-  accountDifficulty?: number;
-  difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
 
+const RULES = [
+  ...ROUND_RULES,
+  "Name the anime from a 30-second slice of its opening, audio only.",
+  `Clues: unlock the video (−${VIDEO_HINT_COST}) or show the artist (−${ARTIST_HINT_COST}). The full opening plays on the results screen.`,
+];
+
 export function GuessOpeningPage({
-  mediaId,
   payload,
   progress,
-  accountDifficulty,
-  difficultyHint,
   onProgressChange,
   nextSlug,
 }: Props) {
-  const controller = useRef<((round: number) => void) | null>(null);
-  const [controllerReady, setControllerReady] = useState(false);
-  const rounds = payload.rounds ?? [];
-  const totalRounds = Math.max(rounds.length, 1);
-  const roundKey = useMemo(
-    () => rounds.map((round) => round.mediaId).join("|"),
-    [rounds],
-  );
-
-  const clampDifficulty = useCallback(
-    (value: number | undefined | null) => {
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        return undefined;
-      }
-      const rounded = Math.round(value);
-      return Math.max(1, Math.min(totalRounds, rounded));
-    },
-    [totalRounds],
-  );
-
-  const selectedDifficulty = clampDifficulty(accountDifficulty);
-  const recommendedDifficulty = clampDifficulty(difficultyHint);
-  const preferredRound = useMemo(
-    () =>
-      clampDifficulty(progress?.round) ??
-      selectedDifficulty ??
-      recommendedDifficulty ??
-      1,
-    [
-      clampDifficulty,
-      progress?.round,
-      recommendedDifficulty,
-      selectedDifficulty,
-    ],
-  );
-  const [displayRound, setDisplayRound] = useState(preferredRound);
-
-  useEffect(() => {
-    controller.current = null;
-    setControllerReady(false);
-  }, [mediaId, roundKey]);
-
-  useEffect(() => {
-    if (!controllerReady) return;
-    controller.current?.(preferredRound);
-  }, [controllerReady, preferredRound]);
-
-  useEffect(() => {
-    setDisplayRound(preferredRound);
-  }, [preferredRound]);
-
-  if (rounds.length === 0) {
-    return (
-      <div className="rounded-lg border border-line bg-surface-raised p-6 text-paper">
-        Unable to load Guess the Opening for today. Please try again later.
-      </div>
-    );
-  }
-
-  const handleProgressChange = useCallback(
-    (state: GameProgress) => {
-      setDisplayRound(state.round);
-      onProgressChange(state);
-    },
-    [onProgressChange],
-  );
-
   return (
-    <div className="space-y-6">
-      <GameShell
-        title="Guess the Opening"
-        status={
-          <>
-            Opening {displayRound} / {totalRounds}
-          </>
-        }
-      >
+    <RoundGamePage
+      title="Guess the Opening"
+      slug="guess-the-opening"
+      roundCount={payload.rounds.length}
+      progress={progress}
+      onProgressChange={onProgressChange}
+      rules={RULES}
+    >
+      {(handleProgressChange) => (
         <GuessOpening
-          payload={rounds}
+          payload={payload.rounds}
           initialProgress={progress}
           onProgressChange={handleProgressChange}
-          registerRoundController={(fn) => {
-            controller.current = fn;
-            setControllerReady(true);
-          }}
           nextSlug={nextSlug}
-          accountDifficulty={selectedDifficulty}
         />
-      </GameShell>
-    </div>
+      )}
+    </RoundGamePage>
   );
 }

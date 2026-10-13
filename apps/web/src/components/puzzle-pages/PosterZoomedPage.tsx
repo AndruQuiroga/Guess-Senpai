@@ -1,95 +1,50 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import PosterZoom from "../PosterZoom";
-import { GameShell } from "../GameShell";
+import PosterZoom, {
+  GENRE_HINT_COST,
+  POSTER_POINTS,
+  ZOOM_HINT_COST,
+} from "../PosterZoom";
+import { ROUND_RULES, RoundGamePage } from "./RoundGamePage";
 import type { GameProgress } from "../../types/progress";
-import { PosterZoomGame } from "../../types/puzzles";
+import type { PosterZoomGame } from "../../types/puzzles";
 
 interface Props {
   payload: PosterZoomGame;
   progress?: GameProgress;
-  accountDifficulty?: number;
-  difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
 
+const RULES = [
+  ...ROUND_RULES,
+  `Name the anime from a zoomed-in crop of its poster (${POSTER_POINTS.title} pts). Season (+${POSTER_POINTS.season}) and year (+${POSTER_POINTS.year}, half if off by one) are bonus points.`,
+  `Hints: zoom out (−${ZOOM_HINT_COST} each, twice) or show genres (−${GENRE_HINT_COST}). The full poster appears on the results screen.`,
+];
+
 export function PosterZoomedPage({
   payload,
   progress,
-  accountDifficulty,
   onProgressChange,
   nextSlug,
 }: Props) {
-  const controller = useRef<((round: number) => void) | null>(null);
-  const [controllerReady, setControllerReady] = useState(false);
-
-  const totalRounds = useMemo(
-    () => (payload.rounds.length > 0 ? payload.rounds.length : 1),
-    [payload.rounds.length],
-  );
-
-  const clampRound = useCallback(
-    (value: number | undefined | null) => {
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        return undefined;
-      }
-      const rounded = Math.round(value);
-      return Math.max(1, Math.min(totalRounds, rounded));
-    },
-    [totalRounds],
-  );
-
-  const highlightedRound = clampRound(progress?.round) ?? 1;
-  const [displayRound, setDisplayRound] = useState(highlightedRound);
-
-  useEffect(() => {
-    controller.current = null;
-    setControllerReady(false);
-  }, [payload.rounds]);
-
-  useEffect(() => {
-    if (!controllerReady) return;
-    if (progress?.completed) return;
-    controller.current?.(highlightedRound);
-  }, [controllerReady, highlightedRound, progress?.completed]);
-
-  useEffect(() => {
-    setDisplayRound(highlightedRound);
-  }, [highlightedRound]);
-
-  const handleProgressChange = useCallback(
-    (state: GameProgress) => {
-      setDisplayRound(state.round);
-      onProgressChange(state);
-    },
-    [onProgressChange],
-  );
-
   return (
-    <div className="space-y-6">
-      <GameShell
-        title="Poster Zoomed"
-        status={
-          <>
-            Round {displayRound} / {totalRounds}
-          </>
-        }
-      >
+    <RoundGamePage
+      title="Poster Zoomed"
+      slug="poster-zoomed"
+      roundCount={payload.rounds.length}
+      progress={progress}
+      onProgressChange={onProgressChange}
+      rules={RULES}
+    >
+      {(handleProgressChange) => (
         <PosterZoom
           payload={payload}
           initialProgress={progress}
           onProgressChange={handleProgressChange}
-          registerRoundController={(fn) => {
-            controller.current = fn;
-            setControllerReady(true);
-          }}
           nextSlug={nextSlug}
-          accountDifficulty={accountDifficulty}
         />
-      </GameShell>
-    </div>
+      )}
+    </RoundGamePage>
   );
 }

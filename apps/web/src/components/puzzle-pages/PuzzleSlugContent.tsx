@@ -25,6 +25,7 @@ import type {
   GuessOpeningGame,
   PosterZoomGame,
   RedactedSynopsisGame,
+  SolutionPayload,
 } from "../../types/puzzles";
 
 interface Props {
@@ -153,8 +154,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           <PosterZoomedPage
             payload={posterBundle.puzzle}
             progress={progress.poster_zoomed}
-            accountDifficulty={difficultyLevel ?? undefined}
-            difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.poster_zoomed}
             nextSlug={nextSlug}
           />
@@ -174,8 +173,6 @@ export function PuzzleSlugContent({ data, slug }: Props) {
             mediaId={silhouetteBundle.mediaId}
             payload={silhouetteBundle.puzzle}
             progress={progress.character_silhouette}
-            accountDifficulty={difficultyLevel ?? undefined}
-            difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.character_silhouette}
             nextSlug={nextSlug}
           />
@@ -189,14 +186,14 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         const synopsisBundle = bundle as {
           mediaId: number;
           puzzle: RedactedSynopsisGame;
+          solution?: SolutionPayload | null;
         };
         return (
           <RedactedSynopsisPage
             mediaId={synopsisBundle.mediaId}
             payload={synopsisBundle.puzzle}
+            solution={synopsisBundle.solution ?? null}
             progress={progress.redacted_synopsis}
-            accountDifficulty={difficultyLevel ?? undefined}
-            difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.redacted_synopsis}
             nextSlug={nextSlug}
           />
@@ -213,11 +210,8 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         };
         return (
           <GuessOpeningPage
-            mediaId={openingBundle.mediaId}
             payload={openingBundle.puzzle}
             progress={progress.guess_the_opening}
-            accountDifficulty={difficultyLevel ?? undefined}
-            difficultyHint={data.games.difficulty_level ?? undefined}
             onProgressChange={progressHandlers.guess_the_opening}
             nextSlug={nextSlug}
           />

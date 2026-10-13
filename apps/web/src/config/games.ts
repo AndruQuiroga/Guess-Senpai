@@ -77,7 +77,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       rules: [
         "Submit an anime title to compare its metadata with the answer.",
         "Use higher/lower, matching, and partial-match feedback to narrow the possibilities.",
-        "Synopsis hints reveal progressively as you make incorrect guesses.",
+        "Twenty guesses; optional hints become available later in the game.",
       ],
       media: {
         type: "image",
@@ -108,9 +108,9 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       summary:
         "Watch an iconic key visual slowly zoom out—each round adds release clues so you can lock in the anime and its debut.",
       rules: [
-        "Start with a tight crop; each round widens the frame and layers on extra metadata.",
-        "Submit both the anime title and its release season or year to clear the round.",
-        "Complete the round by matching the anime and its release information.",
+        "Three rounds (Easy, Medium, Hard), each a zoomed-in crop of a different poster.",
+        "Name the anime, with bonus points for its season and year.",
+        "Zoom out or show genres for a points cost; the full poster appears on the results screen.",
       ],
       media: {
         type: "image",
@@ -140,9 +140,9 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       summary:
         "Tackle three escalating rounds of silhouettes—four cards per round—locking in both the character and anime before the lights come up.",
       rules: [
-        "Each round features four characters from the same anime—submit both the series and character name to clear a card.",
-        "Incorrect guesses keep the round alive but you’ll need both answers to remove the filter.",
-        "Clear all three rounds (twelve cards total) to complete the daily silhouette lineup.",
+        "Three rounds of four shadowed characters, each from a different anime.",
+        "Fill in every character's name and anime, then check them all at once.",
+        "Sharpen a card for a points cost; everyone is revealed on the results screen.",
       ],
       media: {
         type: "image",
@@ -171,9 +171,9 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       summary:
         "Decode a synopsis that censors critical names and phrases, piecing together the series from context clues.",
       rules: [
-        "Review the redacted description and consider the surrounding hints.",
-        "Guess the anime—incorrect answers restore a few missing terms.",
-        "Fill in enough blanks to identify the series before the final reveal.",
+        "Three rounds (Easy, Medium, Hard), each a different anime's synopsis with most words blacked out.",
+        "One answer per round; reveal a few words for a points cost.",
+        "The full synopsis appears on the results screen.",
       ],
       media: {
         type: "image",
@@ -203,9 +203,9 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       summary:
         "An optional mode that is available when a playable clip set is returned.",
       rules: [
-        "Spin up each short clip sourced from AnimeThemes and lock in the correct series.",
-        "Three openings per day—solve every clip to secure the daily win.",
-        "Hints reveal metadata like season, artist, song title, and clip length as you advance.",
+        "Three openings (Easy, Medium, Hard), each a 30-second audio slice from AnimeThemes.",
+        "One answer per round; unlock the video or the artist for a points cost.",
+        "The whole opening plays on the results screen.",
       ],
       media: {
         type: "image",
@@ -332,7 +332,7 @@ export const PRACTICE_MODES: GameDirectoryEntry[] = [
       summary:
         "Same rules as the daily Anidle, with a new random puzzle whenever you finish one.",
       rules: [
-        "Find one exact anime title in 8 accepted guesses.",
+        "Find one exact anime title in 20 accepted guesses.",
         "Nothing here counts toward your streak or daily score.",
       ],
     },

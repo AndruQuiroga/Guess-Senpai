@@ -10,7 +10,7 @@ interface KnowledgeSummaryProps {
 const CHIP =
   "inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-semibold leading-tight";
 
-/** Open beside the grid on wide screens; collapsed above it on phones. */
+/** Open above the table on wide screens; collapsed on phones. */
 const WIDE_QUERY = "(min-width: 1024px)";
 
 /** "What you know": every guess so far folded into one answer profile. */
@@ -43,7 +43,7 @@ export function KnowledgeSummary({ evaluations }: KnowledgeSummaryProps) {
           </span>
         </summary>
         <div className="space-y-3 px-4 pb-4">
-          <dl className="grid grid-cols-2 gap-2">
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {knowledge.scalars.map((item) => (
               <div
                 key={item.key}
@@ -64,7 +64,7 @@ export function KnowledgeSummary({ evaluations }: KnowledgeSummaryProps) {
               </div>
             ))}
           </dl>
-          <dl className="space-y-2.5">
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
             {knowledge.lists.map((item) => (
               <div key={item.key} className="space-y-1">
                 <dt className="text-[0.65rem] font-bold uppercase tracking-wide text-muted">

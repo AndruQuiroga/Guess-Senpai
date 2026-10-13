@@ -137,7 +137,7 @@ describe("Today page", () => {
       },
     };
     render(<HomePage />);
-    const link = screen.getByRole("link", { name: "Today 1,000 / 4,000" });
+    const link = screen.getByRole("link", { name: "Today 3,000 / 12,000" });
     expect(link).toHaveAttribute("href", "/how-to-play#daily-score");
   });
 

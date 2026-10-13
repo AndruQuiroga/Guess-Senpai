@@ -136,16 +136,17 @@ export default function HowToPlayPage() {
           </h2>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
-              Each daily mode is worth up to 1,000 points, so the maximum is
-              1,000 × the modes available today.
+              Each daily mode is worth up to 3,000 points, so the maximum is
+              3,000 × the modes available today.
             </li>
             <li>
-              Anidle: solving on guess 1 earns 1,000 and each extra guess costs
-              125, down to 125 on guess 8.
+              Round modes have Easy, Medium and Hard rounds worth up to 1,000
+              each. Every round takes one answer; hints you choose to take come
+              off that round.
             </li>
             <li>
-              Other modes: every round earns full marks, minus 25% for each
-              wrong guess or extra hint, never below 25% once solved.
+              Anidle: solving on guess 1 earns 3,000, and each extra guess costs
+              a twentieth of that.
             </li>
             <li>
               Unsolved or out-of-guesses modes score 0. The score is computed on

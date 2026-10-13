@@ -1,90 +1,173 @@
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
 import SynopsisRedacted from "../SynopsisRedacted";
-import type { RedactedSynopsisGame } from "../../types/puzzles";
-
-const useTitleSuggestionsMock = vi.hoisted(() => vi.fn());
+import type { GameProgress } from "../../types/progress";
+import type {
+  RedactedSynopsisGame,
+  RedactedSynopsisRound,
+} from "../../types/puzzles";
 
 vi.mock("../../hooks/useTitleSuggestions", () => ({
-  useTitleSuggestions: useTitleSuggestionsMock,
+  useTitleSuggestions: () => ({ suggestions: [], loading: false, error: null }),
 }));
 
 const verifyGuessMock = vi.hoisted(() => vi.fn());
-
 vi.mock("../../utils/verifyGuess", () => ({
   verifyGuess: (...args: unknown[]) => verifyGuessMock(...args),
 }));
 
-describe("SynopsisRedacted autocomplete", () => {
+const words =
+  "A young alchemist searches for the stone to restore his brother".split(" ");
+
+function synopsisRound(
+  order: number,
+  mediaId: number,
+  answer: string,
+): RedactedSynopsisRound {
+  const segments = words.flatMap((text, index) => [
+    { text, masked: index % 2 === 0 },
+    ...(index < words.length - 1 ? [{ text: " ", masked: false }] : []),
+  ]);
+  return {
+    order,
+    difficulty: order,
+    mediaId,
+    answer,
+    segments,
+    masked_word_indices: segments
+      .map((segment, index) => (segment.masked ? index : -1))
+      .filter((index) => index >= 0),
+    solution: {
+      titles: { userPreferred: answer },
+      coverImage: null,
+      aniListUrl: `https://anilist.co/anime/${mediaId}`,
+      streamingLinks: [],
+    },
+  };
+}
+
+const base: RedactedSynopsisGame = {
+  spec: [],
+  answer: "Legacy Show",
+  text: "",
+  segments: [
+    { text: "Hidden", masked: true },
+    { text: " plot", masked: false },
+  ],
+  masked_word_indices: [0],
+  masked_words: ["Hidden"],
+};
+
+describe("SynopsisRedacted rounds", () => {
   beforeEach(() => {
-    useTitleSuggestionsMock.mockReturnValue({
-      suggestions: [
-        { id: 900, title: "Steins;Gate" },
-        { id: 901, title: "Erased" },
-      ],
-      loading: false,
-      error: null,
-    });
-    verifyGuessMock.mockResolvedValue({ correct: true, match: "Steins;Gate" });
+    verifyGuessMock.mockResolvedValue({ correct: true, animeMatch: true });
   });
+  afterEach(() => vi.clearAllMocks());
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("allows choosing a suggestion and forwards its canonical id", async () => {
+  it("plays three rounds, revealing words for a cost", async () => {
+    const progress = vi.fn();
     const payload: RedactedSynopsisGame = {
-      spec: [{ difficulty: 1, hints: ["unmask:2"] }],
-      answer: "Steins;Gate",
-      text: "A genius tests a microwave...",
-      segments: [
-        { text: "A", masked: false },
-        { text: " ", masked: false },
-        { text: "genius", masked: true },
-        { text: " ", masked: false },
-        { text: "tests", masked: true },
-        { text: " ", masked: false },
-        { text: "a", masked: false },
-        { text: " ", masked: false },
-        { text: "microwave", masked: true },
-        { text: "...", masked: false },
+      ...base,
+      rounds: [
+        synopsisRound(1, 1, "Fullmetal Alchemist"),
+        synopsisRound(2, 2, "Second Show"),
+        synopsisRound(3, 3, "Third Show"),
       ],
-      masked_word_indices: [2, 4, 8],
-      masked_words: ["genius", "tests", "microwave"],
     };
-
-    const user = userEvent.setup();
-
     render(
       <SynopsisRedacted
-        mediaId={73}
         payload={payload}
-        onProgressChange={() => {}}
+        mediaId={1}
+        onProgressChange={progress}
       />,
     );
 
-    const input = screen.getByLabelText("Synopsis guess");
-    await user.type(input, "st");
+    expect(
+      screen.getByRole("button", { name: /Round 3 · Hard/ }),
+    ).toBeDisabled();
+    const hidden = screen.getAllByRole("img", { name: "redacted word" }).length;
+    expect(hidden).toBe(6);
 
-    const listbox = await screen.findByRole("listbox", {
-      name: /synopsis title suggestions/i,
+    fireEvent.click(screen.getByRole("button", { name: /Reveal some words/ }));
+    expect(
+      screen.getAllByRole("img", { name: "redacted word" }).length,
+    ).toBeLessThan(hidden);
+    expect(screen.getByText(/1\/3 reveals used/)).toBeInTheDocument();
+
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Synopsis anime title" }),
+      {
+        target: { value: "Fullmetal Alchemist" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+
+    expect(await screen.findByText("+850")).toBeInTheDocument();
+    expect(verifyGuessMock).toHaveBeenCalledWith(
+      1,
+      "Fullmetal Alchemist",
+      undefined,
+    );
+    const last = progress.mock.calls.at(-1)?.[0] as GameProgress;
+    expect(last.rounds?.[0]).toMatchObject({
+      completed: true,
+      points: 850,
+      hints: 1,
     });
-    expect(listbox).toBeInTheDocument();
+  });
 
-    await user.keyboard("{ArrowDown}");
-    const option = screen.getByRole("option", { name: "Steins;Gate" });
-    expect(option).toHaveAttribute("aria-selected", "true");
+  it("scores a wrong answer as 0 and never charges below zero", async () => {
+    verifyGuessMock.mockResolvedValue({ correct: false, animeMatch: false });
+    const payload = {
+      ...base,
+      rounds: [synopsisRound(1, 1, "Fullmetal Alchemist")],
+    };
+    render(
+      <SynopsisRedacted
+        payload={payload}
+        mediaId={1}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Reveal some words/ }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Synopsis anime title" }),
+      {
+        target: { value: "Naruto" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+    expect(await screen.findByText("+0")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Missed" })).toBeInTheDocument();
+  });
 
-    await user.keyboard("{Enter}");
-    expect(input).toHaveValue("Steins;Gate");
+  it("requires a title before spending the round", async () => {
+    render(
+      <SynopsisRedacted
+        payload={{ ...base, rounds: [synopsisRound(1, 1, "X")] }}
+        mediaId={1}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Type an anime title first",
+    );
     expect(verifyGuessMock).not.toHaveBeenCalled();
-    await user.keyboard("{Enter}");
+  });
 
-    await waitFor(() => {
-      expect(verifyGuessMock).toHaveBeenCalledWith(73, "Steins;Gate", 900);
-    });
+  it("plays older single-synopsis payloads as one round", () => {
+    render(
+      <SynopsisRedacted
+        payload={base}
+        mediaId={42}
+        onProgressChange={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: /Round/ })).toHaveLength(1);
+    expect(
+      screen.getByRole("img", { name: "redacted word" }),
+    ).toBeInTheDocument();
   });
 });

@@ -1,319 +1,360 @@
 "use client";
 
-import type { ReactNode } from "react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useMemo, useRef, useState, type FormEvent } from "react";
 
-import { GameProgress } from "../hooks/usePuzzleProgress";
-import { RedactedSynopsisGame as SynopsisPayload } from "../types/puzzles";
-import { resolveHintRound } from "../utils/difficulty";
+import type { GameProgress } from "../types/progress";
+import type {
+  RedactedSynopsisGame,
+  RedactedSynopsisRound,
+  SolutionPayload,
+} from "../types/puzzles";
 import { verifyGuess } from "../utils/verifyGuess";
-import NextPuzzleButton from "./NextPuzzleButton";
 import {
   TitleGuessField,
   type TitleGuessFieldHandle,
-  type TitleGuessSelection,
 } from "./games/TitleGuessField";
+import {
+  GameSummary,
+  HintButton,
+  LegacyFinished,
+  RoundResult,
+  RoundTabs,
+} from "./rounds/RoundUI";
+import {
+  buildOutcome,
+  difficultyLabel,
+  line,
+  ROUND_POINTS,
+} from "./rounds/scoring";
+import { useRoundGame, type RoundGameState } from "./rounds/useRoundGame";
 
-interface Props {
-  mediaId: number;
-  payload: SynopsisPayload;
-  initialProgress?: GameProgress;
-  onProgressChange(state: GameProgress): void;
-  registerRoundController?: (fn: (round: number) => void) => void;
-  nextSlug?: string | null;
-  accountDifficulty?: number;
+export const REVEAL_HINT_COST = 150;
+export const MAX_REVEAL_HINTS = 3;
+/** Share of the hidden words each hint uncovers (title words never are). */
+const REVEAL_SHARE = 0.12;
+
+/** Rounds-v3 payloads carry rounds; older ones are one round at the top level. */
+export function synopsisRounds(
+  payload: RedactedSynopsisGame,
+  mediaId: number,
+  solution?: SolutionPayload | null,
+): RedactedSynopsisRound[] {
+  if (payload.rounds?.length) return payload.rounds;
+  return [
+    {
+      order: 1,
+      difficulty: 1,
+      mediaId,
+      answer: payload.answer,
+      segments: payload.segments,
+      masked_word_indices: payload.masked_word_indices,
+      solution: solution ?? {
+        titles: { userPreferred: payload.answer },
+        aniListUrl: `https://anilist.co/anime/${mediaId}`,
+        streamingLinks: [],
+      },
+    },
+  ];
 }
 
-const TOTAL_ROUNDS = 3;
-
-type FeedbackState =
-  | { type: "success"; message: string }
-  | { type: "error"; message: string }
-  | null;
-
-export default function SynopsisRedacted({
-  mediaId,
-  payload,
-  initialProgress,
-  onProgressChange,
-  registerRoundController,
-  nextSlug,
-  accountDifficulty,
-}: Props) {
-  const [round, setRound] = useState(initialProgress?.round ?? 1);
-  const [guess, setGuess] = useState("");
-  const [guesses, setGuesses] = useState<string[]>(
-    initialProgress?.guesses ?? [],
+/** Indices revealed by `hints` hints, never touching the title's own words. */
+function revealedIndices(round: RedactedSynopsisRound, hints: number) {
+  const titleWords = new Set(
+    round.segments
+      .map((segment, index) => ({ segment, index }))
+      .filter(({ segment }) =>
+        round.answer
+          .toLowerCase()
+          .split(/\W+/)
+          .filter((word) => word.length > 2)
+          .includes(segment.text.toLowerCase()),
+      )
+      .map(({ index }) => index),
   );
-  const [completed, setCompleted] = useState(
-    initialProgress?.completed ?? false,
+  const order = round.masked_word_indices.filter(
+    (index) => !titleWords.has(index),
   );
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
-  const guessFieldRef = useRef<TitleGuessFieldHandle | null>(null);
-
-  const normalizedAnswer = useMemo(
-    () => payload.answer.trim().toLowerCase(),
-    [payload.answer],
+  const perHint = Math.max(2, Math.ceil(order.length * REVEAL_SHARE));
+  // Spread reveals across the text instead of uncovering it front to back.
+  const spread = [...order].sort(
+    (a, b) => ((a * 7919) % 97) - ((b * 7919) % 97) || a - b,
   );
+  return new Set(spread.slice(0, perHint * hints));
+}
 
-  useEffect(() => {
-    if (!initialProgress) {
-      setRound(1);
-      setGuesses([]);
-      setCompleted(false);
-      setFeedback(null);
-    } else {
-      setRound(initialProgress.round ?? 1);
-      setGuesses(initialProgress.guesses ?? []);
-      setCompleted(initialProgress.completed ?? false);
-      if (initialProgress.completed) {
-        setFeedback({
-          type: "success",
-          message: `Correct! The anime is ${payload.answer}`,
-        });
-      } else {
-        setFeedback(null);
-      }
-    }
-    setGuess("");
-  }, [initialProgress, payload.answer, payload.text, payload.segments]);
-
-  useEffect(() => {
-    if (!registerRoundController) return;
-    registerRoundController((targetRound) => {
-      setRound(() => Math.max(1, Math.min(TOTAL_ROUNDS, targetRound)));
-    });
-  }, [registerRoundController]);
-
-  const hintRound = useMemo(
-    () =>
-      completed
-        ? TOTAL_ROUNDS
-        : resolveHintRound(round, TOTAL_ROUNDS, accountDifficulty),
-    [accountDifficulty, completed, round],
-  );
-
-  const wordsToReveal = useMemo(() => {
-    const totalMasked = (payload.masked_word_indices ?? []).length;
-    if (completed) {
-      return totalMasked;
-    }
-
-    const activeSpecs = payload.spec.filter(
-      (spec) => spec.difficulty <= hintRound,
-    );
-    let maxTokens = 0;
-    activeSpecs.forEach((spec) => {
-      spec.hints.forEach((hint) => {
-        if (hint.startsWith("unmask:")) {
-          const value = Number.parseInt(hint.split(":")[1], 10);
-          if (!Number.isNaN(value)) {
-            maxTokens = Math.max(maxTokens, value);
-          }
-        }
-      });
-    });
-    return Math.min(maxTokens, totalMasked);
-  }, [completed, hintRound, payload.masked_word_indices, payload.spec]);
-
-  const revealedWordCount = useMemo(() => {
-    if (completed) {
-      return (payload.masked_word_indices ?? []).length;
-    }
-    return wordsToReveal;
-  }, [completed, payload.masked_word_indices, wordsToReveal]);
-
-  const renderedSynopsis = useMemo<ReactNode>(() => {
-    const segments = payload.segments;
-    if (!segments || segments.length === 0) {
-      return <span className="whitespace-pre-wrap">{payload.text}</span>;
-    }
-
-    const order = payload.masked_word_indices ?? [];
-    const revealCount = completed ? order.length : wordsToReveal;
-    const revealSet = new Set(order.slice(0, revealCount));
-
-    return segments.map((segment, index) => {
-      const isMasked = segment.masked && !revealSet.has(index);
-      if (isMasked) {
-        return (
-          <span
-            key={`segment-${index}`}
-            className="relative inline-flex align-baseline"
-          >
-            <span className="sr-only">Masked word</span>
+function SynopsisText({
+  round,
+  revealed,
+  showAll = false,
+}: {
+  round: RedactedSynopsisRound;
+  revealed: Set<number>;
+  showAll?: boolean;
+}) {
+  return (
+    <p className="whitespace-pre-wrap text-base leading-8 text-paper">
+      {round.segments.map((segment, index) => {
+        if (!segment.masked || showAll) {
+          return (
             <span
-              aria-hidden
-              className="inline-flex select-none items-center rounded-sm bg-black px-1 py-0.5 text-sm font-semibold leading-tight text-transparent shadow-sm"
+              key={index}
+              className={
+                segment.masked && showAll
+                  ? "rounded bg-signal-soft px-0.5 text-paper"
+                  : undefined
+              }
             >
               {segment.text}
             </span>
-          </span>
+          );
+        }
+        if (revealed.has(index)) {
+          return (
+            <mark key={index} className="rounded bg-close px-0.5 text-ink">
+              {segment.text}
+            </mark>
+          );
+        }
+        return (
+          <span
+            key={index}
+            role="img"
+            aria-label="redacted word"
+            className="mx-0.5 inline-block h-[1.05em] rounded-sm bg-ink align-[-0.15em] ring-1 ring-line-strong"
+            style={{
+              width: `${Math.min(10, Math.max(2, segment.text.length)) * 0.6}em`,
+            }}
+          />
         );
-      }
-
-      return (
-        <span key={`segment-${index}`} className="whitespace-pre-wrap">
-          {segment.text}
-        </span>
-      );
-    });
-  }, [
-    completed,
-    payload.masked_word_indices,
-    payload.segments,
-    payload.text,
-    wordsToReveal,
-  ]);
-
-  useEffect(() => {
-    onProgressChange({ completed, round, guesses });
-  }, [completed, round, guesses, onProgressChange]);
-
-  const attemptGuess = useCallback(
-    async ({ value, suggestionId }: TitleGuessSelection) => {
-      if (completed) return;
-      const trimmed = value.trim();
-      if (!trimmed) {
-        setFeedback({
-          type: "error",
-          message: "Enter a guess before submitting.",
-        });
-        return;
-      }
-
-      setFeedback(null);
-      try {
-        const result = await verifyGuess(mediaId, trimmed, suggestionId);
-        setGuesses((prev) => [...prev, trimmed]);
-        if (result.correct) {
-          setCompleted(true);
-          setFeedback({
-            type: "success",
-            message: `Correct! The anime is ${payload.answer}`,
-          });
-        } else {
-          setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
-          setFeedback({
-            type: "error",
-            message: "Not quite. Keep trying!",
-          });
-        }
-      } catch (error) {
-        setGuesses((prev) => [...prev, trimmed]);
-        if (trimmed.toLowerCase() === normalizedAnswer) {
-          setCompleted(true);
-          setFeedback({
-            type: "success",
-            message: `Correct! The anime is ${payload.answer}`,
-          });
-        } else {
-          setRound((prev) => (prev >= TOTAL_ROUNDS ? TOTAL_ROUNDS : prev + 1));
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unable to verify your guess. Please try again.";
-          setFeedback({
-            type: "error",
-            message,
-          });
-        }
-      } finally {
-        setGuess("");
-      }
-    },
-    [completed, mediaId, normalizedAnswer, payload.answer],
+      })}
+    </p>
   );
+}
 
-  const handleFieldSubmit = useCallback(
-    (selection: TitleGuessSelection) => {
-      void attemptGuess(selection);
-    },
-    [attemptGuess],
-  );
+interface Props {
+  payload: RedactedSynopsisGame;
+  mediaId: number;
+  solution?: SolutionPayload | null;
+  initialProgress?: GameProgress;
+  onProgressChange(state: GameProgress): void;
+  nextSlug?: string | null;
+}
 
-  const handleSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (completed) return;
-      const selection = guessFieldRef.current?.submit();
-      if (!selection) {
-        setFeedback({
-          type: "error",
-          message: "Enter a guess before submitting.",
-        });
-        return;
-      }
-      void attemptGuess(selection);
-    },
-    [attemptGuess, completed],
+export default function SynopsisRedacted({
+  payload,
+  mediaId,
+  solution,
+  initialProgress,
+  onProgressChange,
+  nextSlug,
+}: Props) {
+  const rounds = useMemo(
+    () => synopsisRounds(payload, mediaId, solution),
+    [mediaId, payload, solution],
   );
+  const game = useRoundGame({
+    roundCount: rounds.length,
+    initialProgress,
+    onProgressChange,
+    puzzleKey: rounds.map((round) => round.mediaId).join(":"),
+  });
+  const tabs = rounds.map((round) => ({
+    label: difficultyLabel(round.difficulty, round.order),
+  }));
+
+  if (game.legacyFinished) return <LegacyFinished nextSlug={nextSlug} />;
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-line-strong bg-panel-raised p-5 text-base leading-relaxed text-paper   whitespace-pre-wrap">
-        {renderedSynopsis}
-      </div>
-      <div className="flex flex-wrap gap-2 text-sm uppercase tracking-wide text-muted">
-        {revealedWordCount > 0 && (
-          <span className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 font-semibold text-paper">
-            Revealed words: {revealedWordCount}
-          </span>
-        )}
-      </div>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-        <TitleGuessField
-          ref={guessFieldRef}
-          className="w-full"
-          value={guess}
-          onValueChange={setGuess}
-          onSubmit={handleFieldSubmit}
-          disabled={completed}
-          placeholder={completed ? payload.answer : "Guess the anime…"}
-          ariaLabel="Synopsis guess"
-          suggestionsLabel="Synopsis title suggestions"
+      <RoundTabs
+        rounds={tabs}
+        records={game.records}
+        view={game.view}
+        canView={game.canView}
+        onSelect={game.goTo}
+      />
+      {game.view >= rounds.length ? (
+        <GameSummary
+          title="Redacted Synopsis"
+          nextSlug={nextSlug}
+          rows={rounds.map((round, index) => ({
+            label: `Round ${index + 1} · ${tabs[index].label}`,
+            answer: round.answer,
+            coverImage: round.solution.coverImage,
+            points: game.records[index]?.outcome?.points ?? 0,
+          }))}
         />
-        <button
-          type="submit"
-          className="inline-flex items-center justify-center rounded-lg bg-signal !text-signal-ink px-6 py-3 text-sm font-semibold uppercase tracking-wide text-paper  transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={completed}
-        >
-          Submit
-        </button>
-      </form>
-      <div className="space-y-3 text-sm text-muted" aria-live="polite">
-        {guesses.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 text-sm uppercase tracking-[0.2em] text-muted">
-            Attempts
-            {guesses.map((value, index) => (
-              <span
-                key={`${value}-${index}`}
-                className="rounded-full border border-line-strong bg-panel-raised px-3 py-1 text-sm text-muted"
-              >
-                {value}
-              </span>
-            ))}
-          </div>
-        )}
-        {feedback?.type === "error" && (
-          <div className="rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger-ink">
-            {feedback.message}
-          </div>
-        )}
-        {feedback?.type === "success" && (
-          <div className="rounded-lg border border-correct bg-correct-soft px-4 py-3 text-sm text-correct-ink">
-            {feedback.message}
-          </div>
-        )}
-        {completed && <NextPuzzleButton nextSlug={nextSlug} />}
-      </div>
+      ) : (
+        <SynopsisRound
+          key={game.view}
+          index={game.view}
+          round={rounds[game.view]}
+          label={`Round ${game.view + 1} · ${tabs[game.view].label}`}
+          game={game}
+          isLast={game.view === rounds.length - 1}
+        />
+      )}
     </div>
+  );
+}
+
+function SynopsisRound({
+  index,
+  round,
+  label,
+  game,
+  isLast,
+}: {
+  index: number;
+  round: RedactedSynopsisRound;
+  label: string;
+  game: RoundGameState;
+  isLast: boolean;
+}) {
+  const record = game.records[index];
+  const fieldRef = useRef<TitleGuessFieldHandle | null>(null);
+  const [title, setTitle] = useState(String(record.answers.title ?? ""));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hints = Math.min(record.hints, MAX_REVEAL_HINTS);
+  const revealed = useMemo(() => revealedIndices(round, hints), [hints, round]);
+  const hintCost = hints * REVEAL_HINT_COST;
+
+  const submit = useCallback(
+    async (event?: FormEvent) => {
+      event?.preventDefault();
+      if (busy) return;
+      const selection = fieldRef.current?.submit() ?? null;
+      const guess = (selection?.value ?? title).trim();
+      if (!guess) {
+        // One answer per round: never spend it on an accidental blank.
+        setError("Type an anime title first.");
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        const correct = guess
+          ? (await verifyGuess(round.mediaId, guess, selection?.suggestionId))
+              .animeMatch
+          : false;
+        game.submitRound(index, {
+          answers: { title: guess },
+          guesses: guess ? [guess] : [],
+          outcome: buildOutcome(
+            [
+              line(
+                "Title",
+                guess,
+                round.answer,
+                correct ? "correct" : "wrong",
+                ROUND_POINTS,
+              ),
+            ],
+            hintCost,
+          ),
+        });
+      } catch (caught) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Couldn't check your answer. Try again.",
+        );
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, game, hintCost, index, round, title],
+  );
+
+  if (record.submitted && record.outcome) {
+    return (
+      <RoundResult
+        roundLabel={label}
+        outcome={record.outcome}
+        answerTitle={round.answer}
+        subtitle={
+          round.solution.titles.english &&
+          round.solution.titles.english !== round.answer
+            ? round.solution.titles.english
+            : null
+        }
+        coverImage={round.solution.coverImage}
+        aniListUrl={round.solution.aniListUrl}
+        media={
+          <details className="rounded-md border border-line bg-ink p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-paper">
+              Full synopsis
+            </summary>
+            <div className="mt-2">
+              <SynopsisText round={round} revealed={new Set()} showAll />
+            </div>
+          </details>
+        }
+        onNext={game.advance}
+        nextLabel={isLast ? "See final score" : "Next round"}
+      />
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <div className="rounded-lg border border-line-strong bg-panel p-4 sm:p-5">
+        <SynopsisText round={round} revealed={revealed} />
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <HintButton
+          label="Reveal some words"
+          cost={REVEAL_HINT_COST}
+          disabled={hints >= MAX_REVEAL_HINTS}
+          used="No reveals left"
+          onClick={() => game.takeHint(index)}
+        />
+        <span className="text-sm text-muted">
+          {hints}/{MAX_REVEAL_HINTS} reveals used. Title words stay hidden.
+        </span>
+      </div>
+      <div className="space-y-2">
+        <label
+          htmlFor={`synopsis-title-${index}`}
+          className="text-sm font-semibold text-paper"
+        >
+          Which anime is this?
+        </label>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <TitleGuessField
+            ref={fieldRef}
+            id={`synopsis-title-${index}`}
+            className="w-full"
+            value={title}
+            onValueChange={setTitle}
+            onSubmit={() => void submit()}
+            disabled={busy}
+            placeholder="Type an anime title…"
+            ariaLabel="Synopsis anime title"
+            suggestionsLabel="Synopsis title suggestions"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="button button-primary shrink-0 disabled:opacity-60"
+          >
+            {busy ? "Checking…" : "Lock in answer"}
+          </button>
+        </div>
+        <p className="text-sm text-muted">
+          One answer per round, worth {ROUND_POINTS} points
+          {hintCost > 0 ? ` (−${hintCost} for reveals)` : ""}.
+        </p>
+      </div>
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+        >
+          {error}
+        </p>
+      ) : null}
+    </form>
   );
 }

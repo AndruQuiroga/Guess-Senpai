@@ -50,6 +50,8 @@ export interface PosterZoomRound {
   answer: string;
   meta: PosterZoomMeta;
   cropStages: PosterCropStage[];
+  /** Rounds v3: answer card for the results screen. */
+  solution?: SolutionPayload | null;
 }
 
 export interface PosterZoomGame {
@@ -62,6 +64,17 @@ export interface RedactedSynopsisSegment {
   masked: boolean;
 }
 
+export interface RedactedSynopsisRound {
+  order: number;
+  difficulty: number;
+  mediaId: number;
+  answer: string;
+  segments: RedactedSynopsisSegment[];
+  /** Masked word indices in the order hints reveal them. */
+  masked_word_indices: number[];
+  solution: SolutionPayload;
+}
+
 export interface RedactedSynopsisGame {
   spec: RoundSpec[];
   answer: string;
@@ -69,6 +82,8 @@ export interface RedactedSynopsisGame {
   segments: RedactedSynopsisSegment[];
   masked_word_indices: number[];
   masked_words: string[];
+  /** Rounds v3: Easy/Medium/Hard rounds, each a different anime. */
+  rounds?: RedactedSynopsisRound[];
 }
 
 export interface CharacterSilhouetteRound {
@@ -98,6 +113,9 @@ export interface CharacterGuessEntry {
   animeAnswer: string;
   animeAliases: string[];
   reveal: CharacterGuessReveal;
+  /** Rounds v3: the anime this card belongs to (cards differ per round). */
+  mediaId?: number | null;
+  animeCover?: string | null;
 }
 
 export interface CharacterGuessRound {
@@ -118,6 +136,9 @@ export interface OpeningClip {
   videoUrl?: string | null;
   mimeType?: string | null;
   lengthSeconds?: number | null;
+  /** Playable window in seconds; nothing outside it is exposed. */
+  startSeconds?: number | null;
+  endSeconds?: number | null;
 }
 
 export interface GuessOpeningMeta {
@@ -131,6 +152,7 @@ export interface GuessOpeningMeta {
 
 export interface GuessOpeningRound {
   order: number;
+  difficulty?: number | null;
   mediaId: number;
   spec: RoundSpec[];
   answer: string;

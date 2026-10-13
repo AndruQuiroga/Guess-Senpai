@@ -94,19 +94,13 @@ export default function Anidle({
           newPuzzleBusy={newPuzzleBusy}
         />
       ) : null}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
-        <GuessGrid
-          evaluations={views}
-          animateIndex={game.lastAddedIndex}
-          hydrating={game.hydrating}
-          hydrationProgress={game.hydrationProgress}
-        />
-        {game.hydrating ? null : (
-          <div className="order-first lg:order-none lg:sticky lg:top-6">
-            <KnowledgeSummary evaluations={views} />
-          </div>
-        )}
-      </div>
+      {game.hydrating ? null : <KnowledgeSummary evaluations={views} />}
+      <GuessGrid
+        evaluations={views}
+        animateIndex={game.lastAddedIndex}
+        hydrating={game.hydrating}
+        hydrationProgress={game.hydrationProgress}
+      />
     </div>
   );
 }

@@ -26,6 +26,7 @@ from app.services.anilist import (
     CharacterName,
     Media,
     MediaCharacterEdge,
+    MediaCharacters,
     MediaList,
     MediaListCollection,
     MediaListEntry,
@@ -73,9 +74,12 @@ def make_media(media_id: int, title: str) -> Media:
     )
 
 
-def make_guess_opening(media: Media, *, order: int = 1, total_rounds: int = 3) -> GuessOpeningRound:
+def make_guess_opening(
+    media: Media, *, order: int = 1, total_rounds: int = 3, difficulty: int | None = None
+) -> GuessOpeningRound:
     return GuessOpeningRound(
         order=order,
+        difficulty=difficulty,
         mediaId=media.id,
         spec=[RoundSpec(difficulty=1, hints=["length"])],
         answer=media.title.english or "Unknown",
@@ -495,3 +499,92 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
     assert result.games.character_silhouette is not None
     assert result.games.guess_the_opening is not None
     assert len(attempts) >= 4
+
+
+def _media_with_character(media_id: int, title: str, popularity: int) -> Media:
+    media = make_media(media_id, title)
+    media.popularity = popularity
+    media.description = f"{title} follows a hero through a long and winding adventure story."
+    edge = make_character_edge(media_id)
+    media.characters = MediaCharacters(edges=[edge])
+    return media
+
+
+def test_popularity_tiers_split_the_ranking_in_thirds() -> None:
+    ranking = [_media_with_character(i, f"M{i}", popularity=1000 - i) for i in range(9)]
+    tiers = engine._popularity_tiers(ranking)
+    assert tiers[1] == {0, 1, 2}
+    assert tiers[2] == {3, 4, 5}
+    assert tiers[3] == {6, 7, 8}
+    # An exhausted tier widens to its neighbour instead of failing.
+    picked = engine._tier_candidates(ranking, tiers, 3, excluded_ids={6, 7, 8})
+    assert {media.id for media in picked} == {3, 4, 5}
+
+
+def test_tiered_poster_crops_never_show_the_whole_poster() -> None:
+    media = make_media(5, "Poster")
+    for difficulty, scales in engine.POSTER_ZOOM_SCALES.items():
+        stages = engine._build_poster_crop_stages(media, difficulty)
+        assert [stage.scale for stage in stages] == list(scales)
+        assert min(stage.scale for stage in stages) > 1.0
+    # Legacy (difficulty 0) keeps its final full-poster stage.
+    assert engine._build_poster_crop_stages(media)[-1].scale == 1.0
+
+
+@pytest.mark.asyncio
+async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
+    day = date(2024, 2, 1)
+    popular = [_media_with_character(900 + i, f"Show {i}", popularity=100_000 - i * 1000) for i in range(45)]
+    media_by_id = {media.id: media for media in popular}
+    tiers = engine._popularity_tiers(popular)
+
+    async def fake_load_popular_pool(day_value, cache, settings):
+        return list(popular)
+
+    async def fake_load_media_details(media_id: int, cache, settings):
+        return media_by_id[media_id]
+
+    async def fake_build_guess_opening_round(media: Media, cache, **kwargs):
+        return make_guess_opening(media, **kwargs)
+
+    monkeypatch.setattr(engine, "_load_popular_pool", fake_load_popular_pool)
+    monkeypatch.setattr(engine, "_load_media_details", fake_load_media_details)
+    monkeypatch.setattr(engine, "_build_guess_opening_round", fake_build_guess_opening_round)
+
+    result = await engine._assemble_daily_puzzle(day, user=None, include_guess_opening=True, cache=DummyCache())
+
+    poster = result.games.poster_zoomed.puzzle.rounds
+    assert [r.difficulty for r in poster] == [1, 2, 3]
+    assert all(r.mediaId in tiers[r.difficulty] for r in poster)
+    assert all(r.solution is not None for r in poster)
+
+    synopsis = result.games.redacted_synopsis.puzzle.rounds
+    assert [r.difficulty for r in synopsis] == [1, 2, 3]
+    assert all(r.mediaId in tiers[r.difficulty] and r.masked_word_indices for r in synopsis)
+    assert result.games.redacted_synopsis.puzzle.answer == synopsis[0].answer
+
+    characters = result.games.character_silhouette.puzzle.rounds
+    assert [r.difficulty for r in characters] == [1, 2, 3]
+    card_media = [entry.mediaId for r in characters for entry in r.entries]
+    assert all(len(r.entries) == engine.CHARACTERS_PER_ROUND for r in characters)
+    assert len(card_media) == len(set(card_media))
+    for r in characters:
+        assert all(entry.mediaId in tiers[r.difficulty] for entry in r.entries)
+
+    openings = result.games.guess_the_opening.puzzle.rounds
+    assert [r.difficulty for r in openings] == [1, 2, 3]
+
+    every_round = (
+        [r.mediaId for r in poster] + [r.mediaId for r in synopsis] + card_media + [r.mediaId for r in openings]
+    )
+    assert len(every_round) == len(set(every_round))
+
+
+def test_sequels_are_detected_from_relations() -> None:
+    first = make_media(1, "Show")
+    sequel = make_media(2, "Show Season 2")
+    sequel.relations = {"edges": [{"relationType": "PREQUEL"}, {"relationType": "SEQUEL"}]}
+    first.relations = {"edges": [{"relationType": "SEQUEL"}]}
+    assert engine._is_sequel(sequel) is True
+    assert engine._is_sequel(first) is False
+    assert engine._is_sequel(make_media(3, "No relations")) is False

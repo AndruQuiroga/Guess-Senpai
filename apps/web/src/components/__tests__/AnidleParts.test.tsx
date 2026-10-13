@@ -77,6 +77,15 @@ describe("scalar and list tiles", () => {
   });
 });
 
+/** Body rows of the guess table (row 0 is the column header). */
+const bodyRows = () => screen.getAllByRole("row").slice(1);
+
+/** Chip values in a cell, prefixed with their ✓/✗ marker. */
+const chips = (cell: HTMLElement) =>
+  Array.from(cell.querySelectorAll("li")).map((item) =>
+    item.textContent?.replace(/^([✓✗])/, "$1 "),
+  );
+
 describe("episodes and format columns", () => {
   it("points the episodes arrow toward the answer and tones closeness", () => {
     expect(scalarTile("episodes", evaluation().episodes!)).toMatchObject({
@@ -110,7 +119,7 @@ describe("episodes and format columns", () => {
         ]}
       />,
     );
-    const row = screen.getAllByRole("row")[0];
+    const row = bodyRows()[0];
     expect(within(row).getAllByRole("cell")).toHaveLength(9);
     expect(
       within(row).getByText("Episodes 12: the answer is higher"),
@@ -119,8 +128,13 @@ describe("episodes and format columns", () => {
     expect(within(row).getByText("Format: 0 of 1 match")).toBeInTheDocument();
     const cover = row.querySelector("img");
     expect(cover).toHaveAttribute("src", "https://img.example/cover.jpg");
-    expect(within(row).getByText("Episodes")).toBeInTheDocument();
-    expect(within(row).getByText("Format")).toBeInTheDocument();
+    const header = screen.getAllByRole("row")[0];
+    expect(
+      within(header).getByRole("columnheader", { name: "Episodes" }),
+    ).toBeInTheDocument();
+    expect(
+      within(header).getByRole("columnheader", { name: "Format" }),
+    ).toBeInTheDocument();
   });
 
   it("shows a no-data tile for guesses saved before the new columns existed", () => {
@@ -129,7 +143,7 @@ describe("episodes and format columns", () => {
         evaluations={[evaluation({ episodes: undefined, format: undefined })]}
       />,
     );
-    const row = screen.getAllByRole("row")[0];
+    const row = bodyRows()[0];
     expect(within(row).getByText("Episodes: no data")).toBeInTheDocument();
     expect(within(row).getByText("Format: No data")).toBeInTheDocument();
   });
@@ -145,7 +159,7 @@ describe("GuessGrid", () => {
         ]}
       />,
     );
-    const rows = screen.getAllByRole("row");
+    const rows = bodyRows();
     expect(rows[0]).toHaveTextContent("Second");
     expect(rows[1]).toHaveTextContent("First");
     const cells = within(rows[0]).getAllByRole("cell");
@@ -158,15 +172,33 @@ describe("GuessGrid", () => {
     expect(screen.getByRole("list", { name: "Legend" })).toBeInTheDocument();
   });
 
-  it("lists every matched and missed genre, tag and studio", () => {
+  it("lists every matched and missed genre and tag, one column each", () => {
     render(<GuessGrid evaluations={[evaluation()]} />);
-    const row = screen.getAllByRole("row")[0];
-    expect(within(row).getByText("✓ Action")).toBeInTheDocument();
-    expect(within(row).getByText("✗ Drama")).toBeInTheDocument();
-    expect(within(row).getByText("✓ D")).toBeInTheDocument();
-    expect(within(row).getByText("✗ E")).toBeInTheDocument();
-    expect(within(row).getByText("✗ Bones")).toBeInTheDocument();
-    expect(within(row).queryByText(/^\+\d/)).toBeNull();
+    const cells = within(bodyRows()[0]).getAllByRole("cell");
+    // Year, Score, Popularity, Episodes, Format, Source, Genres, Tags, Studio.
+    expect(chips(cells[6])).toEqual(["✓ Action", "✗ Drama"]);
+    expect(chips(cells[7])).toEqual(["✓ A", "✓ B", "✓ C", "✓ D", "✗ E"]);
+    expect(chips(cells[8])).toEqual(["✗ Bones"]);
+  });
+
+  it("keeps the studio column to two entries", () => {
+    render(
+      <GuessGrid
+        evaluations={[
+          evaluation({
+            studios: [
+              { value: "MAPPA", status: "match" },
+              { value: "Aniplex", status: "miss" },
+              { value: "Toho", status: "miss" },
+              { value: "Dentsu", status: "miss" },
+            ],
+          }),
+        ]}
+      />,
+    );
+    const studio = within(bodyRows()[0]).getAllByRole("cell")[8];
+    expect(chips(studio)).toEqual(["✓ MAPPA", "✗ Aniplex", "+2"]);
+    expect(studio).toHaveTextContent("Studio: 1 of 4 match: MAPPA");
   });
 
   it("only animates the freshly added row", () => {
@@ -176,7 +208,7 @@ describe("GuessGrid", () => {
         animateIndex={1}
       />,
     );
-    const rows = container.querySelectorAll('[role="row"]');
+    const rows = container.querySelectorAll("tbody tr");
     expect(rows[0].querySelectorAll(".anidle-reveal").length).toBeGreaterThan(
       0,
     );

@@ -1,86 +1,65 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 
-import SynopsisRedacted from "../SynopsisRedacted";
-import { GameShell } from "../GameShell";
+import SynopsisRedacted, {
+  MAX_REVEAL_HINTS,
+  REVEAL_HINT_COST,
+  synopsisRounds,
+} from "../SynopsisRedacted";
+import { ROUND_RULES, RoundGamePage } from "./RoundGamePage";
 import type { GameProgress } from "../../types/progress";
-import { RedactedSynopsisGame } from "../../types/puzzles";
+import type {
+  RedactedSynopsisGame,
+  SolutionPayload,
+} from "../../types/puzzles";
 
 interface Props {
   mediaId: number;
   payload: RedactedSynopsisGame;
+  solution?: SolutionPayload | null;
   progress?: GameProgress;
-  accountDifficulty?: number;
-  difficultyHint?: number;
   onProgressChange: (state: GameProgress) => void;
   nextSlug?: string | null;
 }
 
+const RULES = [
+  ...ROUND_RULES,
+  "Name the anime from its synopsis with most words blacked out.",
+  `Hints: reveal some hidden words (−${REVEAL_HINT_COST} each, up to ${MAX_REVEAL_HINTS} times). Words from the title are never revealed.`,
+];
+
 export function RedactedSynopsisPage({
   mediaId,
   payload,
+  solution,
   progress,
-  accountDifficulty,
-  difficultyHint,
   onProgressChange,
   nextSlug,
 }: Props) {
-  const controller = useRef<((round: number) => void) | null>(null);
-  const [controllerReady, setControllerReady] = useState(false);
-  const totalRounds = 3;
-
-  const clampDifficulty = useCallback(
-    (value: number | undefined | null) => {
-      if (typeof value !== "number" || Number.isNaN(value)) {
-        return undefined;
-      }
-      const rounded = Math.round(value);
-      return Math.max(1, Math.min(totalRounds, rounded));
-    },
-    [totalRounds],
+  const roundCount = useMemo(
+    () => synopsisRounds(payload, mediaId, solution).length,
+    [mediaId, payload, solution],
   );
-
-  const selectedDifficulty = clampDifficulty(accountDifficulty);
-  const recommendedDifficulty = clampDifficulty(difficultyHint);
-  const highlightDifficulty = selectedDifficulty ?? recommendedDifficulty ?? 1;
-
-  useEffect(() => {
-    controller.current = null;
-    setControllerReady(false);
-  }, [mediaId]);
-
-  useEffect(() => {
-    if (!controllerReady) return;
-    if (progress?.completed) return;
-    controller.current?.(highlightDifficulty);
-  }, [controllerReady, highlightDifficulty, progress?.completed]);
-
   return (
-    <div className="space-y-6">
-      <GameShell
-        title="Redacted Synopsis"
-        status={
-          <>
-            {progress?.completed
-              ? "Revealed"
-              : `Hint ${Math.min(totalRounds, progress?.round ?? highlightDifficulty)} / ${totalRounds}`}
-          </>
-        }
-      >
+    <RoundGamePage
+      title="Redacted Synopsis"
+      slug="redacted-synopsis"
+      roundCount={roundCount}
+      progress={progress}
+      onProgressChange={onProgressChange}
+      rules={RULES}
+    >
+      {(handleProgressChange) => (
         <SynopsisRedacted
-          mediaId={mediaId}
           payload={payload}
+          mediaId={mediaId}
+          solution={solution}
           initialProgress={progress}
-          onProgressChange={onProgressChange}
-          registerRoundController={(fn) => {
-            controller.current = fn;
-            setControllerReady(true);
-          }}
+          onProgressChange={handleProgressChange}
           nextSlug={nextSlug}
-          accountDifficulty={selectedDifficulty}
         />
-      </GameShell>
-    </div>
+      )}
+    </RoundGamePage>
   );
 }

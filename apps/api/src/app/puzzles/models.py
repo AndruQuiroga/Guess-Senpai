@@ -75,6 +75,8 @@ class PosterZoomRound(BaseModel):
     answer: str
     meta: PosterZoomMeta
     cropStages: List[PosterCropStage] = Field(default_factory=list)
+    # Rounds v3: the round's own answer card for the results screen.
+    solution: Optional[SolutionPayload] = None
 
 
 class PosterZoomGame(BaseModel):
@@ -87,6 +89,19 @@ class RedactedSynopsisSegment(BaseModel):
     masked: bool = False
 
 
+class RedactedSynopsisRound(BaseModel):
+    """One Easy/Medium/Hard synopsis round, each a different anime."""
+
+    order: int
+    difficulty: int
+    mediaId: int
+    answer: str
+    segments: List[RedactedSynopsisSegment] = Field(default_factory=list)
+    # Masked word indices in the order hints reveal them (title words last).
+    masked_word_indices: List[int] = Field(default_factory=list)
+    solution: SolutionPayload
+
+
 class RedactedSynopsisGame(BaseModel):
     spec: List[RoundSpec]
     answer: str
@@ -94,6 +109,7 @@ class RedactedSynopsisGame(BaseModel):
     segments: List[RedactedSynopsisSegment] = Field(default_factory=list)
     masked_word_indices: List[int] = Field(default_factory=list)
     masked_words: List[str] = Field(default_factory=list)
+    rounds: List[RedactedSynopsisRound] = Field(default_factory=list)
 
 
 class CharacterSilhouetteRound(BaseModel):
@@ -123,6 +139,9 @@ class CharacterGuessEntry(BaseModel):
     animeAnswer: str
     animeAliases: List[str] = Field(default_factory=list)
     reveal: CharacterGuessReveal
+    # Rounds v3: each card can come from a different anime.
+    mediaId: Optional[int] = None
+    animeCover: Optional[str] = None
 
 
 class CharacterGuessRound(BaseModel):
@@ -143,6 +162,9 @@ class OpeningClip(BaseModel):
     videoUrl: Optional[str] = None
     mimeType: Optional[str] = None
     lengthSeconds: Optional[int] = None
+    # Playable window; the player never exposes anything outside it.
+    startSeconds: Optional[float] = None
+    endSeconds: Optional[float] = None
 
 
 class GuessOpeningMeta(BaseModel):
@@ -156,6 +178,7 @@ class GuessOpeningMeta(BaseModel):
 
 class GuessOpeningRound(BaseModel):
     order: int
+    difficulty: Optional[int] = None
     mediaId: int
     spec: List[RoundSpec]
     answer: str
@@ -307,6 +330,11 @@ class GameRoundProgressPayload(BaseModel):
         validation_alias=AliasChoices("resolvedYear", "resolved_year"),
         serialization_alias="resolvedYear",
     )
+    # Rounds v3 (one submission per round): what was played and what it scored.
+    points: Optional[int] = Field(default=None, ge=0)
+    hints: Optional[int] = Field(default=None, ge=0)
+    answers: Optional[Dict[str, Any]] = None
+    result: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="after")
     def _normalize(self) -> "GameRoundProgressPayload":

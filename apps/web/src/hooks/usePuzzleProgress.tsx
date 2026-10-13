@@ -446,6 +446,22 @@ function normalizeGameRoundProgress(value: unknown): GameRoundProgress | null {
     }
   }
 
+  // Rounds v3: one scored submission per round.
+  const points = coercePositiveInteger(record.points, 0);
+  if (points !== undefined) {
+    normalized.points = points;
+  }
+  const hints = coercePositiveInteger(record.hints, 0);
+  if (hints !== undefined) {
+    normalized.hints = hints;
+  }
+  if (record.answers && typeof record.answers === "object") {
+    normalized.answers = record.answers as Record<string, unknown>;
+  }
+  if (record.result && typeof record.result === "object") {
+    normalized.result = record.result as Record<string, unknown>;
+  }
+
   return normalized;
 }
 

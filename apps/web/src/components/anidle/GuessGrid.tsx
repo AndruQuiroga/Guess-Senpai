@@ -9,17 +9,20 @@ import {
   scalarFeedback,
   scalarTile,
   type AnidleEvaluationView,
+  type ListKey,
   type Tone,
 } from "./tiles";
 
 /*
- * Layout: every guess is a card at every width. The header carries the cover
- * and title, then one row of compact tiles (year, score, popularity, episodes,
- * format, source), then one labelled line each for genres, tags and studio
- * listing every value with its own match/miss chip. A wide table squeezed ten
- * columns into the content width and hid misses behind "+n" counters.
+ * Layout: a real table with one column per attribute (Title, Year, Score,
+ * Popularity, Episodes, Format, Source, Genres, Tags, Studio), newest guess on
+ * top. It scrolls sideways on narrow screens with the title column pinned.
+ * Every cell carries a screen-reader sentence, and tone is always backed by an
+ * icon or text. List columns show every value, matches (✓) before misses (✗);
+ * Studio shows two and folds the rest into "+n".
  */
 const STAGGER_MS = 70;
+const STUDIO_LIMIT = 2;
 
 const REVEAL_CSS = `
 @keyframes anidle-reveal {
@@ -41,102 +44,86 @@ function revealProps(index: number | null) {
     : { className: "", style: undefined };
 }
 
-function Tile({
+const CELL = "border-b border-line px-0.5 py-1 align-top";
+
+function Swatch({
   tone,
-  label,
-  caption,
   animateIndex,
   children,
 }: {
   tone: Tone;
-  label: string;
-  caption: string;
   animateIndex: number | null;
   children: ReactNode;
 }) {
   const reveal = revealProps(animateIndex);
   return (
     <div
-      role="cell"
-      data-tone={tone}
-      className={`flex min-h-[3.25rem] min-w-0 flex-col justify-center rounded-md border px-2 py-1.5 text-sm font-semibold ${TONE_CLASS[tone]} ${reveal.className}`}
+      className={`flex min-h-[2.75rem] flex-col justify-center rounded-md border px-2 py-1 text-sm font-semibold ${TONE_CLASS[tone]} ${reveal.className}`}
       style={reveal.style}
     >
-      <span className="sr-only">{label}</span>
-      <span
-        aria-hidden
-        className="text-[0.65rem] font-bold uppercase leading-tight tracking-wide opacity-80"
-      >
-        {caption}
-      </span>
-      <span aria-hidden className="min-w-0 truncate">
-        {children}
-      </span>
+      {children}
     </div>
   );
 }
 
 const CHIP =
-  "inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-semibold leading-tight";
-const CHIP_MATCH = `${CHIP} border-correct bg-correct text-ink`;
-const CHIP_MISS = `${CHIP} border-line bg-ink text-muted`;
+  "inline-flex max-w-[8.5rem] items-center rounded px-1.5 py-0.5 text-xs font-semibold leading-tight";
 
-function ListLine({
-  caption,
-  label,
-  tone,
+function ListCell({
+  columnKey,
   matched,
   missed,
   animateIndex,
 }: {
-  caption: string;
-  label: string;
-  tone: Tone;
+  columnKey: ListKey;
   matched: string[];
   missed: string[];
   animateIndex: number | null;
 }) {
   const reveal = revealProps(animateIndex);
+  const all = [
+    ...matched.map((value) => ({ value, match: true })),
+    ...missed.map((value) => ({ value, match: false })),
+  ];
+  const limit = columnKey === "studios" ? STUDIO_LIMIT : all.length;
+  const shown = all.slice(0, limit);
+  const hidden = all.slice(limit);
+  if (all.length === 0) {
+    return <span className="px-1 text-xs text-muted">—</span>;
+  }
   return (
-    <div
-      role="cell"
-      data-tone={tone}
-      className={`flex min-w-0 items-start gap-3 ${reveal.className}`}
+    <ul
+      className={`flex flex-col items-start gap-1 ${reveal.className}`}
       style={reveal.style}
     >
-      <span className="sr-only">{label}</span>
-      <span
-        aria-hidden
-        className="w-14 shrink-0 pt-1 text-[0.65rem] font-bold uppercase tracking-wide text-muted"
-      >
-        {caption}
-      </span>
-      <span aria-hidden className="flex min-w-0 flex-1 flex-wrap gap-1">
-        {matched.length + missed.length === 0 ? (
-          <span className="pt-0.5 text-xs text-muted">—</span>
-        ) : null}
-        {matched.map((value) => (
-          <span key={`m-${value}`} className={CHIP_MATCH}>
-            ✓ {value}
+      {shown.map((item) => (
+        <li
+          key={`${item.match ? "m" : "x"}-${item.value}`}
+          className={`${CHIP} ${
+            item.match
+              ? "bg-correct text-ink"
+              : "border border-line bg-ink text-muted"
+          }`}
+        >
+          <span aria-hidden className="mr-1">
+            {item.match ? "✓" : "✗"}
           </span>
-        ))}
-        {missed.map((value) => (
-          <span key={`x-${value}`} className={CHIP_MISS}>
-            ✗ {value}
+          <span className="truncate" title={item.value}>
+            {item.value}
           </span>
-        ))}
-      </span>
-    </div>
+        </li>
+      ))}
+      {hidden.length > 0 ? (
+        <li
+          className={`${CHIP} border border-line bg-ink text-muted`}
+          title={hidden.map((item) => item.value).join(", ")}
+        >
+          +{hidden.length}
+        </li>
+      ) : null}
+    </ul>
   );
 }
-
-const TILE_LIST_KEYS = new Set(["format", "source"]);
-const TILE_LISTS = LIST_COLUMNS.filter((column) =>
-  TILE_LIST_KEYS.has(column.key),
-);
-const LINE_LISTS = LIST_COLUMNS.filter(
-  (column) => !TILE_LIST_KEYS.has(column.key),
-);
 
 interface GridRowProps {
   evaluation: AnidleEvaluationView;
@@ -147,111 +134,105 @@ interface GridRowProps {
 function GridRow({ evaluation, attempt, animate }: GridRowProps) {
   let cellIndex = 0;
   const next = () => (animate ? cellIndex++ : null);
-  const header = revealProps(next());
+  const title = revealProps(next());
   return (
-    <div
-      role="row"
-      data-solved={evaluation.correct ? "true" : undefined}
-      className={`space-y-2.5 rounded-lg border p-3 ${
-        evaluation.correct
-          ? "border-correct bg-correct-soft"
-          : "border-line bg-panel"
-      }`}
-    >
-      <div
-        role="rowheader"
-        className={`flex min-w-0 items-center gap-3 ${header.className}`}
-        style={header.style}
+    <tr data-solved={evaluation.correct ? "true" : undefined}>
+      <th
+        scope="row"
+        className={`${CELL} sticky left-0 z-10 bg-surface-raised text-left font-normal`}
       >
-        {evaluation.coverImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={evaluation.coverImage}
-            alt=""
-            width={36}
-            height={50}
-            className="h-[50px] w-9 shrink-0 rounded-sm object-cover"
-          />
-        ) : null}
-        <p className="min-w-0 flex-1 break-words text-base font-semibold leading-snug text-paper">
-          {evaluation.correct ? (
-            <span aria-hidden className="mr-1 text-correct">
-              ✓
-            </span>
+        <div
+          className={`flex w-36 min-w-0 items-center gap-2 rounded-md border px-2 py-1 xl:w-40 ${
+            evaluation.correct
+              ? "border-correct bg-correct-soft"
+              : "border-line"
+          } ${title.className}`}
+          style={title.style}
+        >
+          {evaluation.coverImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={evaluation.coverImage}
+              alt=""
+              width={28}
+              height={40}
+              className="h-10 w-7 shrink-0 rounded-sm object-cover"
+            />
           ) : null}
-          {evaluation.title}
-        </p>
-        <p className="shrink-0 text-xs font-semibold text-muted">
-          Guess {attempt}
-          {evaluation.correct ? (
-            <span className="sr-only"> · correct answer</span>
-          ) : null}
-        </p>
-      </div>
-      <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-        {SCALAR_COLUMNS.map((column) => {
-          const tile = scalarTile(
-            column.key,
-            scalarFeedback(evaluation, column.key),
-          );
-          return (
-            <Tile
-              key={column.key}
-              tone={tile.tone}
-              label={tile.label}
-              caption={column.label}
-              animateIndex={next()}
-            >
-              <span>{tile.value}</span>
-              <span className="ml-1 text-base leading-none">{tile.icon}</span>
+          <div className="min-w-0">
+            <p className="line-clamp-2 break-words text-sm font-semibold leading-snug text-paper">
+              {evaluation.correct ? (
+                <span aria-hidden className="mr-1 text-correct">
+                  ✓
+                </span>
+              ) : null}
+              {evaluation.title}
+            </p>
+            <p className="text-xs text-muted">
+              Guess {attempt}
+              {evaluation.correct ? (
+                <span className="sr-only"> · correct answer</span>
+              ) : null}
+            </p>
+          </div>
+        </div>
+      </th>
+      {SCALAR_COLUMNS.map((column) => {
+        const tile = scalarTile(
+          column.key,
+          scalarFeedback(evaluation, column.key),
+        );
+        return (
+          <td key={column.key} data-tone={tile.tone} className={CELL}>
+            <span className="sr-only">{tile.label}</span>
+            <Swatch tone={tile.tone} animateIndex={next()}>
+              <span aria-hidden className="whitespace-nowrap">
+                {tile.value}
+                <span className="ml-1 text-base leading-none">{tile.icon}</span>
+              </span>
               {tile.season ? (
-                <span className="block text-[0.65rem] font-bold uppercase leading-tight">
+                <span
+                  aria-hidden
+                  className="text-[0.65rem] font-bold uppercase leading-tight"
+                >
                   {tile.season}
                 </span>
               ) : null}
-            </Tile>
-          );
-        })}
-        {TILE_LISTS.map((column) => {
-          const tile = listTile(
-            listFeedback(evaluation, column.key),
-            column.cap,
-          );
-          return (
-            <Tile
-              key={column.key}
-              tone={tile.tone}
-              label={`${column.label}: ${tile.label}`}
-              caption={column.label}
-              animateIndex={next()}
-            >
-              {tile.total === 0
-                ? "—"
-                : `${tile.matched.length ? "✓ " : ""}${
-                    tile.matched[0] ?? tile.unmatched[0]
-                  }`}
-            </Tile>
-          );
-        })}
-      </div>
-      <div className="space-y-1.5">
-        {LINE_LISTS.map((column) => {
-          const items = listFeedback(evaluation, column.key);
-          const tile = listTile(items, items.length);
-          return (
-            <ListLine
-              key={column.key}
-              caption={column.label}
-              label={`${column.label}: ${tile.label}`}
-              tone={tile.tone}
-              matched={tile.matched}
-              missed={tile.unmatched}
-              animateIndex={next()}
-            />
-          );
-        })}
-      </div>
-    </div>
+            </Swatch>
+          </td>
+        );
+      })}
+      {LIST_COLUMNS.map((column) => {
+        const items = listFeedback(evaluation, column.key);
+        const tile = listTile(items, items.length);
+        const single = column.cap === 1;
+        return (
+          <td key={column.key} data-tone={tile.tone} className={CELL}>
+            <span className="sr-only">{`${column.label}: ${tile.label}`}</span>
+            <div aria-hidden>
+              {single ? (
+                <Swatch tone={tile.tone} animateIndex={next()}>
+                  <span className="whitespace-nowrap">
+                    {tile.total === 0
+                      ? "—"
+                      : `${tile.matched.length ? "✓ " : ""}${
+                          tile.matched[0] ?? tile.unmatched[0]
+                        }`}
+                  </span>
+                </Swatch>
+              ) : (
+                <ListCell
+                  columnKey={column.key}
+                  matched={tile.matched}
+                  missed={tile.unmatched}
+                  animateIndex={next()}
+                />
+              )}
+            </div>
+          </td>
+        );
+      })}
+    </tr>
   );
 }
 
@@ -327,19 +308,47 @@ export function GuessGrid({
       <style>{REVEAL_CSS}</style>
       <GridLegend />
       <div className="relative min-h-[4rem]">
-        <div role="table" aria-label="Guess history" className="space-y-2.5">
-          {rows.map(({ evaluation, index }) => (
-            <GridRow
-              key={index}
-              evaluation={evaluation}
-              attempt={index + 1}
-              animate={animateIndex === index}
-            />
-          ))}
+        <div className="overflow-x-auto rounded-lg border border-line bg-surface-raised">
+          <table className="w-full min-w-[52rem] border-collapse text-left">
+            <caption className="sr-only">
+              Guess history, newest first. Each column compares one attribute
+              with the answer.
+            </caption>
+            <thead>
+              <tr className="text-xs font-semibold uppercase tracking-wide text-muted">
+                <th
+                  scope="col"
+                  className="sticky left-0 z-10 bg-surface-raised px-2 py-2"
+                >
+                  Title
+                </th>
+                {SCALAR_COLUMNS.map((column) => (
+                  <th scope="col" className="px-2 py-2" key={column.key}>
+                    {column.label}
+                  </th>
+                ))}
+                {LIST_COLUMNS.map((column) => (
+                  <th scope="col" className="px-2 py-2" key={column.key}>
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ evaluation, index }) => (
+                <GridRow
+                  key={index}
+                  evaluation={evaluation}
+                  attempt={index + 1}
+                  animate={animateIndex === index}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
         {hydrating ? (
           <div
-            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-md bg-ink px-6 py-4 text-center"
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-md bg-ink px-6 py-4 text-center"
             role="status"
             aria-live="polite"
           >
