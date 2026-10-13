@@ -1,4 +1,9 @@
 import type { DailyProgress, GameKey, GameProgress } from "../types/progress";
+import {
+  anidleClueCost,
+  isAnidleClueId,
+  legacyAnidleClues,
+} from "../components/anidle/hints";
 import { ROUND_POINTS } from "../components/rounds/scoring";
 import { getGameOutcome } from "./gameAction";
 
@@ -12,7 +17,8 @@ import { getGameOutcome } from "./gameAction";
  * - Round games (rounds v3) score the points each played round earned, even
  *   before the last round is played.
  * - Anidle (rules v2): solved on attempt a of L scores
- *   POINTS_PER_GAME * (L - a + 1) / L; unsolved and exhausted score 0.
+ *   POINTS_PER_GAME * (L - a + 1) / L, minus the price of each bought clue
+ *   (genres, year, synopsis); unsolved and exhausted score 0.
  * - Older round records without points: each round scores
  *   max(25%, 100% - 25% * misses) of its share, where a miss is a wrong guess
  *   or an extra hint stage. The mode score is the mean over its rounds.
@@ -45,7 +51,11 @@ function scoreAnidle(progress: GameProgress): number {
   // Legacy records have no anidleHistory; their guess list is the best proxy.
   const used = count(progress.anidleHistory) || count(progress.guesses);
   const attempts = Math.min(limit, Math.max(1, used));
-  return Math.round((POINTS_PER_GAME * (limit - attempts + 1)) / limit);
+  const bought = progress.anidleHints?.length
+    ? progress.anidleHints.filter(isAnidleClueId)
+    : legacyAnidleClues(Math.max(0, finiteNumber(progress.hintsRevealed) ?? 0));
+  const base = (POINTS_PER_GAME * (limit - attempts + 1)) / limit;
+  return Math.max(0, Math.round(base - anidleClueCost(bought)));
 }
 
 function roundMisses(gameKey: GameKey, round: unknown): number {

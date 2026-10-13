@@ -104,8 +104,9 @@ export default function HowToPlayPage() {
               at once. Each card shows its own result.
             </li>
             <li>
-              Easy and Medium show shadows; Hard mixes a close-up, a pixel
-              mosaic and scrambled tiles. Sharpen a card for a points cost.
+              Every round uses popular characters: Easy is black and white,
+              Medium a full-colour close-up, Hard a full-colour mosaic. Buy a
+              clearer view of a card for a points cost.
             </li>
           </ul>
         </PanelSection>

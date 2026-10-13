@@ -37,6 +37,8 @@ function opening(
       songTitle: "Song",
       sequence: 1,
       season: null,
+      genres: ["Action", "Drama"],
+      year: 2019,
     },
     solution: {
       titles: { userPreferred: answer },
@@ -68,14 +70,25 @@ describe("GuessOpening rounds", () => {
     expect(video.className).toContain("opacity-0");
     expect(screen.getByText(/0:00 \/ 0:30/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Unlock video clue/ }));
+    // The video stays locked until the genres or the year is bought.
+    const video_ = () =>
+      screen.getByRole("button", { name: /buy video clue/i });
+    expect(video_()).toBeDisabled();
+    expect(
+      screen.getByText("Buy the genres or year first"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /buy release year/i }));
+    expect(screen.getByText("2019")).toBeInTheDocument();
+    expect(video_()).toBeEnabled();
+    fireEvent.click(video_());
     expect(document.querySelector("video")!.className).toContain(
       "aspect-video",
     );
     expect(progress.mock.calls.at(-1)?.[0].rounds[0]).toMatchObject({
-      hints: 1,
-      answers: { video: true },
+      hints: 2,
+      answers: { year: true, video: true },
     });
+    expect(screen.queryByText(/artist/i)).toBeNull();
   });
 
   it("loads each round's own clip and scores with clue costs", async () => {
@@ -83,8 +96,8 @@ describe("GuessOpening rounds", () => {
     render(<GuessOpening payload={rounds} onProgressChange={progress} />);
     expect(mediaSrc()).toBe("https://v.example/1.webm");
 
-    fireEvent.click(screen.getByRole("button", { name: /Show artist/ }));
-    expect(screen.getByText("Artist: Artist 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /buy genres/i }));
+    expect(screen.getByText("Action · Drama")).toBeInTheDocument();
     fireEvent.change(
       screen.getByRole("combobox", { name: "Opening anime title" }),
       {

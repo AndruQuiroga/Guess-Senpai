@@ -146,6 +146,9 @@ export interface GuessOpeningMeta {
   artist?: string | null;
   sequence?: number | null;
   season?: string | null;
+  /** Buyable clues (rounds v3). */
+  genres?: string[];
+  year?: number | null;
   roundOrder?: number | null;
   roundTotal?: number | null;
 }

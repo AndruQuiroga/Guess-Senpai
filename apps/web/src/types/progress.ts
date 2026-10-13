@@ -47,6 +47,8 @@ export interface GameProgress {
   attemptLimit?: number;
   /** Anidle hints the player chose to reveal (rules v2 hints are opt-in). */
   hintsRevealed?: number;
+  /** Anidle clue types bought (genres, year, synopsis), each priced. */
+  anidleHints?: string[];
 }
 
 export type DailyProgress = Partial<Record<GameKey, GameProgress>>;

@@ -15,7 +15,7 @@ import {
 } from "./games/TitleGuessField";
 import {
   GameSummary,
-  HintButton,
+  HintShop,
   LegacyFinished,
   RoundResult,
   RoundTabs,
@@ -302,17 +302,22 @@ function SynopsisRound({
       <div className="rounded-lg border border-line-strong bg-panel p-4 sm:p-5">
         <SynopsisText round={round} revealed={revealed} />
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <HintButton
-          label="Reveal some words"
-          cost={REVEAL_HINT_COST}
-          disabled={hints >= MAX_REVEAL_HINTS}
-          used="No reveals left"
-          onClick={() => game.takeHint(index)}
+      <div>
+        <HintShop
+          spent={hintCost}
+          disabled={busy}
+          onBuy={() => game.takeHint(index)}
+          clues={[
+            {
+              id: "reveal",
+              label: "Reveal some words",
+              cost: REVEAL_HINT_COST,
+              uses: { used: hints, max: MAX_REVEAL_HINTS },
+              reveal:
+                "Revealed words are highlighted. Title words stay hidden.",
+            },
+          ]}
         />
-        <span className="text-sm text-muted">
-          {hints}/{MAX_REVEAL_HINTS} reveals used. Title words stay hidden.
-        </span>
       </div>
       <div className="space-y-2">
         <label
@@ -342,10 +347,7 @@ function SynopsisRound({
             {busy ? "Checking…" : "Lock in answer"}
           </button>
         </div>
-        <p className="text-sm text-muted">
-          One answer per round, worth {ROUND_POINTS} points
-          {hintCost > 0 ? ` (−${hintCost} for reveals)` : ""}.
-        </p>
+        <p className="text-sm text-muted">One answer per round.</p>
       </div>
       {error ? (
         <p

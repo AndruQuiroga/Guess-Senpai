@@ -18,11 +18,19 @@ import {
  * Popularity, Episodes, Format, Source, Genres, Tags, Studio), newest guess on
  * top. It scrolls sideways on narrow screens with the title column pinned.
  * Every cell carries a screen-reader sentence, and tone is always backed by an
- * icon or text. List columns show every value, matches (✓) before misses (✗);
- * Studio shows two and folds the rest into "+n".
+ * icon or text. List columns show matches (✓) before misses (✗); genres are
+ * always complete, tags and studios fold the rest into "+n" so a long tag or
+ * production-committee list can't swamp the row. Inside the wide page layout
+ * every column fits without scrolling on a desktop screen.
  */
 const STAGGER_MS = 70;
-const STUDIO_LIMIT = 2;
+const LIST_LIMITS: Partial<Record<ListKey, number>> = { tags: 3, studios: 2 };
+/** Room for chips to wrap two or three to a line instead of stacking. */
+const LIST_WIDTHS: Partial<Record<ListKey, string>> = {
+  genres: "w-[13rem]",
+  tags: "w-[15rem]",
+  studios: "w-[12rem]",
+};
 
 const REVEAL_CSS = `
 @keyframes anidle-reveal {
@@ -44,7 +52,7 @@ function revealProps(index: number | null) {
     : { className: "", style: undefined };
 }
 
-const CELL = "border-b border-line px-0.5 py-1 align-top";
+const CELL = "border-b border-line px-1 py-1.5 align-top";
 
 function Swatch({
   tone,
@@ -58,7 +66,7 @@ function Swatch({
   const reveal = revealProps(animateIndex);
   return (
     <div
-      className={`flex min-h-[2.75rem] flex-col justify-center rounded-md border px-2 py-1 text-sm font-semibold ${TONE_CLASS[tone]} ${reveal.className}`}
+      className={`flex min-h-[3.25rem] flex-col justify-center rounded-md border px-2 py-1 text-base font-semibold ${TONE_CLASS[tone]} ${reveal.className}`}
       style={reveal.style}
     >
       {children}
@@ -67,7 +75,7 @@ function Swatch({
 }
 
 const CHIP =
-  "inline-flex max-w-[8.5rem] items-center rounded px-1.5 py-0.5 text-xs font-semibold leading-tight";
+  "inline-flex max-w-[11rem] items-center rounded px-1.5 py-0.5 text-xs font-semibold leading-tight";
 
 function ListCell({
   columnKey,
@@ -85,7 +93,7 @@ function ListCell({
     ...matched.map((value) => ({ value, match: true })),
     ...missed.map((value) => ({ value, match: false })),
   ];
-  const limit = columnKey === "studios" ? STUDIO_LIMIT : all.length;
+  const limit = LIST_LIMITS[columnKey] ?? all.length;
   const shown = all.slice(0, limit);
   const hidden = all.slice(limit);
   if (all.length === 0) {
@@ -93,7 +101,7 @@ function ListCell({
   }
   return (
     <ul
-      className={`flex flex-col items-start gap-1 ${reveal.className}`}
+      className={`flex flex-wrap items-start gap-1 ${reveal.className}`}
       style={reveal.style}
     >
       {shown.map((item) => (
@@ -142,7 +150,7 @@ function GridRow({ evaluation, attempt, animate }: GridRowProps) {
         className={`${CELL} sticky left-0 z-10 bg-surface-raised text-left font-normal`}
       >
         <div
-          className={`flex w-36 min-w-0 items-center gap-2 rounded-md border px-2 py-1 xl:w-40 ${
+          className={`flex w-44 min-w-0 items-center gap-3 rounded-md border px-2 py-1.5 xl:w-56 ${
             evaluation.correct
               ? "border-correct bg-correct-soft"
               : "border-line"
@@ -154,13 +162,13 @@ function GridRow({ evaluation, attempt, animate }: GridRowProps) {
             <img
               src={evaluation.coverImage}
               alt=""
-              width={28}
-              height={40}
-              className="h-10 w-7 shrink-0 rounded-sm object-cover"
+              width={44}
+              height={64}
+              className="h-16 w-11 shrink-0 rounded-sm object-cover"
             />
           ) : null}
           <div className="min-w-0">
-            <p className="line-clamp-2 break-words text-sm font-semibold leading-snug text-paper">
+            <p className="line-clamp-3 break-words text-base font-semibold leading-snug text-paper">
               {evaluation.correct ? (
                 <span aria-hidden className="mr-1 text-correct">
                   ✓
@@ -328,7 +336,11 @@ export function GuessGrid({
                   </th>
                 ))}
                 {LIST_COLUMNS.map((column) => (
-                  <th scope="col" className="px-2 py-2" key={column.key}>
+                  <th
+                    scope="col"
+                    className={`px-2 py-2 ${LIST_WIDTHS[column.key] ?? ""}`}
+                    key={column.key}
+                  >
                     {column.label}
                   </th>
                 ))}

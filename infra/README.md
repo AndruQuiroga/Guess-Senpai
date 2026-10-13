@@ -58,6 +58,16 @@ waits for PostgreSQL, runs Alembic, and starts a single Uvicorn worker. This is
 a fresh-database rollout; an existing unversioned database requires the
 separate adoption procedure.
 
+## Archive backfill
+
+Past days are never generated on request. To fill missing archive days (for
+example after a fresh database), run inside the API container:
+
+    python -m app.puzzles.backfill --days 14
+
+It only publishes days that have no set, from current popularity data seeded by
+each date, and never replaces a published day.
+
 ## Storage and availability
 
 All initial services are constrained to `docker-1`. Dedicated named volumes are

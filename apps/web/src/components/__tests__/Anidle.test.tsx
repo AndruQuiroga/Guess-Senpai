@@ -8,6 +8,7 @@ import {
 import { vi } from "vitest";
 
 import Anidle from "../Anidle";
+import { StakeBadge, StakeProvider } from "../rounds/RoundUI";
 import type { AnidleGame } from "../../types/puzzles";
 import type { GameProgress } from "../../hooks/usePuzzleProgress";
 import {
@@ -268,53 +269,79 @@ describe("Anidle hydration", () => {
     };
   }
 
-  it.each([
-    [1, null],
-    [2, "First clue"],
-    [4, "Second clue"],
-    [6, "Third clue"],
-  ])("resumes %i attempts with its revealed hint", (count, hint) => {
+  it("resumes with exactly the clues that were bought", () => {
     render(
       <Anidle
         mediaId={88}
         payload={finitePayload}
-        initialProgress={{ ...stored(count as number), hintsRevealed: 3 }}
+        initialProgress={{
+          ...stored(6),
+          anidleHints: ["year", "synopsis"],
+        }}
         onProgressChange={vi.fn()}
       />,
     );
-    if (hint) expect(screen.getByText(hint)).toBeInTheDocument();
-    else expect(screen.queryByText("First clue")).not.toBeInTheDocument();
+    expect(screen.getByText("2001")).toBeInTheDocument();
+    // The excerpt is the middle redaction level.
+    expect(screen.getByText("Second clue")).toBeInTheDocument();
+    expect(screen.queryByText("Adventure")).not.toBeInTheDocument();
     expect(evaluateAnidleGuessMock).not.toHaveBeenCalled();
   });
 
-  it("keeps earned hints hidden until the player reveals one", () => {
-    const progress = vi.fn();
+  it("maps older saves that stored a hint count onto the first clue types", () => {
     render(
       <Anidle
         mediaId={88}
         payload={finitePayload}
-        initialProgress={stored(4)}
-        onProgressChange={progress}
+        initialProgress={{ ...stored(6), hintsRevealed: 1 }}
+        onProgressChange={vi.fn()}
       />,
     );
-    expect(screen.queryByText("First clue")).not.toBeInTheDocument();
-    expect(screen.getByText(/2 hints are available/)).toBeInTheDocument();
+    expect(screen.getByText("Adventure")).toBeInTheDocument();
+    expect(screen.queryByText("2001")).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Reveal hint" }));
-    expect(screen.getByText("First clue")).toBeInTheDocument();
-    expect(screen.getByText(/A hint is available/)).toBeInTheDocument();
-    expect(progress).toHaveBeenLastCalledWith(
-      expect.objectContaining({ hintsRevealed: 1 }),
+  it("sells three separately priced clues, each unlocking on its own", () => {
+    const progress = vi.fn();
+    render(
+      <StakeProvider>
+        <StakeBadge />
+        <Anidle
+          mediaId={88}
+          payload={finitePayload}
+          initialProgress={stored(4)}
+          onProgressChange={progress}
+        />
+      </StakeProvider>,
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Reveal hint" }));
-    expect(screen.getByText("Second clue")).toBeInTheDocument();
+    // 8 guesses, 4 used: solving next scores 3,000 × 4/8.
     expect(
-      screen.queryByRole("button", { name: "Reveal hint" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/Next hint available after 2 more/),
+      screen.getByRole("status", { name: /1,500 of 3,000/ }),
     ).toBeInTheDocument();
+    // Genres (after 2) and year (after 4) are open; the excerpt needs 6 misses.
+    expect(
+      screen.getByRole("button", { name: /buy synopsis excerpt/i }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Synopsis excerpt: after 2 more misses/),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /buy release year for 150/i }),
+    );
+    expect(screen.getByText("2001")).toBeInTheDocument();
+    expect(screen.queryByText("Adventure")).not.toBeInTheDocument();
+    expect(progress).toHaveBeenLastCalledWith(
+      expect.objectContaining({ anidleHints: ["year"] }),
+    );
+    expect(
+      screen.getByRole("status", {
+        name: /1,350 of 3,000 points available, 1,650 spent/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Release year: bought" }),
+    ).toBeDisabled();
   });
 
   it("accepts the eighth miss, reveals the answer, and resumes exhaustion without awarding a solve", async () => {
@@ -460,7 +487,7 @@ describe("Anidle hydration", () => {
     expect(screen.getByText("Second clue")).toBeInTheDocument();
   });
 
-  it("uses progressive metadata hints when no synopsis exists", () => {
+  it("offers tags as the third clue when no synopsis exists", () => {
     const view = render(
       <Anidle
         mediaId={88}
@@ -468,24 +495,13 @@ describe("Anidle hydration", () => {
           ...finitePayload,
           hints: { ...finitePayload.hints, synopsis: [] },
         }}
-        initialProgress={{ ...stored(2), hintsRevealed: 3 }}
+        initialProgress={stored(6)}
         onProgressChange={vi.fn()}
       />,
     );
-    expect(screen.getByText("Adventure")).toBeInTheDocument();
-    expect(screen.queryByText("2001")).not.toBeInTheDocument();
-    view.rerender(
-      <Anidle
-        mediaId={88}
-        payload={{
-          ...finitePayload,
-          hints: { ...finitePayload.hints, synopsis: [] },
-        }}
-        initialProgress={{ ...stored(6), hintsRevealed: 3 }}
-        onProgressChange={vi.fn()}
-      />,
-    );
-    expect(screen.getByText("2001")).toBeInTheDocument();
+    // Without a synopsis the third clue sells the tags instead.
+    fireEvent.click(screen.getByRole("button", { name: /buy tags/i }));
     expect(screen.getByText("Space")).toBeInTheDocument();
+    view.unmount();
   });
 });

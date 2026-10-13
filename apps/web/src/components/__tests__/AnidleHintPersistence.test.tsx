@@ -69,9 +69,9 @@ it("keeps a revealed hint when the page feeds saved progress back in", () => {
   const log = vi.fn();
   render(<Harness log={log} />);
   expect(screen.queryByText("First clue")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Reveal hint" }));
-  expect(screen.getByText("First clue")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /buy genres/i }));
+  expect(screen.getByText("Action")).toBeInTheDocument();
   expect(log).toHaveBeenLastCalledWith(
-    expect.objectContaining({ hintsRevealed: 1 }),
+    expect.objectContaining({ anidleHints: ["genres"] }),
   );
 });

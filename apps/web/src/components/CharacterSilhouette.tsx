@@ -33,6 +33,7 @@ import {
   RoundResult,
   RoundTabs,
   VERDICT,
+  useReportStake,
 } from "./rounds/RoundUI";
 import {
   buildOutcome,
@@ -171,7 +172,18 @@ function CharacterRound({
   const [error, setError] = useState<string | null>(null);
 
   const hintsByCard = cardHints(record.answers);
+  const mode = artModeFor(round.difficulty);
+  const spentOnCards = Object.values(hintsByCard).reduce(
+    (sum, count) => sum + count * SHARPEN_HINT_COST,
+    0,
+  );
   const perCard = Math.floor(ROUND_POINTS / entries.length);
+  const roundMax = perCard * entries.length;
+  useReportStake(
+    Math.max(0, roundMax - spentOnCards),
+    roundMax,
+    !record.submitted,
+  );
   const half = Math.floor(perCard / 2);
 
   const update = (card: number, patch: Partial<CardDraft>) =>
@@ -312,13 +324,15 @@ function CharacterRound({
   return (
     <form onSubmit={checkAll} className="space-y-5">
       <p className="text-sm text-muted">
-        Name each character and their anime, then check them all at once. Each
-        card is worth {perCard} points (half for the name, half for the anime).
+        <span className="font-semibold text-paper">
+          {ART_MODE_LABELS[mode]}
+        </span>{" "}
+        · Name each character and their anime, then check them all at once. Each
+        card is worth {perCard} (half name, half anime).
       </p>
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {entries.map((entry, card) => {
           const sharpened = Math.min(ART_LEVELS - 1, hintsByCard[card] ?? 0);
-          const mode = artModeFor(round.difficulty, card);
           return (
             <li
               key={entry.character.id}
@@ -334,11 +348,10 @@ function CharacterRound({
                 />
                 <span className="absolute left-2 top-2 rounded bg-ink px-2 py-0.5 text-xs font-bold text-paper">
                   #{card + 1}
-                  {mode !== "shadow" ? ` · ${ART_MODE_LABELS[mode]}` : ""}
                 </span>
               </div>
               <HintButton
-                label="Sharpen"
+                label="Buy a clearer view"
                 cost={SHARPEN_HINT_COST}
                 disabled={sharpened >= ART_LEVELS - 1}
                 used="Clearest"

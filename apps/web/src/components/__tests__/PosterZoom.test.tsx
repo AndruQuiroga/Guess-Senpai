@@ -78,7 +78,7 @@ describe("PosterZoom rounds", () => {
     const progress = vi.fn();
     render(<PosterZoom payload={payload} onProgressChange={progress} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Zoom out/ }));
+    fireEvent.click(screen.getByRole("button", { name: /buy zoom out/i }));
     expect(posterSrc()).toContain("hints=1");
     expect(progress).toHaveBeenLastCalledWith(
       expect.objectContaining({

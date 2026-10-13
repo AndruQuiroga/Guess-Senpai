@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import { KnowledgeSummary } from "../anidle/KnowledgeSummary";
 import { summarizeEvaluations } from "../anidle/summary";
@@ -95,5 +95,21 @@ describe("KnowledgeSummary", () => {
     expect(within(region).getByText("≥ 2011")).toBeInTheDocument();
     expect(within(region).getByText("✓ Action")).toBeInTheDocument();
     expect(within(region).getByText("Drama")).toBeInTheDocument();
+  });
+
+  it("folds long ruled-out lists behind a toggle", () => {
+    const studios = Array.from({ length: 12 }, (_, index) => ({
+      value: `Studio ${index}`,
+      status: "miss" as const,
+    }));
+    render(<KnowledgeSummary evaluations={[guess({ studios })]} />);
+    expect(screen.queryByText("Studio 11")).toBeNull();
+    const toggle = screen.getByRole("button", { name: "+4 more ruled out" });
+    fireEvent.click(toggle);
+    expect(screen.getByText("Studio 11")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 });

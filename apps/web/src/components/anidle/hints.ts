@@ -8,92 +8,142 @@ export type AggregatedHint =
   | { type: "synopsis"; label: string; ratio: number; text: string };
 
 export const LEGACY_TOTAL_ROUNDS = 3;
+export type AnidleClueId = "genres" | "year" | "synopsis";
+
+/**
+ * Rules-v2 Anidle clues: three types, each with its own price and its own
+ * unlock point (the matching entry of `rules.hint_after_incorrect`). Players
+ * buy any unlocked clue they want; nothing is shown otherwise.
+ */
+export const ANIDLE_CLUES: readonly {
+  id: AnidleClueId;
+  label: string;
+  cost: number;
+}[] = [
+  { id: "genres", label: "Genres", cost: 150 },
+  { id: "year", label: "Release year", cost: 150 },
+  { id: "synopsis", label: "Synopsis excerpt", cost: 300 },
+];
+
+const CLUE_IDS = new Set<string>(ANIDLE_CLUES.map((clue) => clue.id));
+
+export function isAnidleClueId(value: unknown): value is AnidleClueId {
+  return typeof value === "string" && CLUE_IDS.has(value);
+}
+
+/** Total points the bought clues cost. */
+export function anidleClueCost(ids: readonly string[]): number {
+  return ANIDLE_CLUES.filter((clue) => ids.includes(clue.id)).reduce(
+    (sum, clue) => sum + clue.cost,
+    0,
+  );
+}
+
+/** Older saves stored a count of progressive hints; map them onto types. */
+export function legacyAnidleClues(count: number): AnidleClueId[] {
+  return ANIDLE_CLUES.slice(0, Math.max(0, count)).map((clue) => clue.id);
+}
+
+/** Wrong guesses after which clue `index` can be bought. */
+export function anidleClueUnlockAt(rules: AnidleRules, index: number): number {
+  const thresholds = rules.hint_after_incorrect;
+  return thresholds[index] ?? thresholds[thresholds.length - 1] ?? 0;
+}
+
+/** The synopsis clue falls back to tags for anime without a synopsis. */
+export function anidleClueLabel(payload: AnidleGame, id: AnidleClueId): string {
+  if (id === "synopsis" && !synopsisExcerpt(payload)) return "Tags";
+  return ANIDLE_CLUES.find((clue) => clue.id === id)?.label ?? id;
+}
+
+export function anidleClueAvailable(
+  payload: AnidleGame,
+  id: AnidleClueId,
+): boolean {
+  if (id === "genres") return payload.hints.genres.length > 0;
+  if (id === "year") return payload.hints.year != null;
+  return Boolean(synopsisExcerpt(payload)) || payload.hints.tags.length > 0;
+}
+
+/** A middle redaction level: enough to help without giving the show away. */
+function synopsisExcerpt(payload: AnidleGame) {
+  const entries = (payload.hints.synopsis ?? []).filter((hint) =>
+    hint.text.trim(),
+  );
+  return entries.length ? entries[Math.min(1, entries.length - 1)] : null;
+}
+
+/**
+ * What solving on the next guess would score: the game's points shrink by one
+ * guess's share per accepted guess, minus what bought clues cost.
+ */
+export function anidleStake(
+  maxPoints: number,
+  attemptLimit: number,
+  used: number,
+  clueCost: number,
+): number {
+  const limit = Math.max(1, attemptLimit);
+  const base = (maxPoints * Math.max(0, limit - used)) / limit;
+  return Math.max(0, Math.round(base - clueCost));
+}
 const MIN_INCORRECT_GUESSES_FOR_HINT = 10;
 const INCORRECT_GUESS_INTERVAL = 2;
 
-/** How many rules-v2 hints the player has earned (they still choose to reveal). */
-export function availableHintCount(
-  rules: AnidleRules,
-  incorrectGuessCount: number,
-): number {
-  return rules.hint_after_incorrect.filter(
-    (count) => incorrectGuessCount >= count,
-  ).length;
-}
-
-/** Wrong guesses still needed before the next hint becomes available. */
-export function missesUntilNextHint(
-  rules: AnidleRules,
-  incorrectGuessCount: number,
-): number | null {
-  const next = rules.hint_after_incorrect.find(
-    (count) => count > incorrectGuessCount,
-  );
-  return next == null ? null : next - incorrectGuessCount;
-}
-
-/** Player-facing summary of the rules-v2 guess budget and hint cadence. */
+/** Player-facing summary of the rules-v2 guess budget and clues. */
 export function describeAnidleRules(rules: AnidleRules): string[] {
-  const thresholds = rules.hint_after_incorrect;
-  const list =
-    thresholds.length > 1
-      ? `${thresholds.slice(0, -1).join(", ")} and ${thresholds[thresholds.length - 1]}`
-      : String(thresholds[0] ?? "");
+  const clues = ANIDLE_CLUES.map(
+    (clue, index) =>
+      `${clue.label.toLowerCase()} (−${clue.cost}, after ${anidleClueUnlockAt(rules, index)} misses)`,
+  ).join(", ");
   return [
-    `Find one exact anime title in ${rules.max_attempts} accepted guesses.`,
-    thresholds.length
-      ? `Optional hints become available after ${list} wrong guesses. Nothing is revealed unless you ask: a partly redacted synopsis, or genres, then year, then tags when no synopsis exists.`
-      : "This puzzle has no hints.",
+    `Find one exact anime title in ${rules.max_attempts} accepted guesses. Solving sooner scores more.`,
+    rules.hint_after_incorrect.length
+      ? `Optional clues, each bought separately: ${clues}.`
+      : "This puzzle has no clues.",
   ];
 }
 
 /**
- * Hints shown to the player. Rules v2 shows the `revealed` hints the player
- * asked for (capped by what they have earned); legacy rules unlock by misses.
+ * Hints shown to the player. Rules v2 shows exactly the clues bought;
+ * legacy rules unlock by misses.
  */
 export function computeAnidleHints(
   payload: AnidleGame,
   rules: AnidleRules | null,
   incorrectGuessCount: number,
-  revealed = 0,
+  revealed: readonly AnidleClueId[] = [],
 ): AggregatedHint[] {
   if (rules) {
-    const stage = Math.min(
-      revealed,
-      availableHintCount(rules, incorrectGuessCount),
-    );
-    if (stage <= 0) return [];
-    const entries = payload.hints.synopsis.filter((hint) => hint.text.trim());
-    if (entries.length) {
-      const hint = entries[Math.min(stage - 1, entries.length - 1)];
-      return [
-        {
-          type: "synopsis",
-          label: "Synopsis hint",
-          ratio: hint.ratio,
-          text: hint.text,
-        },
-      ];
-    }
     const hints: AggregatedHint[] = [];
-    if (payload.hints.genres.length)
+    if (revealed.includes("genres") && payload.hints.genres.length)
       hints.push({
         type: "text",
         label: "Genres",
         value: payload.hints.genres.join(", "),
       });
-    if (stage >= 2 && payload.hints.year != null)
+    if (revealed.includes("year") && payload.hints.year != null)
       hints.push({
         type: "text",
-        label: "Year",
+        label: "Release year",
         value: String(payload.hints.year),
       });
-    if (stage >= 3 && payload.hints.tags.length)
-      hints.push({
-        type: "tags",
-        label: "Tags",
-        values: payload.hints.tags.slice(0, 4),
-      });
+    if (revealed.includes("synopsis")) {
+      const excerpt = synopsisExcerpt(payload);
+      if (excerpt)
+        hints.push({
+          type: "synopsis",
+          label: "Synopsis excerpt",
+          ratio: excerpt.ratio,
+          text: excerpt.text,
+        });
+      else if (payload.hints.tags.length)
+        hints.push({
+          type: "tags",
+          label: "Tags",
+          values: payload.hints.tags.slice(0, 4),
+        });
+    }
     return hints;
   }
 

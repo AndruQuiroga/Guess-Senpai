@@ -524,7 +524,9 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
                       statusLabel={entry.statusLabel}
                       statusIcon={entry.statusIcon}
                       ctaLabel={entry.ctaLabel}
-                      href={`/games/${entry.slug}`}
+                      // The date keeps archive days on their own set
+                      // instead of opening today's.
+                      href={`/games/${entry.slug}?d=${data.date}`}
                       index={index}
                       preview={previewComponents[entry.gameKey] ?? null}
                     />

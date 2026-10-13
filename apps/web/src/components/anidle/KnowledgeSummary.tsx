@@ -10,6 +10,38 @@ interface KnowledgeSummaryProps {
 const CHIP =
   "inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-semibold leading-tight";
 
+/** Ruled-out values shown before "+n more"; tags and studios run long. */
+const EXCLUDED_PREVIEW = 8;
+
+function ExcludedValues({ values }: { values: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? values : values.slice(0, EXCLUDED_PREVIEW);
+  const hidden = values.length - shown.length;
+  return (
+    <>
+      {shown.map((value) => (
+        <span
+          key={`x-${value}`}
+          className={`${CHIP} border-line bg-ink text-muted line-through decoration-1`}
+        >
+          <span className="sr-only">not </span>
+          {value}
+        </span>
+      ))}
+      {hidden > 0 || expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((open) => !open)}
+          aria-expanded={expanded}
+          className={`${CHIP} border-line-strong bg-panel-raised text-paper hover:bg-hover`}
+        >
+          {expanded ? "Show less" : `+${hidden} more ruled out`}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 /** Open above the table on wide screens; collapsed on phones. */
 const WIDE_QUERY = "(min-width: 1024px)";
 
@@ -82,15 +114,7 @@ export function KnowledgeSummary({ evaluations }: KnowledgeSummaryProps) {
                       ✓ {value}
                     </span>
                   ))}
-                  {item.excluded.map((value) => (
-                    <span
-                      key={`x-${value}`}
-                      className={`${CHIP} border-line bg-ink text-muted line-through decoration-1`}
-                    >
-                      <span className="sr-only">not </span>
-                      {value}
-                    </span>
-                  ))}
+                  <ExcludedValues values={item.excluded} />
                 </dd>
               </div>
             ))}

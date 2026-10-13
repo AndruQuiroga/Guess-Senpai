@@ -140,7 +140,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       summary:
         "Easy, Medium and Hard lineups of four hidden characters. Name each one and their anime, then check them all at once.",
       rules: [
-        "Three rounds of four shadowed characters, each from a different anime.",
+        "Three rounds of four popular characters: black and white, close-up, then mosaic.",
         "Fill in every character's name and anime, then check them all at once.",
         "Sharpen a card for a points cost; each card shows its own result after checking.",
       ],

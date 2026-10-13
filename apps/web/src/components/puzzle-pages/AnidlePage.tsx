@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Anidle from "../Anidle";
 import { AttemptMeter } from "../anidle/AttemptMeter";
+import { StakeBadge, StakeProvider } from "../rounds/RoundUI";
 import { GameShell } from "../GameShell";
 import type { DailyProgress, GameProgress } from "../../types/progress";
 import { AnidleGame } from "../../types/puzzles";
@@ -134,35 +135,40 @@ export function AnidlePage({
 
   return (
     <div className="space-y-6">
-      <GameShell
-        title="Anidle"
-        slug="anidle"
-        rules={rulesCopy(payload.rules)}
-        status={
-          rules ? (
-            <AttemptMeter
-              used={used}
-              max={rules.max_attempts}
-              hintAfter={rules.hint_after_incorrect}
-              position={displayRound}
-              finished={finished}
-            />
-          ) : (
-            <span>Round {displayRound}</span>
-          )
-        }
-      >
-        <Anidle
-          mediaId={mediaId}
-          payload={payload}
-          initialProgress={progress}
-          onProgressChange={handleProgressChange}
-          registerRoundController={registerController}
-          nextSlug={nextSlug}
-          answerCoverImage={answerCoverImage}
-          accountDifficulty={selectedDifficulty}
-        />
-      </GameShell>
+      <StakeProvider>
+        <GameShell
+          title="Anidle"
+          slug="anidle"
+          rules={rulesCopy(payload.rules)}
+          status={
+            rules ? (
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <AttemptMeter
+                  used={used}
+                  max={rules.max_attempts}
+                  hintAfter={rules.hint_after_incorrect}
+                  position={displayRound}
+                  finished={finished}
+                />
+                <StakeBadge />
+              </span>
+            ) : (
+              <span>Round {displayRound}</span>
+            )
+          }
+        >
+          <Anidle
+            mediaId={mediaId}
+            payload={payload}
+            initialProgress={progress}
+            onProgressChange={handleProgressChange}
+            registerRoundController={registerController}
+            nextSlug={nextSlug}
+            answerCoverImage={answerCoverImage}
+            accountDifficulty={selectedDifficulty}
+          />
+        </GameShell>
+      </StakeProvider>
     </div>
   );
 }

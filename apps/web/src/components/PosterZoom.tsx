@@ -11,7 +11,7 @@ import {
 } from "./games/TitleGuessField";
 import {
   GameSummary,
-  HintButton,
+  HintShop,
   LegacyFinished,
   RoundResult,
   RoundTabs,
@@ -277,42 +277,37 @@ function PosterRound({
         </figure>
 
         <div className="space-y-5">
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-semibold text-paper">
-              Hints (optional)
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              <HintButton
-                label="Zoom out"
-                cost={ZOOM_HINT_COST}
-                disabled={zooms >= MAX_ZOOM_HINTS}
-                used="Fully zoomed out"
-                onClick={() => game.takeHint(index)}
-              />
-              <HintButton
-                label="Show genres"
-                cost={GENRE_HINT_COST}
-                disabled={genresShown || genres.length === 0}
-                used="Shown"
-                onClick={() => {
-                  setGenresShown(true);
-                  game.takeHint(index, { genresShown: true });
-                }}
-              />
-            </div>
-            {genresShown ? (
-              <p className="flex flex-wrap gap-1.5 text-sm" aria-live="polite">
-                {genres.map((genre) => (
-                  <span
-                    key={genre}
-                    className="rounded border border-line-strong bg-panel-raised px-2 py-0.5 text-paper"
-                  >
-                    {genre}
-                  </span>
-                ))}
-              </p>
-            ) : null}
-          </fieldset>
+          <HintShop
+            spent={hintCost}
+            disabled={busy}
+            onBuy={(id) => {
+              if (id === "genres") {
+                setGenresShown(true);
+                game.takeHint(index, { genresShown: true });
+              } else {
+                game.takeHint(index);
+              }
+            }}
+            clues={[
+              {
+                id: "zoom",
+                label: "Zoom out",
+                cost: ZOOM_HINT_COST,
+                uses: { used: zooms, max: MAX_ZOOM_HINTS },
+              },
+              ...(genres.length
+                ? [
+                    {
+                      id: "genres",
+                      label: "Genres",
+                      cost: GENRE_HINT_COST,
+                      bought: genresShown,
+                      reveal: genres.join(" · "),
+                    },
+                  ]
+                : []),
+            ]}
+          />
 
           <div className="space-y-2">
             <label
@@ -408,7 +403,6 @@ function PosterRound({
             </button>
             <p className="text-sm text-muted">
               One answer per round. Blank fields score 0.
-              {hintCost > 0 ? ` Hints so far: −${hintCost} pts.` : ""}
             </p>
           </div>
         </div>

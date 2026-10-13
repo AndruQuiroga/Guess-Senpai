@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import NextPuzzleButton from "../NextPuzzleButton";
 import type { RoundRecord } from "./useRoundGame";
@@ -78,6 +86,184 @@ export function RoundTabs({
         </button>
       ) : null}
     </nav>
+  );
+}
+
+export interface ShopClue {
+  id: string;
+  label: string;
+  cost: number;
+  /** Repeatable clues (zoom out, reveal words): how many of how many. */
+  uses?: { used: number; max: number };
+  /** One-off clues: already bought. */
+  bought?: boolean;
+  /** Why it can't be bought yet (e.g. "after 3 more misses"). */
+  lockedReason?: string;
+  /** Shown under the clue row once bought. */
+  reveal?: ReactNode;
+}
+
+export interface Stake {
+  /** Points the current round (or Anidle guess) can still score. */
+  left: number;
+  max: number;
+}
+
+const StakeContext = createContext<{
+  stake: Stake | null;
+  setStake(stake: Stake | null): void;
+} | null>(null);
+
+/** Lets a game's clue row report its points to the header badge. */
+export function StakeProvider({ children }: { children: ReactNode }) {
+  const [stake, setStake] = useState<Stake | null>(null);
+  const value = useMemo(() => ({ stake, setStake }), [stake]);
+  return (
+    <StakeContext.Provider value={value}>{children}</StakeContext.Provider>
+  );
+}
+
+/**
+ * Publishes the points still available; cleared when inactive (e.g. on a
+ * results screen) or when the reporter unmounts.
+ */
+export function useReportStake(left: number, max: number, active = true) {
+  const context = useContext(StakeContext);
+  const setStake = context?.setStake;
+  useEffect(() => {
+    setStake?.(active ? { left, max } : null);
+  }, [active, left, max, setStake]);
+  useEffect(() => () => setStake?.(null), [setStake]);
+}
+
+/**
+ * Subtle header readout: available / total points, with a red ▼ showing what
+ * clues (and, in Anidle, guesses) have cost so far.
+ */
+export function StakeBadge() {
+  const stake = useContext(StakeContext)?.stake;
+  if (!stake) return null;
+  const spent = Math.max(0, stake.max - stake.left);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-sm tabular-nums"
+      aria-label={`${formatPoints(stake.left)} of ${formatPoints(stake.max)} points available${
+        spent ? `, ${formatPoints(spent)} spent` : ""
+      }`}
+      role="status"
+    >
+      <span aria-hidden className="font-semibold text-paper">
+        {formatPoints(stake.left)}
+      </span>
+      <span aria-hidden className="text-muted">
+        / {formatPoints(stake.max)}
+      </span>
+      {spent > 0 ? (
+        <span aria-hidden className="text-xs font-semibold text-danger-ink">
+          ▼{formatPoints(spent)}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * Optional clues as a compact row of small buttons ("Genres −150"). Bought
+ * clues show a ✓ and their content underneath; locked ones say why. The
+ * points they cost are reported to the header badge.
+ */
+export function HintShop({
+  clues,
+  spent,
+  onBuy,
+  max = ROUND_POINTS,
+  disabled = false,
+}: {
+  clues: ShopClue[];
+  /** Points already spent this round (clues, and guesses in Anidle). */
+  spent: number;
+  onBuy(id: string): void;
+  max?: number;
+  disabled?: boolean;
+}) {
+  useReportStake(Math.max(0, max - spent), max);
+  if (clues.length === 0) return null;
+  const revealed = clues.filter(
+    (clue) => clue.reveal && (clue.bought || (clue.uses?.used ?? 0) > 0),
+  );
+  return (
+    <section aria-label="Clues" className="space-y-1.5">
+      <ul className="flex flex-wrap items-center gap-1.5 text-sm">
+        <li className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Clues
+        </li>
+        {clues.map((clue) => {
+          const used = clue.uses?.used ?? (clue.bought ? 1 : 0);
+          const maxed = clue.uses
+            ? used >= clue.uses.max
+            : Boolean(clue.bought);
+          const locked = Boolean(clue.lockedReason) && !maxed;
+          return (
+            <li key={clue.id}>
+              <button
+                type="button"
+                onClick={() => onBuy(clue.id)}
+                disabled={disabled || locked || maxed}
+                title={locked ? clue.lockedReason : undefined}
+                aria-label={
+                  maxed
+                    ? `${clue.label}: bought`
+                    : `Buy ${clue.label.toLowerCase()} for ${clue.cost} points${
+                        locked ? ` (${clue.lockedReason})` : ""
+                      }`
+                }
+                className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition disabled:cursor-not-allowed ${
+                  maxed
+                    ? "border-signal bg-signal-soft text-paper"
+                    : locked
+                      ? "border-line text-muted opacity-60"
+                      : "border-line-strong text-paper hover:bg-hover"
+                }`}
+              >
+                {maxed ? <span aria-hidden>✓</span> : null}
+                <span>{clue.label}</span>
+                {clue.uses && clue.uses.max > 1 ? (
+                  <span className="text-xs text-muted">
+                    {used}/{clue.uses.max}
+                  </span>
+                ) : null}
+                {maxed ? null : (
+                  <span className="text-xs font-semibold text-danger-ink">
+                    −{formatPoints(clue.cost)}
+                  </span>
+                )}
+              </button>
+              {locked ? (
+                <span className="sr-only">{clue.lockedReason}</span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      {clues.some((clue) => clue.lockedReason && !clue.bought) ? (
+        <p className="text-xs text-muted">
+          {clues
+            .filter((clue) => clue.lockedReason && !clue.bought)
+            .map((clue) => `${clue.label}: ${clue.lockedReason}`)
+            .join(" · ")}
+        </p>
+      ) : null}
+      {revealed.length ? (
+        <dl className="space-y-0.5 text-sm" aria-live="polite">
+          {revealed.map((clue) => (
+            <div key={clue.id} className="flex flex-wrap gap-x-2">
+              <dt className="text-muted">{clue.label}:</dt>
+              <dd className="text-paper">{clue.reveal}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </section>
   );
 }
 
@@ -419,16 +605,4 @@ export function LegacyFinished({ nextSlug }: { nextSlug?: string | null }) {
       <NextPuzzleButton nextSlug={nextSlug} />
     </section>
   );
-}
-
-/** Header status for the round games: "Round 2 / 3 · 1,450 pts". */
-export function roundStatus(
-  playedCount: number,
-  roundCount: number,
-  totalPoints: number,
-): string {
-  const round = Math.min(roundCount, playedCount + 1);
-  const where =
-    playedCount >= roundCount ? "Done" : `Round ${round} / ${roundCount}`;
-  return `${where} · ${formatPoints(totalPoints)} pts`;
 }

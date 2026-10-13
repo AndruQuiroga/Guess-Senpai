@@ -12,7 +12,7 @@ import {
 } from "./games/TitleGuessField";
 import {
   GameSummary,
-  HintButton,
+  HintShop,
   LegacyFinished,
   RoundResult,
   RoundTabs,
@@ -26,7 +26,15 @@ import {
 import { useRoundGame, type RoundGameState } from "./rounds/useRoundGame";
 
 export const VIDEO_HINT_COST = 300;
-export const ARTIST_HINT_COST = 150;
+export const GENRE_HINT_COST = 150;
+export const YEAR_HINT_COST = 150;
+
+/** The release year: from the round meta, or older payloads' "FALL 2019". */
+function openingYear(round: GuessOpeningRound): number | null {
+  if (round.meta.year) return round.meta.year;
+  const match = round.meta.season?.match(/\d{4}/);
+  return match ? Number(match[0]) : null;
+}
 
 interface Props {
   payload: GuessOpeningRound[];
@@ -114,9 +122,14 @@ function OpeningRound({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const videoShown = Boolean(record.answers.video);
-  const artistShown = Boolean(record.answers.artist);
+  const genreShown = Boolean(record.answers.genre);
+  const yearShown = Boolean(record.answers.year);
+  const genres = round.meta.genres ?? [];
+  const year = openingYear(round);
   const hintCost =
-    (videoShown ? VIDEO_HINT_COST : 0) + (artistShown ? ARTIST_HINT_COST : 0);
+    (videoShown ? VIDEO_HINT_COST : 0) +
+    (genreShown ? GENRE_HINT_COST : 0) +
+    (yearShown ? YEAR_HINT_COST : 0);
   const hasVideo = Boolean(round.clip.videoUrl);
 
   const submit = useCallback(
@@ -209,31 +222,50 @@ function OpeningRound({
         showVideo={videoShown}
         label={`Round ${index + 1} opening clip`}
       />
-      <div className="flex flex-wrap items-center gap-2">
-        {hasVideo ? (
-          <HintButton
-            label="Unlock video clue"
-            cost={VIDEO_HINT_COST}
-            disabled={videoShown}
-            used="Video unlocked"
-            onClick={() => game.takeHint(index, { video: true })}
-          />
-        ) : null}
-        {round.meta.artist ? (
-          <HintButton
-            label="Show artist"
-            cost={ARTIST_HINT_COST}
-            disabled={artistShown}
-            used="Shown"
-            onClick={() => game.takeHint(index, { artist: true })}
-          />
-        ) : null}
-        {artistShown && round.meta.artist ? (
-          <span className="rounded border border-line-strong bg-panel-raised px-2 py-1 text-sm text-paper">
-            Artist: {round.meta.artist}
-          </span>
-        ) : null}
-      </div>
+      <HintShop
+        spent={hintCost}
+        disabled={busy}
+        onBuy={(id) => game.takeHint(index, { [id]: true })}
+        clues={[
+          ...(genres.length
+            ? [
+                {
+                  id: "genre",
+                  label: "Genres",
+                  cost: GENRE_HINT_COST,
+                  bought: genreShown,
+                  reveal: genres.join(" · "),
+                },
+              ]
+            : []),
+          ...(year
+            ? [
+                {
+                  id: "year",
+                  label: "Release year",
+                  cost: YEAR_HINT_COST,
+                  bought: yearShown,
+                  reveal: String(year),
+                },
+              ]
+            : []),
+          ...(hasVideo
+            ? [
+                {
+                  id: "video",
+                  label: "Video clue",
+                  cost: VIDEO_HINT_COST,
+                  bought: videoShown,
+                  // The video gives away the most, so a cheaper clue comes first.
+                  lockedReason:
+                    genreShown || yearShown || (!genres.length && !year)
+                      ? undefined
+                      : "Buy the genres or year first",
+                },
+              ]
+            : []),
+        ]}
+      />
       <div className="space-y-2">
         <label
           htmlFor={`opening-title-${index}`}
@@ -262,10 +294,7 @@ function OpeningRound({
             {busy ? "Checking…" : "Lock in answer"}
           </button>
         </div>
-        <p className="text-sm text-muted">
-          One answer per round, worth {ROUND_POINTS} points
-          {hintCost > 0 ? ` (−${hintCost} for clues)` : ""}.
-        </p>
+        <p className="text-sm text-muted">One answer per round.</p>
       </div>
       {error ? (
         <p
