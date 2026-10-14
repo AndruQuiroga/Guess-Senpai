@@ -92,23 +92,31 @@ async def test_republish_legacy_upgrades_old_sets_only(local_generation):  # noq
     again = await engine.get_daily_puzzle(current_day)
     assert again.model_dump() == current.model_dump()
     response = await engine.get_daily_puzzle(today)
-    assert response.mode_puzzle_ids["anidle"].endswith(":v3")
+    assert response.mode_puzzle_ids["anidle"].endswith(f":v{engine.CURRENT_RULES_VERSION}")
 
 
 @pytest.mark.asyncio
-async def test_republish_relabels_round_content_without_regenerating(local_generation, monkeypatch):  # noqa: F811
+async def test_republish_regenerates_round_content_from_an_older_version(local_generation, monkeypatch):  # noqa: F811
     today = datetime.now(timezone.utc).date()
     day = today - timedelta(days=1)
-    original = await engine.publish_daily_puzzle(day)
+    await engine.publish_daily_puzzle(day)
     async with get_session_factory()() as session:
         row = await session.get(DailyPuzzleSet, day)
-        row.rules_version = "2"
+        row.rules_version = "3"
+        row.content = {**row.content, "marker": "rules-v3"}
         await session.commit()
 
-    async def must_not_generate(*args, **kwargs):
-        raise AssertionError("round-format content must not be regenerated")
+    calls = []
+    assemble = engine._assemble_daily_puzzle
 
-    monkeypatch.setattr(engine, "_assemble_daily_puzzle", must_not_generate)
+    async def counting(*args, **kwargs):
+        calls.append(1)
+        return await assemble(*args, **kwargs)
+
+    monkeypatch.setattr(engine, "_assemble_daily_puzzle", counting)
     upgraded = await engine.publish_daily_puzzle(day, replace_legacy=True)
+    # Same-format content is rebuilt too: the rules changed, not just the label.
+    assert calls == [1]
     assert upgraded.rules_version == engine.CURRENT_RULES_VERSION
-    assert upgraded.games.model_dump() == original.games.model_dump()
+    async with get_session_factory()() as session:
+        assert "marker" not in (await session.get(DailyPuzzleSet, day)).content

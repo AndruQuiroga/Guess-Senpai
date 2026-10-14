@@ -4,24 +4,49 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { OpeningClip } from "../../types/puzzles";
 
-const DEFAULT_WINDOW = { start: 10, end: 40 };
+const DEFAULT_WINDOW = { start: 20, end: 50 };
+/**
+ * Seconds kept off-limits at each end of the song: openings usually show
+ * the title card early and the credits late.
+ */
+const EDGE_SECONDS = 20;
+/** The video clue is a hazy impression, not a free answer. */
+const VIDEO_CLUE_FILTER = "blur(14px) saturate(0.45)";
 
 function formatSeconds(value: number) {
   const safe = Math.max(0, Math.floor(value));
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-export function clipWindow(clip: OpeningClip) {
-  const start = clip.startSeconds ?? DEFAULT_WINDOW.start;
-  const end = Math.max(start + 1, clip.endSeconds ?? DEFAULT_WINDOW.end);
+/**
+ * The playable window: the server's window, kept past the opening's first
+ * 20 seconds and, once the real length is known, pulled back before its
+ * last 20 (AnimeThemes doesn't report lengths, so the server assumes 90s).
+ */
+export function clipWindow(clip: OpeningClip, duration?: number | null) {
+  const rawStart = clip.startSeconds ?? DEFAULT_WINDOW.start;
+  const rawEnd = Math.max(rawStart + 1, clip.endSeconds ?? DEFAULT_WINDOW.end);
+  const length = rawEnd - rawStart;
+  let start = Math.max(rawStart, EDGE_SECONDS);
+  let end = start + length;
+  if (duration && Number.isFinite(duration) && duration > 0) {
+    const margin = Math.min(EDGE_SECONDS, duration * 0.2);
+    const latestEnd = duration - margin;
+    if (end > latestEnd) {
+      end = latestEnd;
+      start = Math.max(margin, end - length);
+    }
+    if (end - start < 1) return { start: 0, end: duration };
+  }
   return { start, end };
 }
 
 /**
  * Opening player limited to the clip's window. There are no native controls,
  * so the rest of the song (and the credits that name the show) can't be
- * scrubbed to. The video stays hidden until `showVideo`; `unrestricted` lifts
- * the window for the results screen.
+ * scrubbed to. Until `showVideo` it plays the light audio file (falling back
+ * to the video's soundtrack); the video clue itself is blurred. `unrestricted`
+ * lifts the window and the blur for the results screen.
  */
 export function OpeningPlayer({
   clip,
@@ -34,19 +59,39 @@ export function OpeningPlayer({
   unrestricted?: boolean;
   label: string;
 }) {
-  const source = clip.videoUrl ?? clip.audioUrl ?? null;
-  const isVideo = Boolean(clip.videoUrl);
+  const isVideo = Boolean(showVideo && clip.videoUrl);
+  const sources = (
+    isVideo ? [clip.videoUrl] : [clip.audioUrl, clip.videoUrl]
+  ).filter((value, index, all): value is string =>
+    Boolean(value && all.indexOf(value) === index),
+  );
+  const sourceKey = sources.join("|");
   const mediaRef = useRef<HTMLVideoElement & HTMLAudioElement>(null);
-  const { start, end } = clipWindow(clip);
+  // Carry the listener's place (and whether it was playing) across the
+  // audio → video switch, which swaps the media element.
+  const resumeAt = useRef<number | null>(null);
+  const resumePlaying = useRef(false);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [duration, setDuration] = useState<number | null>(null);
+  const { start, end } = clipWindow(clip, duration);
   const [playing, setPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(false);
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [failed, setFailed] = useState(false);
+  const source = sources[sourceIndex] ?? null;
+
+  useEffect(() => {
+    setSourceIndex(0);
+    setFailed(false);
+    setPlaying(false);
+    setBuffering(false);
+  }, [sourceKey]);
 
   useEffect(() => {
     const media = mediaRef.current;
     if (media) media.volume = volume;
-  }, [volume]);
+  }, [volume, source]);
 
   const clamp = useCallback(() => {
     const media = mediaRef.current;
@@ -66,13 +111,22 @@ export function OpeningPlayer({
       media.pause();
       return;
     }
+    if (failed) {
+      // Retry from scratch: a stalled or errored source needs a fresh load.
+      setSourceIndex(0);
+      media.load();
+    }
     clamp();
     try {
+      setFailed(false);
       await media.play();
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      // An aborted play (the source changed underneath it) is not a failure.
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setFailed(true);
+      }
     }
-  }, [clamp]);
+  }, [clamp, failed]);
 
   const restart = useCallback(() => {
     const media = mediaRef.current;
@@ -96,20 +150,56 @@ export function OpeningPlayer({
     preload: "metadata" as const,
     onLoadedMetadata: () => {
       const media = mediaRef.current;
-      if (media && !unrestricted) media.currentTime = start;
+      if (!media) return;
+      const known = Number.isFinite(media.duration) ? media.duration : null;
+      setDuration(known);
+      if (unrestricted) return;
+      const fitted = clipWindow(clip, known);
+      const resume = resumeAt.current;
+      media.currentTime =
+        resume !== null && resume >= fitted.start && resume < fitted.end
+          ? resume
+          : fitted.start;
+      resumeAt.current = null;
+      if (resumePlaying.current) {
+        resumePlaying.current = false;
+        media.play().catch(() => undefined);
+      }
     },
     onTimeUpdate: () => {
       const media = mediaRef.current;
       if (!media) return;
       clamp();
+      if (!media.paused) {
+        resumeAt.current = media.currentTime;
+        resumePlaying.current = true;
+      }
       setPosition(Math.max(0, media.currentTime - (unrestricted ? 0 : start)));
     },
-    onPlay: () => setPlaying(true),
-    onPause: () => setPlaying(false),
-    onError: () => setFailed(true),
+    onPlay: () => {
+      setPlaying(true);
+      setFailed(false);
+    },
+    onPause: () => {
+      setPlaying(false);
+      resumePlaying.current = false;
+    },
+    onWaiting: () => setBuffering(true),
+    onPlaying: () => setBuffering(false),
+    onCanPlay: () => setBuffering(false),
+    onError: () => {
+      // e.g. Safari can't decode the .ogg: fall back to the video's audio.
+      if (sourceIndex + 1 < sources.length) {
+        setSourceIndex(sourceIndex + 1);
+        return;
+      }
+      setPlaying(false);
+      setBuffering(false);
+      setFailed(true);
+    },
   };
 
-  if (unrestricted && isVideo) {
+  if (unrestricted && clip.videoUrl && isVideo) {
     return (
       <video
         {...shared}
@@ -124,28 +214,27 @@ export function OpeningPlayer({
   return (
     <div className="relative space-y-3 rounded-lg border border-line-strong bg-panel p-4">
       {isVideo ? (
-        <video
-          {...shared}
-          playsInline
-          aria-label={label}
-          className={
-            showVideo
-              ? "aspect-video w-full rounded-md border border-line bg-ink"
-              : // Audio only: the element keeps playing sound while hidden.
-                "pointer-events-none absolute h-px w-px opacity-0"
-          }
-        />
-      ) : (
-        <audio {...shared} aria-label={label} />
-      )}
-      {isVideo && !showVideo ? (
-        <div
-          aria-hidden
-          className="flex aspect-[16/5] w-full items-center justify-center rounded-md border border-dashed border-line-strong bg-ink text-sm text-muted"
-        >
-          ♪ Audio only
+        <div className="relative aspect-video w-full overflow-hidden rounded-md border border-line bg-ink">
+          <video
+            {...shared}
+            playsInline
+            aria-label={label}
+            // Scaled up so the blur doesn't leave soft, see-through edges.
+            className="h-full w-full scale-110 object-cover"
+            style={{ filter: VIDEO_CLUE_FILTER }}
+          />
         </div>
-      ) : null}
+      ) : (
+        <>
+          <audio {...shared} aria-label={label} />
+          <div
+            aria-hidden
+            className="flex aspect-[16/5] w-full items-center justify-center rounded-md border border-dashed border-line-strong bg-ink text-sm text-muted"
+          >
+            ♪ Audio only
+          </div>
+        </>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -181,6 +270,7 @@ export function OpeningPlayer({
             />
           </div>
           <span className="text-xs tabular-nums text-muted">
+            {playing && buffering ? "Loading… " : ""}
             {formatSeconds(position)}
             {length ? ` / ${formatSeconds(length)}` : ""}
           </span>
@@ -200,7 +290,8 @@ export function OpeningPlayer({
       </div>
       {failed ? (
         <p role="alert" className="text-sm text-danger-ink">
-          The clip couldn&apos;t play. Try Play again or check your sound.
+          The clip couldn&apos;t play. Press Play to try again, or check your
+          sound.
         </p>
       ) : null}
     </div>

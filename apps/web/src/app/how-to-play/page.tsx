@@ -74,7 +74,7 @@ export default function HowToPlayPage() {
             Poster Modified
           </h2>
           <p className="text-base leading-relaxed text-muted">
-            A separate daily mode with black-and-white, mosaic and shuffled-tile
+            A separate daily mode with spotlit, mosaic and shuffled-tile
             posters: one of each in a shuffled daily order. Difficulty follows
             anime popularity, independently of the effect. Each round uses a
             different anime, with the same 600 title points and optional bonuses
@@ -119,9 +119,9 @@ export default function HowToPlayPage() {
               at once. Each card shows its own result.
             </li>
             <li>
-              Every round uses popular characters: Easy is black and white,
-              Medium a full-colour close-up, Hard a full-colour mosaic. Buy a
-              clearer view of a card for a points cost.
+              Every round uses popular characters: Easy is a blurred full-colour
+              zoom, Medium a black-and-white close-up, Hard a full-colour
+              mosaic. Buy a clearer view of a card for a points cost.
             </li>
           </ul>
         </PanelSection>

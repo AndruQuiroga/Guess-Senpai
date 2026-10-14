@@ -4,37 +4,36 @@ import { useEffect, useMemo, useRef } from "react";
 
 /**
  * How a character card hides its art. Every round uses popular characters;
- * the round decides the view: Easy is black and white, Medium a full-colour
- * close-up of one detail, Hard a full-colour mosaic. Each mode has three
+ * the round decides the view: Easy is a blurred full-colour zoom on the
+ * head, Medium a tighter, sharp black-and-white close-up of one detail, Hard
+ * a full-colour mosaic. Each mode has three
  * levels (0-2) and each bought "Sharpen" moves a card one level clearer.
  */
-export type ArtMode = "mono" | "crop" | "mosaic";
+export type ArtMode = "zoom" | "crop" | "mosaic";
 
 export const ART_LEVELS = 3;
 
-const MONO_FILTERS = [
-  "grayscale(1) contrast(1.15) blur(3px)",
-  "grayscale(1) blur(1.2px)",
-  "grayscale(1)",
-] as const;
-/** Close-up zoom per level: roughly a seventh, a quarter, then half the art. */
-const CROP_SCALES = [2.6, 1.9, 1.4] as const;
+const ZOOM_BLURS = ["blur(7px)", "blur(4px)", "blur(2px)"] as const;
+/** Easy's zoom per level: about a seventh, a quarter, then half the art. */
+const ZOOM_SCALES = [2.6, 2, 1.45] as const;
+/** Close-up zoom per level: about a thirteenth, a sixth, then a third of the art. */
+const CROP_SCALES = [3.6, 2.5, 1.75] as const;
 /** Mosaic blocks across the card per level. */
-const MOSAIC_BLOCKS = [8, 13, 22] as const;
+const MOSAIC_BLOCKS = [10, 15, 24] as const;
 
 const MODE_BY_DIFFICULTY: Record<number, ArtMode> = {
-  1: "mono",
+  1: "zoom",
   2: "crop",
   3: "mosaic",
 };
 
 export function artModeFor(difficulty: number): ArtMode {
-  return MODE_BY_DIFFICULTY[difficulty] ?? "mono";
+  return MODE_BY_DIFFICULTY[difficulty] ?? "zoom";
 }
 
 export const ART_MODE_LABELS: Record<ArtMode, string> = {
-  mono: "Black and white",
-  crop: "Close-up",
+  zoom: "Blurred zoom",
+  crop: "Black-and-white close-up",
   mosaic: "Mosaic",
 };
 
@@ -121,14 +120,18 @@ export function CharacterArt({
       data-level={step}
       className="relative aspect-[3/4] w-full overflow-hidden bg-ink"
     >
-      {mode === "mono" ? (
+      {mode === "zoom" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt=""
           draggable={false}
-          className="h-full w-full object-cover"
-          style={{ filter: MONO_FILTERS[step] }}
+          className="h-full w-full object-cover transition-transform duration-500"
+          style={{
+            filter: ZOOM_BLURS[step],
+            transform: `scale(${ZOOM_SCALES[step]})`,
+            transformOrigin: `${origin.x}% ${origin.y}%`,
+          }}
         />
       ) : null}
       {mode === "crop" ? (
@@ -139,6 +142,7 @@ export function CharacterArt({
           draggable={false}
           className="h-full w-full object-cover transition-transform duration-500"
           style={{
+            filter: "grayscale(1)",
             transform: `scale(${CROP_SCALES[step]})`,
             transformOrigin: `${origin.x}% ${origin.y}%`,
           }}

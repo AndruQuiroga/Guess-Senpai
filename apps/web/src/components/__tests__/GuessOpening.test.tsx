@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 
 import GuessOpening from "../GuessOpening";
+import { clipWindow } from "../games/OpeningPlayer";
 import type { GameProgress } from "../../types/progress";
 import type { GuessOpeningRound } from "../../types/puzzles";
 
@@ -54,7 +55,8 @@ const rounds = [
   opening(2, 2, "Second"),
   opening(3, 3, "Third"),
 ];
-const mediaSrc = () => document.querySelector("video")?.getAttribute("src");
+const mediaSrc = () =>
+  document.querySelector("audio, video")?.getAttribute("src");
 
 describe("GuessOpening rounds", () => {
   beforeEach(() => {
@@ -65,9 +67,9 @@ describe("GuessOpening rounds", () => {
   it("plays audio only, with no native controls, until the video clue is taken", () => {
     const progress = vi.fn();
     render(<GuessOpening payload={rounds} onProgressChange={progress} />);
-    const video = document.querySelector("video")!;
-    expect(video).not.toHaveAttribute("controls");
-    expect(video.className).toContain("opacity-0");
+    const audio = document.querySelector("audio")!;
+    expect(audio).not.toHaveAttribute("controls");
+    expect(document.querySelector("video")).toBeNull();
     expect(screen.getByText(/0:00 \/ 0:30/)).toBeInTheDocument();
 
     // The video stays locked until the genres or the year is bought.
@@ -81,9 +83,8 @@ describe("GuessOpening rounds", () => {
     expect(screen.getByText("2019")).toBeInTheDocument();
     expect(video_()).toBeEnabled();
     fireEvent.click(video_());
-    expect(document.querySelector("video")!.className).toContain(
-      "aspect-video",
-    );
+    // The video clue is blurred, never the clean picture.
+    expect(document.querySelector("video")!.style.filter).toContain("blur");
     expect(progress.mock.calls.at(-1)?.[0].rounds[0]).toMatchObject({
       hints: 2,
       answers: { year: true, video: true },
@@ -142,12 +143,8 @@ describe("GuessOpening rounds", () => {
     fireEvent.change(screen.getByLabelText("Release year"), {
       target: { value: "2019" },
     });
-    fireEvent.change(screen.getByLabelText("Release season"), {
-      target: { value: "SPRING" },
-    });
-    fireEvent.change(screen.getByLabelText("Numbered season (+200)"), {
-      target: { value: "2" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: /Spring/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "Season 2" }));
     fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
     expect(await screen.findByText("+1,400")).toBeInTheDocument();
     expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({
@@ -164,6 +161,37 @@ describe("GuessOpening rounds", () => {
         expect.anything(),
         expect.anything(),
       ],
+    });
+  });
+
+  it("plays the light audio file and falls back to the video's sound", () => {
+    const round = opening(1, 4, "Fallback");
+    round.clip.audioUrl = "https://a.example/4.ogg";
+    render(<GuessOpening payload={[round]} onProgressChange={vi.fn()} />);
+    expect(mediaSrc()).toBe("https://a.example/4.ogg");
+    fireEvent.error(document.querySelector("audio")!);
+    expect(mediaSrc()).toBe("https://v.example/4.webm");
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.error(document.querySelector("audio")!);
+    expect(screen.getByRole("alert")).toHaveTextContent(/couldn.t play/i);
+  });
+});
+
+describe("clipWindow", () => {
+  it("never plays the first or last 20 seconds", () => {
+    // Never earlier than 20s, whatever the payload says.
+    expect(clipWindow({ startSeconds: 10, endSeconds: 40 })).toEqual({
+      start: 20,
+      end: 50,
+    });
+    // A short 60s cut keeps a fifth (12s) clear at each end instead.
+    expect(clipWindow({ startSeconds: 30, endSeconds: 60 }, 60)).toEqual({
+      start: 18,
+      end: 48,
+    });
+    expect(clipWindow({ startSeconds: 25, endSeconds: 55 }, 89)).toEqual({
+      start: 25,
+      end: 55,
     });
   });
 });

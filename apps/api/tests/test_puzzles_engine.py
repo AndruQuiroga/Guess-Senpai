@@ -590,7 +590,7 @@ async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: py
     modified = result.games.poster_modified.puzzle.rounds
     assert [r.difficulty for r in modified] == [1, 2, 3]
     assert all(r.mediaId in tiers[r.difficulty] for r in modified)
-    assert {r.meta.modification for r in modified} == {"black_white", "mosaic", "shuffled"}
+    assert {r.meta.modification for r in modified} == {"spotlight", "mosaic", "shuffled"}
     every_round.extend(r.mediaId for r in modified)
     assert len(every_round) == 25
     assert len(every_round) == len(set(every_round))
@@ -629,3 +629,26 @@ async def test_opening_rounds_carry_buyable_genre_and_year(monkeypatch: pytest.M
     assert opening is not None
     assert opening.meta.genres == ["Action", "Drama", "Mystery", "Sci-Fi"]
     assert opening.meta.year == 2024
+    # The window skips the first and last 20 seconds of a ~90s opening.
+    assert 20 <= opening.clip.startSeconds <= 40
+    assert opening.clip.endSeconds - opening.clip.startSeconds == 30
+    assert opening.clip.endSeconds <= 70
+
+
+def test_opening_prefers_a_creditless_video_without_lyrics() -> None:
+    from app.services import animethemes
+
+    audio = {"link": "https://a.example/op.ogg"}
+    payload = {"anime": {"animethemes": [{"type": "OP", "sequence": None, "slug": "OP1", "song": {}, "animethemeentries": [{
+        "nsfw": False, "spoiler": False, "videos": [
+            {"link": "https://v.example/OP1-Lyrics.webm", "lyrics": True, "nc": False, "subbed": False,
+             "overlap": "None", "resolution": 720, "size": 24, "audio": audio},
+            {"link": "https://v.example/OP1-NCBD1080.webm", "lyrics": False, "nc": True, "subbed": False,
+             "overlap": "None", "resolution": 1080, "size": 37, "audio": audio},
+            {"link": "https://v.example/OP1.webm", "lyrics": False, "nc": False, "subbed": False,
+             "overlap": "None", "resolution": 720, "size": 29, "audio": audio},
+        ]}]}]}}
+    clip = animethemes.extract_opening_clip(payload)
+    assert clip is not None
+    assert clip.video_url == "https://v.example/OP1-NCBD1080.webm"
+    assert clip.audio_url == "https://a.example/op.ogg"

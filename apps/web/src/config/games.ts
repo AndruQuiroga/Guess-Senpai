@@ -129,7 +129,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
     slug: "poster-modified",
     title: "Poster Modified",
     tagline:
-      "Recognize anime through black-and-white, mosaic and shuffled posters.",
+      "Recognize anime through spotlit, mosaic and shuffled posters.",
     accentColor: "from-emerald-400 via-teal-400 to-sky-500",
     release: "daily",
     playable: false,
@@ -139,7 +139,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       "Three different anime ranked by popularity, with one of each poster effect in a shuffled daily order.",
     preview: {
       summary:
-        "Black and white, mosaic and shuffled tiles: recognize the anime through altered key art.",
+        "Spotlights, mosaic and shuffled tiles: recognize the anime through altered key art.",
       rules: [
         "Three rounds, three different anime. Difficulty follows popularity, not the effect.",
         "One of each effect in a shuffled daily order.",
@@ -148,7 +148,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       media: {
         type: "image",
         src: "/games/poster-modified.svg",
-        alt: "A poster divided into shuffled monochrome and mosaic tiles.",
+        alt: "A poster divided into shuffled, spotlit and mosaic tiles.",
       },
     },
   },
@@ -167,7 +167,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
       summary:
         "Easy, Medium and Hard lineups of four hidden characters. Name each one and their anime, then check them all at once.",
       rules: [
-        "Three rounds of four popular characters: black and white, close-up, then mosaic.",
+        "Three rounds of four popular characters: blurred zoom, black-and-white close-up, then mosaic.",
         "Fill in every character's name and anime, then check them all at once.",
         "Sharpen a card for a points cost; each card shows its own result after checking.",
       ],
