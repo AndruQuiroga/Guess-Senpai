@@ -32,7 +32,7 @@ export interface AnidleGame {
 
 export interface PosterZoomMeta {
   seasonOptions?: number[];
-  modification?: "black_white" | "mosaic" | "shuffled" | null;
+  modification?: "spotlight" | "mosaic" | "shuffled" | null;
   seasonNumber?: number | null;
   seriesTitles?: string[];
   genres: string[];

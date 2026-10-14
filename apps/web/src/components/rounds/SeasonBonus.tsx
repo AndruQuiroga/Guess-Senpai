@@ -1,3 +1,5 @@
+import { useState, type ReactNode } from "react";
+
 import { line, type ScoreLine } from "./scoring";
 
 export const SEASON_NUMBER_POINTS = 200;
@@ -114,6 +116,178 @@ export function seasonBonusLines(
   return result;
 }
 
+const SEASON_ICONS: Record<(typeof SEASONS)[number], string> = {
+  WINTER: "❄️",
+  SPRING: "🌸",
+  SUMMER: "☀️",
+  FALL: "🍂",
+};
+const FIRST_DECADE = 1970;
+
+const chipClass = (selected: boolean) =>
+  `inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+    selected
+      ? "border-signal bg-signal-soft font-semibold text-paper"
+      : "border-line-strong text-paper hover:bg-hover"
+  }`;
+
+/** Single-choice pills; tapping the chosen pill again clears it (a skip). */
+function ChoicePills<T extends string | number>({
+  labelId,
+  options,
+  value,
+  onChange,
+  render,
+}: {
+  labelId: string;
+  options: readonly T[];
+  value: T | null;
+  onChange(value: T | null): void;
+  render(option: T): ReactNode;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelId}
+      className="flex flex-wrap gap-2"
+    >
+      {options.map((option) => {
+        const selected = option === value;
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(selected ? null : option)}
+            className={chipClass(selected)}
+          >
+            {render(option)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Year entry built for thumbs: pick a decade, then a year, or nudge with
+ * the steppers. The text field still takes a typed year.
+ */
+function YearPicker({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange(value: string): void;
+}) {
+  const latestDecade = Math.max(
+    2020,
+    Math.floor(new Date().getFullYear() / 10) * 10,
+  );
+  const decades: number[] = [];
+  for (let decade = FIRST_DECADE; decade <= latestDecade; decade += 10)
+    decades.push(decade);
+  const typed = /^\d{4}$/.test(value) ? Number(value) : null;
+  // The year row only opens on a decade tap and closes again after a pick.
+  const [openDecade, setOpenDecade] = useState<number | null>(null);
+  const decade =
+    openDecade ?? (typed !== null ? Math.floor(typed / 10) * 10 : null);
+  // With nothing entered yet, the steppers start from the open decade.
+  const step = (delta: number) => {
+    setOpenDecade(null);
+    onChange(String(typed !== null ? typed + delta : (decade ?? 2010) + 5));
+  };
+  const stepperClass =
+    "min-h-11 min-w-11 rounded-md border border-line-strong bg-panel text-lg font-semibold text-paper hover:bg-hover disabled:opacity-60";
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-stretch gap-2">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          className={stepperClass}
+          aria-label="One year earlier"
+        >
+          −
+        </button>
+        <input
+          id={`${id}-year`}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={4}
+          value={value}
+          onChange={(event) => {
+            setOpenDecade(null);
+            onChange(event.target.value.replace(/\D/g, "").slice(0, 4));
+          }}
+          placeholder="Year"
+          className="w-24 rounded-md border border-line-strong bg-ink px-3 py-2 text-center text-lg tabular-nums text-paper disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={() => step(1)}
+          className={stepperClass}
+          aria-label="One year later"
+        >
+          +
+        </button>
+        {value ? (
+          <button
+            type="button"
+            onClick={() => {
+              setOpenDecade(null);
+              onChange("");
+            }}
+            className="min-h-11 px-2 text-sm text-muted underline-offset-2 hover:text-paper hover:underline"
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
+      <div role="group" aria-label="Decade" className="flex flex-wrap gap-1.5">
+        {decades.map((start) => (
+          <button
+            key={start}
+            type="button"
+            aria-pressed={decade === start}
+            onClick={() => setOpenDecade(openDecade === start ? null : start)}
+            className={chipClass(decade === start)}
+          >
+            {start}s
+          </button>
+        ))}
+      </div>
+      {openDecade !== null ? (
+        <div
+          role="group"
+          aria-label={`Years in the ${openDecade}s`}
+          className="flex flex-wrap gap-1.5"
+        >
+          {Array.from({ length: 10 }, (_, offset) => openDecade + offset).map(
+            (year) => (
+              <button
+                key={year}
+                type="button"
+                aria-pressed={typed === year}
+                onClick={() => {
+                  setOpenDecade(null);
+                  onChange(String(year));
+                }}
+                className={`${chipClass(typed === year)} tabular-nums`}
+              >
+                {year}
+              </button>
+            ),
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SeasonBonusFields({
   id,
   meta,
@@ -131,11 +305,13 @@ export function SeasonBonusFields({
   const season = releaseSeason(meta);
   const numberBonus = hasNumberedSeasonBonus(meta);
   if (!year && !numberBonus) return null;
-  const fieldClass =
-    "w-full rounded-md border border-line-strong bg-ink px-3 py-3 text-paper disabled:opacity-60";
+  const labelClass = "text-sm font-semibold text-paper";
   return (
-    <fieldset className="space-y-3" disabled={disabled}>
-      <legend className="text-sm font-semibold text-paper">
+    <fieldset
+      className="space-y-4 rounded-lg border border-line p-4"
+      disabled={disabled}
+    >
+      <legend className="px-1 text-sm font-semibold text-paper">
         Optional bonus guesses
       </legend>
       <p className="text-sm text-muted">
@@ -145,88 +321,62 @@ export function SeasonBonusFields({
           ? "Exact year and release season earn +200 total. "
           : ""}
         {numberBonus ? "Numbered season earns a separate +200. " : ""}Skip any
-        field without losing anime points.
+        of them without losing anime points.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {year ? (
-          <div className="space-y-2">
-            <label
-              htmlFor={`${id}-year`}
-              className="text-sm font-semibold text-paper"
-            >
-              Release year
-            </label>
-            <input
-              id={`${id}-year`}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={4}
-              value={value.year}
-              onChange={(event) =>
-                onChange({
-                  ...value,
-                  year: event.target.value.replace(/\D/g, "").slice(0, 4),
-                })
-              }
-              placeholder="e.g. 2019"
-              className={fieldClass}
-            />
-          </div>
-        ) : null}
-        {year && season ? (
-          <div className="space-y-2">
-            <label
-              htmlFor={`${id}-season`}
-              className="text-sm font-semibold text-paper"
-            >
-              Release season
-            </label>
-            <select
-              id={`${id}-season`}
-              value={value.season}
-              onChange={(event) =>
-                onChange({ ...value, season: event.target.value })
-              }
-              className={fieldClass}
-            >
-              <option value="">Skip</option>
-              {SEASONS.map((season) => (
-                <option key={season} value={season}>
-                  {season.charAt(0) + season.slice(1).toLowerCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-        {numberBonus ? (
-          <div className="space-y-2">
-            <label
-              htmlFor={`${id}-number`}
-              className="text-sm font-semibold text-paper"
-            >
-              Numbered season (+200)
-            </label>
-            <select
-              id={`${id}-number`}
-              value={value.seasonNumber}
-              onChange={(event) =>
-                onChange({
-                  ...value,
-                  seasonNumber: event.target.value,
-                })
-              }
-              className={fieldClass}
-            >
-              <option value="">Skip</option>
-              {meta.seasonOptions?.map((number) => (
-                <option key={number} value={number}>
-                  Season {number}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-      </div>
+      {year ? (
+        <div className="space-y-2">
+          <label htmlFor={`${id}-year`} className={labelClass}>
+            Release year
+          </label>
+          <YearPicker
+            id={id}
+            value={value.year}
+            onChange={(next) => onChange({ ...value, year: next })}
+          />
+        </div>
+      ) : null}
+      {year && season ? (
+        <div className="space-y-2">
+          <p id={`${id}-season`} className={labelClass}>
+            Release season
+          </p>
+          <ChoicePills
+            labelId={`${id}-season`}
+            options={SEASONS}
+            value={SEASONS.find((option) => option === value.season) ?? null}
+            onChange={(next) => onChange({ ...value, season: next ?? "" })}
+            render={(option) => (
+              <>
+                <span aria-hidden>{SEASON_ICONS[option]}</span>
+                {option.charAt(0) + option.slice(1).toLowerCase()}
+              </>
+            )}
+          />
+        </div>
+      ) : null}
+      {numberBonus ? (
+        <div className="space-y-2">
+          <p id={`${id}-number`} className={labelClass}>
+            Numbered season (+200)
+          </p>
+          <ChoicePills
+            labelId={`${id}-number`}
+            options={meta.seasonOptions ?? []}
+            value={
+              meta.seasonOptions?.find(
+                (option) => String(option) === value.seasonNumber,
+              ) ?? null
+            }
+            onChange={(next) =>
+              onChange({
+                ...value,
+                seasonNumber: next === null ? "" : String(next),
+              })
+            }
+            render={(option) => `Season ${option}`}
+          />
+        </div>
+      ) : null}
     </fieldset>
   );
 }

@@ -8,6 +8,7 @@ from PIL import Image, ImageChops
 
 from app.puzzles import engine
 from app.services.anime_seasons import season_number, season_options, series_groups, series_titles
+from app.services import poster_modified
 from app.services.poster_modified import MODIFICATIONS, render_modified_poster
 from test_puzzles_engine import DummyCache, _media_with_character, make_media, make_guess_opening
 
@@ -117,20 +118,44 @@ def source_image() -> bytes:
 
 
 @pytest.mark.parametrize("modification", MODIFICATIONS)
-def test_modified_images_are_deterministic_and_clues_restore_original(modification):
+def test_modified_images_are_deterministic_and_never_show_the_plain_poster(modification):
     source = source_image()
     first = render_modified_poster(source, modification, 0, 42)
     assert first == render_modified_poster(source, modification, 0, 42)
     clearer = render_modified_poster(source, modification, 1, 42)
-    restored = render_modified_poster(source, modification, 2, 42)
-    assert first != clearer != restored
+    last = render_modified_poster(source, modification, 2, 42)
+    assert first != clearer != last
     original = Image.open(io.BytesIO(source)).convert("RGB")
-    altered = Image.open(io.BytesIO(first)).convert("RGB")
-    assert ImageChops.difference(original, altered).getbbox() is not None
-    if modification == "black_white":
-        r, g, b = altered.split()
-        assert ImageChops.difference(r, g).getbbox() is None
-        assert ImageChops.difference(g, b).getbbox() is None
+    # Even the last clue keeps the effect: the plain poster prints the title.
+    for stage in (first, last):
+        altered = Image.open(io.BytesIO(stage)).convert("RGB")
+        assert ImageChops.difference(original, altered).getbbox() is not None
+
+
+def test_shuffle_cuts_many_tiles_and_clues_only_put_tiles_back():
+    image = Image.new("RGB", (240, 360))
+    # Every tile a unique flat colour, so a tile's position is easy to read back.
+    cols, rows = poster_modified.SHUFFLE_GRID
+    tile_w, tile_h = 240 // cols, 360 // rows
+    for index in range(cols * rows):
+        x, y = index % cols * tile_w, index // cols * tile_h
+        image.paste((index * 10, 255 - index * 10, 128), (x, y, x + tile_w, y + tile_h))
+    data = io.BytesIO()
+    image.save(data, "PNG")
+
+    def misplaced(hints):
+        out = Image.open(io.BytesIO(render_modified_poster(data.getvalue(), "shuffled", hints, 3))).convert("RGB")
+        return {
+            index for index in range(cols * rows)
+            if max(abs(a - b) for a, b in zip(
+                out.getpixel((index % cols * tile_w + tile_w // 2, index // cols * tile_h + tile_h // 2)),
+                image.getpixel((index % cols * tile_w + tile_w // 2, index // cols * tile_h + tile_h // 2)),
+            )) > 5
+        }
+
+    stages = [misplaced(hints) for hints in range(3)]
+    assert cols * rows >= 24 and len(stages[0]) == cols * rows
+    assert stages[0] > stages[1] > stages[2] and stages[2]
 
 
 @pytest.mark.asyncio

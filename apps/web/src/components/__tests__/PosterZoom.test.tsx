@@ -96,9 +96,7 @@ describe("PosterZoom rounds", () => {
         target: { value: "Bleach" },
       },
     );
-    fireEvent.change(screen.getByLabelText("Release season"), {
-      target: { value: "FALL" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: /Fall/i }));
     fireEvent.change(screen.getByLabelText("Release year"), {
       target: { value: "2005" },
     });
@@ -261,12 +259,8 @@ describe("PosterZoom rounds", () => {
     fireEvent.change(screen.getByLabelText("Release year"), {
       target: { value: "2004" },
     });
-    fireEvent.change(screen.getByLabelText("Release season"), {
-      target: { value: "FALL" },
-    });
-    fireEvent.change(screen.getByLabelText("Numbered season (+200)"), {
-      target: { value: "2" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: /Fall/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "Season 2" }));
     fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
     expect(await screen.findByText("+1,000")).toBeInTheDocument();
     expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({
@@ -305,7 +299,7 @@ describe("PosterZoom rounds", () => {
         ...round,
         meta: {
           ...round.meta,
-          modification: (["shuffled", "black_white", "mosaic"] as const)[index],
+          modification: (["shuffled", "spotlight", "mosaic"] as const)[index],
         },
       })),
     };

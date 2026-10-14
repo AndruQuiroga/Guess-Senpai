@@ -80,8 +80,12 @@ describe("CharacterSilhouette check-all rounds", () => {
     const art = screen.getAllByRole("img", { name: /obscured/ });
     expect(art).toHaveLength(2);
     art.forEach((card) => {
-      expect(card).toHaveAttribute("data-art", "mono");
+      expect(card).toHaveAttribute("data-art", "zoom");
       expect(card).toHaveAttribute("data-level", "0");
+      // Easy is a blurred, zoomed-in crop in full colour.
+      const image = card.querySelector("img");
+      expect(image?.style.transform).toBe("scale(2.6)");
+      expect(image?.style.filter).toBe("blur(7px)");
     });
     expect(screen.queryByAltText("Lelouch")).toBeNull();
   });
@@ -107,7 +111,7 @@ describe("CharacterSilhouette check-all rounds", () => {
     });
   });
 
-  it("shows close-ups in Medium and mosaics in Hard, in full colour", () => {
+  it("shows black-and-white close-ups in Medium and colour mosaics in Hard", () => {
     const rounds = [2, 3].map((difficulty) => ({
       order: difficulty,
       difficulty,
@@ -127,9 +131,11 @@ describe("CharacterSilhouette check-all rounds", () => {
       const art = screen.getAllByRole("img", { name: /obscured/ });
       if (round.difficulty === 2) {
         expect(art.every((item) => item.dataset.art === "crop")).toBe(true);
-        expect(art[0].querySelector("img")?.style.transform).toBe("scale(2.6)");
-        expect(art[0].querySelector("img")?.style.filter).toBe("");
-        expect(screen.getByText("Close-up")).toBeInTheDocument();
+        expect(art[0].querySelector("img")?.style.transform).toBe("scale(3.6)");
+        expect(art[0].querySelector("img")?.style.filter).toBe("grayscale(1)");
+        expect(
+          screen.getByText("Black-and-white close-up"),
+        ).toBeInTheDocument();
       } else {
         expect(art.every((item) => item.dataset.art === "mosaic")).toBe(true);
         expect(art[0].querySelector("canvas")).not.toBeNull();

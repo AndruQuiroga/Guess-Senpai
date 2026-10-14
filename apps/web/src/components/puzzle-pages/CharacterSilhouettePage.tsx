@@ -17,7 +17,7 @@ const RULES = [
   ...ROUND_RULES,
   "Each round shows four popular characters, each from a different anime. Fill in every character's name and anime, then press Check all.",
   `Each card is worth a quarter of the round: half for the name, half for the anime. Buy a clearer view of a card (−${SHARPEN_HINT_COST} from that card) if you need it.`,
-  "Easy shows them in black and white, Medium as full-colour close-ups, Hard as full-colour mosaics.",
+  "Easy shows them as blurred full-colour zooms, Medium as black-and-white close-ups, Hard as full-colour mosaics.",
 ];
 
 export function CharacterSilhouettePage({

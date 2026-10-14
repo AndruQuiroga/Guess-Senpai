@@ -47,7 +47,7 @@ function posterUrl(
 }
 
 export const MODIFICATION_LABELS = {
-  black_white: "Black and white",
+  spotlight: "Spotlights",
   mosaic: "Mosaic",
   shuffled: "Shuffled tiles",
 } as const;

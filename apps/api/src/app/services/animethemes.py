@@ -83,18 +83,22 @@ def _resolve_relationship(
 def _choose_best_video(videos: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not videos:
         return None
-    # Prioritise audio-only if available, otherwise the smallest resolution webm.
-    audio_only = [v for v in videos if v["attributes"].get("audio")]
-    if audio_only:
-        return audio_only[0]
-    sorted_videos = sorted(
-        videos,
-        key=lambda v: (
-            v["attributes"].get("resolution") or 1080,
-            v["attributes"].get("filesize") or 0,
-        ),
-    )
-    return sorted_videos[0]
+
+    # The video clue must not print the song or show name: prefer creditless
+    # cuts without lyrics, subtitles or overlapping episode footage, then the
+    # smallest file. (Every video carries an audio track, so that can't rank.)
+    def rank(video: Dict[str, Any]) -> Tuple[bool, bool, bool, bool, int, int]:
+        attributes = video["attributes"]
+        return (
+            bool(attributes.get("lyrics")),
+            bool(attributes.get("subbed")),
+            not attributes.get("nc"),
+            (attributes.get("overlap") or "None") != "None",
+            attributes.get("resolution") or 1080,
+            attributes.get("size") or attributes.get("filesize") or 0,
+        )
+
+    return min(videos, key=rank)
 
 
 def extract_opening_clip(payload: Dict[str, Any]) -> Optional[OpeningClip]:

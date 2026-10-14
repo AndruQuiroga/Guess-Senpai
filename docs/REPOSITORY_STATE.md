@@ -355,6 +355,28 @@ completed. Three public upstream smoke tests passed separately. Synthetic local
 browser QA covered desktop/mobile poster layouts, all effects, bonus scoring,
 reload recovery and the content-aware season selector.
 
+### Rules v4 difficulty pass (2026-10-14)
+
+`CURRENT_RULES_VERSION` is "4". Poster Zoomed starts far closer (Easy 4.2×,
+Medium 5.2×, Hard 6.4×, never below 2.1×). Poster Modified drops black and
+white (the title stayed readable) for "spotlight" (a few soft windows on a dark
+poster), cuts the shuffle into a 4×6 grid, and keeps every effect on its last
+clue: the plain poster only appears on the results screen. Opening clips prefer
+creditless videos without lyrics or subtitles (AnimeThemes reports no lengths,
+so `_choose_best_video` ranks the `nc`/`lyrics`/`subbed` flags), play a 30s
+window starting 20-40s in, and the player trims the window off the last 20s
+once the real length loads. Audio-only rounds play the `.ogg` with the video's
+soundtrack as fallback; the video clue is blurred and desaturated. Character
+art: Easy is a blurred full-colour zoom on the head, Medium a tighter
+black-and-white close-up, Hard a finer colour mosaic. Bonus year,
+season and numbered-season entry uses decade/year chips and pills.
+
+Republishing no longer relabels round-format sets; a set from an older rules
+version is regenerated in full. Deploy, then run
+`python -m app.puzzles.backfill --days <N> --republish-legacy` to rebuild today
+and the archive window; progress against v3 sets is left behind with them.
+No production backfill was performed here.
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.
