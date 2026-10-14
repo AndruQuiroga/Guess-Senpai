@@ -12,12 +12,14 @@ const GAME_DESCRIPTORS: Array<{
 }> = [
   { label: "Anidle", key: "anidle", totalRounds: 3 },
   { label: "Poster Zoomed", key: "poster_zoomed", totalRounds: 3 },
+  { label: "Poster Modified", key: "poster_modified", totalRounds: 3 },
   { label: "Guess the Character", key: "character_silhouette", totalRounds: 3 },
   { label: "Redacted Synopsis", key: "redacted_synopsis", totalRounds: 3 },
   { label: "Guess the Opening", key: "guess_the_opening", totalRounds: 3 },
 ];
 
 export interface ShareEventOptions {
+  includePosterModified?: boolean;
   includeGuessTheOpening?: boolean;
   aniListUrls?: string[];
   /** @deprecated use aniListUrls */
@@ -193,6 +195,11 @@ export function buildShareEvent(
     .filter((value, index, array) => array.indexOf(value) === index);
 
   const games: ShareEventGame[] = GAME_DESCRIPTORS.filter(({ key }) => {
+    if (
+      key === "poster_modified" &&
+      !(options?.includePosterModified ?? Boolean(progress.poster_modified))
+    )
+      return false;
     if (key === "guess_the_opening" && !includeOpening) {
       return false;
     }
@@ -269,7 +276,7 @@ export function buildShareEvent(
       };
     }
 
-    if (key === "poster_zoomed") {
+    if (key === "poster_zoomed" || key === "poster_modified") {
       const posterRounds = (gameProgress.rounds ?? []).filter(
         (entry): entry is GameRoundProgress => Boolean(entry),
       );

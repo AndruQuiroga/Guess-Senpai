@@ -3,6 +3,7 @@ import type { AnidleGuessHistoryEntry } from "./anidle";
 export type GameKey =
   | "anidle"
   | "poster_zoomed"
+  | "poster_modified"
   | "redacted_synopsis"
   | "character_silhouette"
   | "guess_the_opening";
@@ -38,6 +39,8 @@ export interface GameRoundProgress {
 }
 
 export interface GameProgress {
+  /** Available points for the actual rounds, including optional bonuses. */
+  maxPoints?: number;
   completed: boolean;
   round: number;
   guesses: string[];

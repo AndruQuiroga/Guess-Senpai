@@ -109,7 +109,7 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "Watch an iconic key visual slowly zoom out—each round adds release clues so you can lock in the anime and its debut.",
       rules: [
         "Three rounds (Easy, Medium, Hard), each a zoomed-in crop of a different poster.",
-        "Name the anime, with bonus points for its season and year.",
+        "600 title points; a year one off earns 50, exact year 100, exact year and release season 200 total. Numbered season adds 200 when available.",
         "Zoom out or show genres for a points cost; the full poster appears on the results screen.",
       ],
       media: {
@@ -122,6 +122,33 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         description:
           "A shifting crop that unveils key art details frame by frame.",
         icon: "🖼️",
+      },
+    },
+  },
+  {
+    slug: "poster-modified",
+    title: "Poster Modified",
+    tagline:
+      "Recognize anime through black-and-white, mosaic and shuffled posters.",
+    accentColor: "from-emerald-400 via-teal-400 to-sky-500",
+    release: "daily",
+    playable: false,
+    comingSoon: false,
+    gameKey: "poster_modified",
+    description:
+      "Three different anime ranked by popularity, with one of each poster effect in a shuffled daily order.",
+    preview: {
+      summary:
+        "Black and white, mosaic and shuffled tiles: recognize the anime through altered key art.",
+      rules: [
+        "Three rounds, three different anime. Difficulty follows popularity, not the effect.",
+        "One of each effect in a shuffled daily order.",
+        "600 title points, up to 200 for release year and season, plus 200 for numbered season. Hints cost points.",
+      ],
+      media: {
+        type: "image",
+        src: "/games/poster-modified.svg",
+        alt: "A poster divided into shuffled monochrome and mosaic tiles.",
       },
     },
   },
@@ -204,7 +231,8 @@ export const GAMES_DIRECTORY: GameDirectoryEntry[] = [
         "An optional mode that is available when a playable clip set is returned.",
       rules: [
         "Three openings (Easy, Medium, Hard), each a 30-second audio slice from AnimeThemes.",
-        "One answer per round; unlock the video or the artist for a points cost.",
+        "1,000 title points, up to 200 for release year and season, plus 200 for numbered season when known.",
+        "One answer per round. Genres, year and video are paid clues.",
         "The whole opening plays on the results screen.",
       ],
       media: {
@@ -360,6 +388,7 @@ export function findGameConfig(slug: string): GameDirectoryEntry | undefined {
 
 export interface RuntimeGameAvailability {
   guessTheOpeningEnabled: boolean;
+  posterModifiedEnabled?: boolean;
 }
 
 export function resolveGameAvailability(
@@ -370,7 +399,10 @@ export function resolveGameAvailability(
     return game;
   }
 
-  const playable = availability.guessTheOpeningEnabled;
+  const playable =
+    game.gameKey === "poster_modified"
+      ? Boolean(availability.posterModifiedEnabled)
+      : availability.guessTheOpeningEnabled;
   if (game.playable === playable && !game.comingSoon) {
     return game;
   }

@@ -16,37 +16,41 @@ import {
   RoundResult,
   RoundTabs,
 } from "./rounds/RoundUI";
-import {
-  buildOutcome,
-  difficultyLabel,
-  line,
-  ROUND_POINTS,
-} from "./rounds/scoring";
+import { buildOutcome, difficultyLabel, line } from "./rounds/scoring";
 import { useRoundGame, type RoundGameState } from "./rounds/useRoundGame";
+import {
+  matchesSeriesTitle,
+  seasonBonusLines,
+  SeasonBonusFields,
+  seasonRoundMax,
+} from "./rounds/SeasonBonus";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 /** Title is most of the round; season and year are bonus questions. */
-export const POSTER_POINTS = { title: 600, season: 200, year: 200 } as const;
+export const POSTER_POINTS = {
+  title: 600,
+  season: 100,
+  year: 100,
+  seasonNumber: 200,
+} as const;
 export const ZOOM_HINT_COST = 150;
 export const GENRE_HINT_COST = 100;
 const MAX_ZOOM_HINTS = 2;
 
-const SEASONS = ["WINTER", "SPRING", "SUMMER", "FALL"] as const;
-type Season = (typeof SEASONS)[number];
-
-function titleCase(value: string) {
-  return value.charAt(0) + value.slice(1).toLowerCase();
+function posterUrl(
+  round: PosterZoomRound,
+  zoomHints: number,
+  modified = false,
+) {
+  return `${API_BASE}/puzzles/poster/${round.mediaId}/image?hints=${zoomHints}&difficulty=${round.difficulty}${modified && round.meta.modification ? `&modification=${round.meta.modification}` : ""}`;
 }
 
-function answerSeason(round: PosterZoomRound): Season | null {
-  const token = round.meta.season?.trim().split(/\s+/)[0]?.toUpperCase();
-  return SEASONS.find((season) => season === token) ?? null;
-}
-
-function posterUrl(round: PosterZoomRound, zoomHints: number) {
-  return `${API_BASE}/puzzles/poster/${round.mediaId}/image?hints=${zoomHints}&difficulty=${round.difficulty}`;
-}
+export const MODIFICATION_LABELS = {
+  black_white: "Black and white",
+  mosaic: "Mosaic",
+  shuffled: "Shuffled tiles",
+} as const;
 
 /** Full, unzoomed poster for the results screen. */
 function fullPoster(round: PosterZoomRound) {
@@ -63,6 +67,7 @@ function splitHints(hints: number, genresShown: boolean) {
 }
 
 interface Props {
+  modified?: boolean;
   payload: PosterZoomGame;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
@@ -74,10 +79,14 @@ export default function PosterZoom({
   initialProgress,
   onProgressChange,
   nextSlug,
+  modified = false,
 }: Props) {
   const rounds = payload.rounds;
   const game = useRoundGame({
     roundCount: rounds.length,
+    roundMaxPoints: rounds.map((round) =>
+      seasonRoundMax(POSTER_POINTS.title, round.meta),
+    ),
     initialProgress,
     onProgressChange,
     puzzleKey: rounds.map((round) => round.mediaId).join(":"),
@@ -87,7 +96,11 @@ export default function PosterZoom({
   }));
 
   if (rounds.length === 0) {
-    return <p className="text-muted">Poster Zoomed is unavailable today.</p>;
+    return (
+      <p className="text-muted">
+        {modified ? "Poster Modified" : "Poster Zoomed"} is unavailable today.
+      </p>
+    );
   }
   if (game.legacyFinished) return <LegacyFinished nextSlug={nextSlug} />;
 
@@ -102,13 +115,16 @@ export default function PosterZoom({
       />
       {game.view >= rounds.length ? (
         <GameSummary
-          title="Poster Zoomed"
+          title={modified ? "Poster Modified" : "Poster Zoomed"}
           nextSlug={nextSlug}
           rows={rounds.map((round, index) => ({
             label: `Round ${index + 1} · ${tabs[index].label}`,
             answer: round.answer,
             coverImage: fullPoster(round),
             points: game.records[index]?.outcome?.points ?? 0,
+            max:
+              game.records[index]?.outcome?.max ??
+              seasonRoundMax(POSTER_POINTS.title, round.meta),
           }))}
         />
       ) : (
@@ -119,6 +135,7 @@ export default function PosterZoom({
           label={`Round ${game.view + 1} · ${tabs[game.view].label}`}
           game={game}
           isLast={game.view === rounds.length - 1}
+          modified={modified}
         />
       )}
     </div>
@@ -131,20 +148,23 @@ function PosterRound({
   label,
   game,
   isLast,
+  modified,
 }: {
   index: number;
   round: PosterZoomRound;
   label: string;
   game: RoundGameState;
   isLast: boolean;
+  modified: boolean;
 }) {
   const record = game.records[index];
   const fieldRef = useRef<TitleGuessFieldHandle | null>(null);
   const [title, setTitle] = useState(String(record.answers.title ?? ""));
-  const [season, setSeason] = useState<string>(
-    String(record.answers.season ?? ""),
-  );
-  const [year, setYear] = useState(String(record.answers.year ?? ""));
+  const [bonus, setBonus] = useState({
+    year: String(record.answers.year ?? ""),
+    season: String(record.answers.season ?? ""),
+    seasonNumber: String(record.answers.seasonNumber ?? ""),
+  });
   const [genresShown, setGenresShown] = useState(
     Boolean(record.answers.genresShown),
   );
@@ -154,35 +174,23 @@ function PosterRound({
   const { zooms } = splitHints(record.hints, genresShown);
   const hintCost = zooms * ZOOM_HINT_COST + (genresShown ? GENRE_HINT_COST : 0);
 
-  const correctSeason = answerSeason(round);
-  const correctYear = round.meta.year ?? null;
-
   const submit = useCallback(
     async (event?: FormEvent) => {
       event?.preventDefault();
       if (busy) return;
       const selection = fieldRef.current?.submit() ?? null;
       const guess = (selection?.value ?? title).trim();
-      if (!guess && !season && !year) {
-        setError("Fill in at least one answer first.");
+      if (!guess) {
+        setError("Type an anime title first.");
         return;
       }
       setBusy(true);
       setError(null);
       try {
-        const titleCorrect = guess
-          ? (await verifyGuess(round.mediaId, guess, selection?.suggestionId))
-              .animeMatch
-          : false;
-        const parsedYear = Number.parseInt(year, 10);
-        const yearVerdict =
-          correctYear == null || !Number.isFinite(parsedYear)
-            ? "wrong"
-            : parsedYear === correctYear
-              ? "correct"
-              : Math.abs(parsedYear - correctYear) === 1
-                ? "close"
-                : "wrong";
+        const titleCorrect =
+          matchesSeriesTitle(guess, round.meta) ||
+          (await verifyGuess(round.mediaId, guess, selection?.suggestionId))
+            .animeMatch;
         const outcome = buildOutcome(
           [
             line(
@@ -192,26 +200,19 @@ function PosterRound({
               titleCorrect ? "correct" : "wrong",
               POSTER_POINTS.title,
             ),
-            line(
-              "Season",
-              season ? titleCase(season) : "",
-              correctSeason ? titleCase(correctSeason) : "Unknown",
-              correctSeason && season === correctSeason ? "correct" : "wrong",
-              POSTER_POINTS.season,
-            ),
-            line(
-              "Year",
-              Number.isFinite(parsedYear) ? String(parsedYear) : "",
-              correctYear != null ? String(correctYear) : "Unknown",
-              yearVerdict,
-              POSTER_POINTS.year,
-            ),
+            ...seasonBonusLines(round.meta, bonus, titleCorrect),
           ],
           hintCost,
-          ROUND_POINTS,
+          seasonRoundMax(POSTER_POINTS.title, round.meta),
         );
         game.submitRound(index, {
-          answers: { title: guess, season, year, genresShown },
+          answers: {
+            title: guess,
+            season: bonus.season,
+            year: bonus.year,
+            seasonNumber: bonus.seasonNumber,
+            genresShown,
+          },
           guesses: guess ? [guess] : [],
           outcome,
         });
@@ -225,19 +226,7 @@ function PosterRound({
         setBusy(false);
       }
     },
-    [
-      busy,
-      correctSeason,
-      correctYear,
-      game,
-      genresShown,
-      hintCost,
-      index,
-      round,
-      season,
-      title,
-      year,
-    ],
+    [busy, bonus, game, genresShown, hintCost, index, round, title],
   );
 
   const genres = useMemo(() => round.meta.genres.slice(0, 4), [round]);
@@ -261,23 +250,30 @@ function PosterRound({
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <div className="grid gap-5 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <figure className="space-y-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={posterUrl(round, zooms)}
-            alt={`Zoomed-in crop of the round ${index + 1} poster`}
+            src={posterUrl(round, zooms, modified)}
+            alt={
+              modified
+                ? `${round.meta.modification ? MODIFICATION_LABELS[round.meta.modification] : "Modified"} poster for round ${index + 1}`
+                : `Zoomed-in crop of the round ${index + 1} poster`
+            }
             className="aspect-[2/3] w-full rounded-lg border border-line-strong bg-ink object-cover"
           />
           <figcaption className="text-xs text-muted">
-            {zooms === 0
-              ? "Closest zoom"
-              : `Zoomed out ${zooms} of ${MAX_ZOOM_HINTS} times`}
+            {modified
+              ? `${round.meta.modification ? MODIFICATION_LABELS[round.meta.modification] : "Modified poster"} · ${zooms} of ${MAX_ZOOM_HINTS} clearer views`
+              : zooms === 0
+                ? "Closest zoom"
+                : `Zoomed out ${zooms} of ${MAX_ZOOM_HINTS} times`}
           </figcaption>
         </figure>
 
         <div className="space-y-5">
           <HintShop
+            max={seasonRoundMax(POSTER_POINTS.title, round.meta)}
             spent={hintCost}
             disabled={busy}
             onBuy={(id) => {
@@ -291,7 +287,7 @@ function PosterRound({
             clues={[
               {
                 id: "zoom",
-                label: "Zoom out",
+                label: modified ? "Clearer image" : "Zoom out",
                 cost: ZOOM_HINT_COST,
                 uses: { used: zooms, max: MAX_ZOOM_HINTS },
               },
@@ -332,57 +328,13 @@ function PosterRound({
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label
-                htmlFor={`poster-season-${index}`}
-                className="text-sm font-semibold text-paper"
-              >
-                Season{" "}
-                <span className="font-normal text-muted">
-                  (+{POSTER_POINTS.season})
-                </span>
-              </label>
-              <select
-                id={`poster-season-${index}`}
-                value={season}
-                onChange={(event) => setSeason(event.target.value)}
-                disabled={busy}
-                className="w-full rounded-md border border-line-strong bg-ink px-3 py-3 text-paper"
-              >
-                <option value="">Skip</option>
-                {SEASONS.map((value) => (
-                  <option key={value} value={value}>
-                    {titleCase(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor={`poster-year-${index}`}
-                className="text-sm font-semibold text-paper"
-              >
-                Year{" "}
-                <span className="font-normal text-muted">
-                  (+{POSTER_POINTS.year}, half if off by one)
-                </span>
-              </label>
-              <input
-                id={`poster-year-${index}`}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={4}
-                value={year}
-                onChange={(event) =>
-                  setYear(event.target.value.replace(/\D/g, "").slice(0, 4))
-                }
-                disabled={busy}
-                placeholder="e.g. 2019"
-                className="w-full rounded-md border border-line-strong bg-ink px-3 py-3 text-paper"
-              />
-            </div>
-          </div>
+          <SeasonBonusFields
+            id={`poster-${index}`}
+            meta={round.meta}
+            value={bonus}
+            onChange={setBonus}
+            disabled={busy}
+          />
 
           {error ? (
             <p

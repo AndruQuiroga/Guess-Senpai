@@ -7,6 +7,16 @@ from fastapi import FastAPI
 
 from app.routers import puzzles
 from app.services import anilist
+from app.services import animethemes
+
+
+@pytest.mark.skipif(os.environ.get("RUN_PUBLIC_UPSTREAM_SMOKE") != "1", reason="explicit public-network smoke opt-in")
+@pytest.mark.asyncio
+async def test_public_second_season_opening_matches_anilist_identity():
+    media = await anilist.fetch_media_details(20958)
+    clip = await animethemes.find_opening_clip([media.title.romaji, media.title.english], anilist_id=media.id)
+    assert clip is not None
+    assert clip.video_url or clip.audio_url
 
 
 @pytest.mark.skipif(os.environ.get("RUN_PUBLIC_UPSTREAM_SMOKE") != "1", reason="explicit public-network smoke opt-in")

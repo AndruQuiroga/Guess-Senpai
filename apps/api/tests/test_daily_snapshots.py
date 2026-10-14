@@ -9,7 +9,7 @@ from app.db.models import DailyPuzzleSet
 from app.puzzles import engine
 from app.puzzles.models import DailyProgressPayload, GameProgressPayload
 from app.services import progress
-from test_puzzles_engine import DummyCache, _media_with_character
+from test_puzzles_engine import DummyCache, _media_with_character, make_guess_opening
 
 
 @pytest.fixture
@@ -25,9 +25,13 @@ def local_generation(monkeypatch):
     async def cache():
         return DummyCache()
 
+    async def opening(media, cache, **kwargs):
+        return make_guess_opening(media, **kwargs)
+
     monkeypatch.setattr(engine, "_load_popular_pool", popular)
     monkeypatch.setattr(engine, "_load_media_details", details)
     monkeypatch.setattr(engine, "_get_cache", cache)
+    monkeypatch.setattr(engine, "_build_guess_opening_round", opening)
     return pool
 
 

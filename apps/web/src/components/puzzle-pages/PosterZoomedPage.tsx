@@ -5,7 +5,7 @@ import PosterZoom, {
   POSTER_POINTS,
   ZOOM_HINT_COST,
 } from "../PosterZoom";
-import { ROUND_RULES, RoundGamePage } from "./RoundGamePage";
+import { RoundGamePage } from "./RoundGamePage";
 import type { GameProgress } from "../../types/progress";
 import type { PosterZoomGame } from "../../types/puzzles";
 
@@ -17,8 +17,8 @@ interface Props {
 }
 
 const RULES = [
-  ...ROUND_RULES,
-  `Name the anime from a zoomed-in crop of its poster (${POSTER_POINTS.title} pts). Season (+${POSTER_POINTS.season}) and year (+${POSTER_POINTS.year}, half if off by one) are bonus points.`,
+  "Three rounds: Easy, Medium and Hard follow anime popularity. Each uses a different anime.",
+  `Name the anime from its cropped poster (${POSTER_POINTS.title} pts). With the correct anime, a year one off earns 50, exact year 100, exact year and release season 200 total. Numbered season adds 200 when known. One answer per round.`,
   `Hints: zoom out (−${ZOOM_HINT_COST} each, twice) or show genres (−${GENRE_HINT_COST}). The full poster appears on the results screen.`,
 ];
 

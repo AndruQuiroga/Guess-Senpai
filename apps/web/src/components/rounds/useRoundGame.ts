@@ -44,9 +44,21 @@ function recordsFromProgress(
   });
 }
 
-function toProgress(records: RoundRecord[]): GameProgress {
+function toProgress(
+  records: RoundRecord[],
+  roundMaxPoints?: number[],
+): GameProgress {
   const played = records.filter((record) => record.submitted).length;
   return {
+    ...(roundMaxPoints
+      ? {
+          maxPoints: records.reduce(
+            (sum, record, index) =>
+              sum + (record.outcome?.max ?? roundMaxPoints[index] ?? 1000),
+            0,
+          ),
+        }
+      : {}),
     completed: records.length > 0 && played === records.length,
     // Only grows, so the server's progress ranking keeps the newest record.
     round: Math.min(records.length, played + 1),
@@ -68,6 +80,7 @@ function toProgress(records: RoundRecord[]): GameProgress {
 }
 
 export interface UseRoundGameOptions {
+  roundMaxPoints?: number[];
   roundCount: number;
   initialProgress?: GameProgress;
   onProgressChange(state: GameProgress): void;
@@ -85,6 +98,7 @@ export function useRoundGame({
   initialProgress,
   onProgressChange,
   puzzleKey,
+  roundMaxPoints,
 }: UseRoundGameOptions) {
   const [records, setRecords] = useState<RoundRecord[]>(() =>
     recordsFromProgress(roundCount, initialProgress),
@@ -140,9 +154,9 @@ export function useRoundGame({
     (next: RoundRecord[]) => {
       recordsRef.current = next;
       setRecords(next);
-      onProgressChange(toProgress(next));
+      onProgressChange(toProgress(next, roundMaxPoints));
     },
-    [onProgressChange],
+    [onProgressChange, roundMaxPoints],
   );
 
   /** Spends a hint; `answers` records which one (e.g. a card or clue name). */

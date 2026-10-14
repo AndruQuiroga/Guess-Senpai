@@ -6,6 +6,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from pydantic import AfterValidator, AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from ..services.anilist import Title
+from ..services.poster_modified import Modification
 
 
 def ensure_utc(value: datetime) -> datetime:
@@ -56,6 +57,10 @@ class AnidleGame(BaseModel):
 
 
 class PosterZoomMeta(BaseModel):
+    seasonOptions: List[int] = Field(default_factory=list)
+    modification: Optional[Modification] = None
+    seasonNumber: Optional[int] = Field(default=None, ge=1)
+    seriesTitles: List[str] = Field(default_factory=list)
     genres: List[str] = Field(default_factory=list)
     year: Optional[int] = None
     season: Optional[str] = None
@@ -168,6 +173,9 @@ class OpeningClip(BaseModel):
 
 
 class GuessOpeningMeta(BaseModel):
+    seasonOptions: List[int] = Field(default_factory=list)
+    seasonNumber: Optional[int] = Field(default=None, ge=1)
+    seriesTitles: List[str] = Field(default_factory=list)
     songTitle: Optional[str] = None
     artist: Optional[str] = None
     sequence: Optional[int] = None
@@ -266,6 +274,7 @@ class GuessOpeningPuzzleBundle(BaseModel):
 class GamesPayload(BaseModel):
     anidle: AnidlePuzzleBundle
     poster_zoomed: PosterZoomPuzzleBundle
+    poster_modified: Optional[PosterZoomPuzzleBundle] = None
     redacted_synopsis: RedactedSynopsisPuzzleBundle
     character_silhouette: CharacterSilhouettePuzzleBundle
     guess_the_opening: Optional[GuessOpeningPuzzleBundle] = None
@@ -465,6 +474,11 @@ class GameProgressPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     completed: bool = False
+    max_points: Optional[int] = Field(
+        default=None, ge=0,
+        validation_alias=AliasChoices("max_points", "maxPoints"),
+        serialization_alias="maxPoints",
+    )
     round: int = 1
     guesses: List[str] = Field(default_factory=list)
     rounds: Optional[List[GameRoundProgressPayload]] = Field(

@@ -29,6 +29,8 @@ function round(
       year: 2004,
       season: "Fall 2004",
       format: "TV",
+      seasonNumber: 2,
+      seasonOptions: [1, 2],
     },
     cropStages: [],
     solution: {
@@ -94,16 +96,16 @@ describe("PosterZoom rounds", () => {
         target: { value: "Bleach" },
       },
     );
-    fireEvent.change(screen.getByLabelText(/Season/), {
+    fireEvent.change(screen.getByLabelText("Release season"), {
       target: { value: "FALL" },
     });
-    fireEvent.change(screen.getByLabelText(/Year/), {
+    fireEvent.change(screen.getByLabelText("Release year"), {
       target: { value: "2005" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
 
-    // 600 title + 200 season + 100 (year off by one) − 150 zoom hint.
-    expect(await screen.findByText("+750")).toBeInTheDocument();
+    // 600 title + 50 (year off by one); season needs exact year; −150 hint.
+    expect(await screen.findByText("+500")).toBeInTheDocument();
     expect(verifyGuessMock).toHaveBeenCalledWith(11, "Bleach", undefined);
     expect(screen.getByAltText("Cover art for Bleach")).toHaveAttribute(
       "src",
@@ -114,7 +116,7 @@ describe("PosterZoom rounds", () => {
     expect(last.round).toBe(2);
     expect(last.rounds?.[0]).toMatchObject({
       completed: true,
-      points: 750,
+      points: 500,
       hints: 1,
     });
 
@@ -129,7 +131,7 @@ describe("PosterZoom rounds", () => {
     render(<PosterZoom payload={payload} onProgressChange={progress} />);
     fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "at least one answer",
+      "anime title first",
     );
     expect(verifyGuessMock).not.toHaveBeenCalled();
     expect(progress).not.toHaveBeenCalled();
@@ -247,5 +249,77 @@ describe("PosterZoom rounds", () => {
       />,
     );
     expect(screen.getByText(/before the new round format/)).toBeInTheDocument();
+  });
+
+  it("adds independent release and numbered-season bonuses and preserves the maximum", async () => {
+    const progress = vi.fn();
+    render(<PosterZoom payload={payload} onProgressChange={progress} />);
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Poster anime title" }),
+      { target: { value: "Bleach" } },
+    );
+    fireEvent.change(screen.getByLabelText("Release year"), {
+      target: { value: "2004" },
+    });
+    fireEvent.change(screen.getByLabelText("Release season"), {
+      target: { value: "FALL" },
+    });
+    fireEvent.change(screen.getByLabelText("Numbered season (+200)"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+    expect(await screen.findByText("+1,000")).toBeInTheDocument();
+    expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({
+      maxPoints: 3000,
+      rounds: [
+        expect.objectContaining({
+          points: 1000,
+          answers: expect.objectContaining({ seasonNumber: "2" }),
+        }),
+        expect.anything(),
+        expect.anything(),
+      ],
+    });
+  });
+
+  it("hides numbered seasons for a sole-season show but keeps release bonuses", () => {
+    const singleSeason = {
+      ...payload,
+      rounds: payload.rounds.map((round) => ({
+        ...round,
+        meta: { ...round.meta, seasonNumber: 1, seasonOptions: [] },
+      })),
+    };
+    render(<PosterZoom payload={singleSeason} onProgressChange={vi.fn()} />);
+    expect(
+      screen.queryByLabelText("Numbered season (+200)"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Release year")).toBeInTheDocument();
+    expect(screen.getByLabelText("Release season")).toBeInTheDocument();
+  });
+
+  it("uses the stored poster effect independently of the round difficulty", () => {
+    const modified = {
+      ...payload,
+      rounds: payload.rounds.map((round, index) => ({
+        ...round,
+        meta: {
+          ...round.meta,
+          modification: (["shuffled", "black_white", "mosaic"] as const)[index],
+        },
+      })),
+    };
+    const progress = vi.fn();
+    render(
+      <PosterZoom modified payload={modified} onProgressChange={progress} />,
+    );
+    const image = screen.getByAltText("Shuffled tiles poster for round 1");
+    expect(image).toHaveAttribute(
+      "src",
+      expect.stringContaining("modification=shuffled"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /buy clearer image/i }));
+    expect(image).toHaveAttribute("src", expect.stringContaining("hints=1"));
+    expect(progress.mock.calls.at(-1)?.[0].rounds[0].hints).toBe(1);
   });
 });

@@ -479,6 +479,8 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
         *[entry.mediaId for r in result.games.character_silhouette.puzzle.rounds for entry in r.entries],
     ]
     bundle_ids.extend(poster_ids)
+    if result.games.poster_modified:
+        bundle_ids.extend(r.mediaId for r in result.games.poster_modified.puzzle.rounds)
     if result.games.guess_the_opening:
         rounds = result.games.guess_the_opening.puzzle.rounds
         assert len(rounds) == 3
@@ -585,7 +587,12 @@ async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: py
         [result.games.anidle.mediaId]
         + [r.mediaId for r in poster] + [r.mediaId for r in synopsis] + card_media + [r.mediaId for r in openings]
     )
-    assert len(every_round) == 22
+    modified = result.games.poster_modified.puzzle.rounds
+    assert [r.difficulty for r in modified] == [1, 2, 3]
+    assert all(r.mediaId in tiers[r.difficulty] for r in modified)
+    assert {r.meta.modification for r in modified} == {"black_white", "mosaic", "shuffled"}
+    every_round.extend(r.mediaId for r in modified)
+    assert len(every_round) == 25
     assert len(every_round) == len(set(every_round))
 
 
@@ -606,7 +613,7 @@ async def test_opening_rounds_carry_buyable_genre_and_year(monkeypatch: pytest.M
     media = make_media(42, "Clip Show")
     media.genres = ["Action", "Drama", "Mystery", "Sci-Fi", "Thriller"]
 
-    async def fake_clip(_variants):
+    async def fake_clip(_variants, *, anilist_id=None):
         return animethemes.OpeningClip(
             title="Clip Show",
             audio_url=None,

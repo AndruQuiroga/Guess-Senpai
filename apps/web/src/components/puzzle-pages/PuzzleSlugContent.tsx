@@ -11,6 +11,7 @@ import { PlaceholderPuzzlePage } from "./PlaceholderPuzzlePage";
 import { AnidlePage } from "./AnidlePage";
 import { CharacterSilhouettePage } from "./CharacterSilhouettePage";
 import { PosterZoomedPage } from "./PosterZoomedPage";
+import { PosterModifiedPage } from "./PosterModifiedPage";
 import { RedactedSynopsisPage } from "./RedactedSynopsisPage";
 import { GuessOpeningPage } from "./GuessOpeningPage";
 import {
@@ -70,6 +71,7 @@ export function PuzzleSlugContent({ data, slug }: Props) {
     () => ({
       anidle: (state) => recordGame("anidle", state),
       poster_zoomed: (state) => recordGame("poster_zoomed", state),
+      poster_modified: (state) => recordGame("poster_modified", state),
       redacted_synopsis: (state) => recordGame("redacted_synopsis", state),
       character_silhouette: (state) =>
         recordGame("character_silhouette", state),
@@ -142,7 +144,15 @@ export function PuzzleSlugContent({ data, slug }: Props) {
         );
       }
     case "poster_zoomed":
+    case "poster_modified":
       if (!bundle) {
+        if (gameKey === "poster_modified")
+          return (
+            <p className="text-muted">
+              Poster Modified is unavailable for this date. Try another daily
+              game.
+            </p>
+          );
         return <PlaceholderPuzzlePage title={slug.title} />;
       }
       {
@@ -150,11 +160,13 @@ export function PuzzleSlugContent({ data, slug }: Props) {
           mediaId: number;
           puzzle: PosterZoomGame;
         };
+        const PosterPage =
+          gameKey === "poster_modified" ? PosterModifiedPage : PosterZoomedPage;
         return (
-          <PosterZoomedPage
+          <PosterPage
             payload={posterBundle.puzzle}
-            progress={progress.poster_zoomed}
-            onProgressChange={progressHandlers.poster_zoomed}
+            progress={progress[gameKey]}
+            onProgressChange={progressHandlers[gameKey]}
             nextSlug={nextSlug}
           />
         );

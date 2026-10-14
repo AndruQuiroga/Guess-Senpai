@@ -56,6 +56,7 @@ export default function HomePage() {
 }
 
 function Today({ date }: { date: string }) {
+  const { daily } = useDailyAvailability();
   const { progress } = usePuzzleProgress(date);
   const { account, loading, error: accountError } = useAccount();
   const { streak, error: streakError } = useAccountStreak();
@@ -69,6 +70,7 @@ function Today({ date }: { date: string }) {
   const score = computeDailyScore(
     games.flatMap((game) => (game.gameKey ? [game.gameKey] : [])),
     progress,
+    daily?.round_max_points,
   );
   const streakText =
     streakError || accountError

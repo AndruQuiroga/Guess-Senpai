@@ -312,6 +312,49 @@ responses: four calls for a cold daily set, none for fourteen further archive
 dates on the same warm cache. Production deployment/backfill was not performed
 as part of this review.
 
+### Poster Modified and season bonuses — 2026-10-13
+
+New sets can include a separate `poster_modified` / `/games/poster-modified`
+mode alongside Poster Zoomed. It stores exactly one black-and-white, mosaic,
+and shuffled-tile effect in a date-seeded random order. Its three anime come
+strictly from the Easy/Medium/Hard popularity thirds; the effect is independent
+of difficulty. If a tier has no unused series, the optional mode is omitted.
+Two paid clarity steps progressively restore the image. Modified variants have
+separate cache keys and reuse the existing poster-source cache.
+
+Poster Zoomed, Poster Modified and Guess the Opening share optional bonuses:
+50 for a release year one off, 100 for exact year, or 200 total for exact year
+and release season. Numbered season earns a separate 200. All bonuses require
+a correct anime/series answer. Posters retain 600 title points (up to 1,000
+with bonuses); Opening retains 1,000 (up to 1,400). Unknown metadata does not
+offer that question or contribute to the round maximum. Progress stores the
+actual maximum as `maxPoints`, including completed legacy outcomes; no SQL
+migration is needed. Availability projects each round's maximum from the stored
+snapshot without upstream calls, so Today and navigation include bonuses before
+the game is played. Daily totals and summaries preserve legacy round maxima.
+
+Posters and openings may now draw later seasons. Existing AniList prequel/sequel
+links group related entries for daily exclusion; a complete six-mode set uses
+25 distinct anime IDs with no known prequel/sequel group repeated, including
+the twelve character cards. Numbered seasons use explicit title labels or
+conservative season-one metadata. Ambiguous parts/cours and unnumbered sequels
+remain unknown instead of counting prequel records. Numbered-season choices
+appear only for known multi-season series, using released seasons already in
+the pool; movies, specials and sole-season shows omit that bonus. This uses already-cached
+data and adds no AniList queries. Opening lookup requires the matching AniList
+resource on AnimeThemes, with a new cache version, so a season-two question
+cannot silently use season one's clip.
+
+Existing published sets are immutable and do not gain Poster Modified. Runtime
+discovery reads `available_modes`, and old archive dates keep their original
+mode list. No production publication, backfill or release was performed here.
+
+Validation for this follow-up: 116 backend tests passed (5 opt-in skipped),
+153 frontend tests passed, TypeScript passed, and the production web builder
+completed. Three public upstream smoke tests passed separately. Synthetic local
+browser QA covered desktop/mobile poster layouts, all effects, bonus scoring,
+reload recovery and the content-aware season selector.
+
 ## Navigation for future work
 
 - API entry/config/startup: `apps/api/src/app/main.py`, `core/config.py`, `core/database.py`.

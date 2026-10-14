@@ -9,10 +9,11 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from sqlalchemy import select
 from ..db.models import DailyPuzzleSet
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..core.config import settings
 from ..core.database import get_session_factory
+from ..services.poster_modified import Modification
 from ..puzzles import engine as puzzle_engine
 from ..puzzles.engine import UserContext, _choose_answer, _title_variants, get_daily_puzzle
 from ..puzzles.models import (
@@ -113,6 +114,7 @@ class ArchiveIndexResponse(BaseModel):
 
 
 class DailyAvailabilityResponse(BaseModel):
+    round_max_points: dict[str, list[int]] = Field(default_factory=dict)
     date: date
     reset_at: UtcDatetime
     published: bool
@@ -170,9 +172,13 @@ async def get_poster_image(
     media_id: int,
     hints: int = Query(default=0, ge=0, description="Number of hints revealed"),
     difficulty: int = Query(default=0, ge=0, le=3, description="Round difficulty (1-3) for the tiered zoom ladder"),
+    modification: Optional[Modification] = Query(default=None),
 ) -> Response:
     try:
-        content, mime = await puzzle_engine.generate_poster_image(media_id, hints, difficulty)
+        if modification:
+            content, mime = await puzzle_engine.generate_modified_poster_image(media_id, hints, modification)
+        else:
+            content, mime = await puzzle_engine.generate_poster_image(media_id, hints, difficulty)
     except puzzle_engine.PosterImageError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return Response(content=content, media_type=mime)
@@ -217,6 +223,7 @@ async def get_daily_availability() -> DailyAvailabilityResponse:
         published = await session.get(DailyPuzzleSet, day)
     modes = list(published.available_modes) if published else ["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"]
     return DailyAvailabilityResponse(
+        round_max_points=puzzle_engine.daily_round_max_points(published.content if published else {}, modes),
         date=day,
         reset_at=published.reset_at if published else datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc),
         published=published is not None,

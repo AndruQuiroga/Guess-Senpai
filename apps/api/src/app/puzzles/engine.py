@@ -21,9 +21,10 @@ from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 from ..core.config import Settings, settings
 from ..core.database import get_session_factory
 from ..db.models import DailyPuzzleSet
-from ..services import animethemes, anilist, character_index, character_pool, title_index
+from ..services import anime_seasons, animethemes, anilist, character_index, character_pool, title_index
 from ..services.anilist import CoverImage, Media, MediaCharacterEdge, MediaListCollection
 from ..services.cache import CacheBackend, get_cache
+from ..services.poster_modified import MODIFICATIONS, Modification, render_modified_poster
 from ..services.history_repository import (
     list_recent_media as repo_list_recent_media,
     record_recent_media as repo_record_recent_media,
@@ -375,6 +376,7 @@ def _build_poster_round(*, media: Media, order: int, difficulty: int) -> PosterZ
     crop_stages = _build_poster_crop_stages(media, difficulty)
     release_year = _poster_release_year(media)
     meta = PosterZoomMeta(
+        seasonNumber=anime_seasons.season_number(media),
         genres=[g for g in media.genres if g],
         year=release_year,
         season=_poster_release_season(media),
@@ -693,6 +695,24 @@ async def generate_poster_image(media_id: int, hints: int, difficulty: int = 0) 
     return variant_bytes, mime
 
 
+async def generate_modified_poster_image(media_id: int, hints: int, modification: Modification) -> Tuple[bytes, str]:
+    cache = await _get_cache()
+    bucket = min(2, max(0, hints))
+    key = f"poster-modified:v1:{media_id}:{modification}:{bucket}"
+    cached = _deserialize_cached_image(await cache.get(key))
+    if cached:
+        return cached
+    media = await _load_media_details(media_id, cache, settings)
+    source, _ = await _load_poster_source(media, cache, settings)
+    try:
+        content = render_modified_poster(source, modification, bucket, media_id)
+    except (OSError, ValueError) as exc:
+        raise PosterImageError("Unable to process poster image", status_code=500) from exc
+    mime = "image/jpeg"
+    await cache.set(key, {"data": base64.b64encode(content).decode("ascii"), "mime": mime}, settings.puzzle_cache_ttl_seconds)
+    return content, mime
+
+
 def _redact_description(
     media: Media,
 ) -> tuple[str, List[RedactedSynopsisSegment], List[int], List[str]]:
@@ -921,10 +941,10 @@ async def _build_guess_opening_round(
     total_rounds: Optional[int] = None,
     difficulty: Optional[int] = None,
 ) -> Optional[GuessOpeningRound]:
-    cache_key = f"animethemes:clip:{media.id}"
+    cache_key = f"animethemes:clip:v2:{media.id}"
 
     async def creator() -> dict:
-        clip = await animethemes.find_opening_clip(_title_variants(media))
+        clip = await animethemes.find_opening_clip(_title_variants(media), anilist_id=media.id)
         if clip:
             return {"clip": asdict(clip)}
         return {"missing": True}
@@ -936,6 +956,7 @@ async def _build_guess_opening_round(
     clip_model = animethemes.OpeningClip(**clip_data["clip"])
 
     meta = GuessOpeningMeta(
+        seasonNumber=anime_seasons.season_number(media),
         songTitle=clip_model.song_title,
         artist=clip_model.artist,
         sequence=clip_model.sequence,
@@ -1340,10 +1361,14 @@ async def _assemble_daily_puzzle(
 
     selected_ids: set[int] = set()
     recorded_ids: List[int] = []
+    families = anime_seasons.series_groups(popular_pool)
+
+    def family_ids(media_id: int) -> set[int]:
+        return families.get(media_id, {media_id})
 
     anidle_candidate = _choose_media_from_pool(base_seed, "anidle", pool, selected_ids)
     anidle_media = await _load_media_details(anidle_candidate.id, cache, settings)
-    selected_ids.add(anidle_media.id)
+    selected_ids.update(family_ids(anidle_media.id))
     if anidle_media.id not in recorded_ids:
         recorded_ids.append(anidle_media.id)
     anidle_bundle = AnidlePuzzleBundle(
@@ -1358,18 +1383,22 @@ async def _assemble_daily_puzzle(
     # player naming the show would miss.
     round_pool = [media for media in pool if not _is_sequel(media)] or pool
     tiers = _popularity_tiers([media for media in popular_pool if not _is_sequel(media)] or popular_pool or pool)
+    poster_tiers = _popularity_tiers(popular_pool or pool)
 
     def remember(media: Media) -> None:
-        selected_ids.add(media.id)
+        selected_ids.update(family_ids(media.id))
         if media.id not in recorded_ids:
             recorded_ids.append(media.id)
 
     poster_rounds: List[PosterZoomRound] = []
     for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
-        candidate = _choose_tiered(base_seed, "poster_zoomed", round_pool, tiers, difficulty, selected_ids)
+        candidate = _choose_tiered(base_seed, "poster_zoomed", pool, poster_tiers, difficulty, selected_ids)
         poster_media = await _load_media_details(candidate.id, cache, settings)
         remember(poster_media)
-        poster_rounds.append(_build_poster_round(media=poster_media, order=order, difficulty=difficulty))
+        poster_round = _build_poster_round(media=poster_media, order=order, difficulty=difficulty)
+        poster_round.meta.seriesTitles = anime_seasons.series_titles(poster_media, popular_pool, families)
+        poster_round.meta.seasonOptions = anime_seasons.season_options(poster_media, popular_pool, families)
+        poster_rounds.append(poster_round)
 
     poster_bundle = PosterZoomPuzzleBundle(
         mediaId=poster_rounds[0].mediaId,
@@ -1422,7 +1451,7 @@ async def _assemble_daily_puzzle(
                 # mosaic), not from obscure characters.
                 base_seed, f"character_silhouette:{order}", round_pool, tiers, 1, excluded, attempt=attempt
             )
-            tried_for_characters.add(candidate.id)
+            tried_for_characters.update(family_ids(candidate.id))
             character_media = await _load_media_details(candidate.id, cache, settings)
             edge = _featured_character_edge(character_media, set())
             if edge is not None:
@@ -1464,10 +1493,10 @@ async def _assemble_daily_puzzle(
         # Same popularity tiers as the other modes: Hard is a less popular but
         # established show, never this season's new releases. (The old
         # dedicated pool mixed in current-season shows and made Hard obscure.)
-        candidate_pool = [media for media in round_pool if (media.status or "").upper() != "RELEASING"] or round_pool
+        candidate_pool = [media for media in pool if (media.status or "").upper() != "RELEASING"]
         if candidate_pool:
             required_rounds = len(ROUND_DIFFICULTIES)
-            opening_tiers = tiers
+            opening_tiers = poster_tiers
             tried_ids: set[int] = set()
             selected_for_opening: set[int] = set()
             for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
@@ -1486,7 +1515,7 @@ async def _assemble_daily_puzzle(
                         selected_ids | selected_for_opening | tried_ids,
                         attempt=attempt,
                     )
-                    tried_ids.add(candidate.id)
+                    tried_ids.update(family_ids(candidate.id))
                     opening_media = await _load_media_details(candidate.id, cache, settings)
                     opening_round = await _build_guess_opening_round(
                         opening_media,
@@ -1496,8 +1525,10 @@ async def _assemble_daily_puzzle(
                         difficulty=difficulty,
                     )
                     if opening_round:
+                        opening_round.meta.seriesTitles = anime_seasons.series_titles(opening_media, popular_pool, families)
+                        opening_round.meta.seasonOptions = anime_seasons.season_options(opening_media, popular_pool, families)
                         opening_rounds.append(opening_round)
-                        selected_for_opening.add(opening_round.mediaId)
+                        selected_for_opening.update(family_ids(opening_round.mediaId))
                         break
             if len(opening_rounds) == required_rounds:
                 selected_ids.update(selected_for_opening)
@@ -1510,6 +1541,37 @@ async def _assemble_daily_puzzle(
                     solution=opening_rounds[0].solution,
                 )
 
+    # One of each effect, shuffled by date independently of popularity tiers.
+    modified_bundle: Optional[PosterZoomPuzzleBundle] = None
+    modifications = list(MODIFICATIONS)
+    random.Random(f"{base_seed}:poster-modifications").shuffle(modifications)
+    modified_rounds: List[PosterZoomRound] = []
+    modified_ids: set[int] = set()
+    for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
+        candidates = [
+            media for media in pool
+            if media.id in poster_tiers[difficulty]
+            and media.id not in selected_ids | modified_ids
+        ]
+        if not candidates:
+            break
+        candidate = _select_media(f"{base_seed}:poster_modified:d{difficulty}", candidates)
+        media = await _load_media_details(candidate.id, cache, settings)
+        modified_ids.update(family_ids(media.id))
+        modified_round = _build_poster_round(media=media, order=order, difficulty=difficulty)
+        modified_round.meta.modification = modifications[order - 1]
+        modified_round.meta.seriesTitles = anime_seasons.series_titles(media, popular_pool, families)
+        modified_round.meta.seasonOptions = anime_seasons.season_options(media, popular_pool, families)
+        modified_rounds.append(modified_round)
+    if len(modified_rounds) == len(ROUND_DIFFICULTIES):
+        selected_ids.update(modified_ids)
+        recorded_ids.extend(r.mediaId for r in modified_rounds)
+        modified_bundle = PosterZoomPuzzleBundle(
+            mediaId=modified_rounds[0].mediaId,
+            puzzle=PosterZoomGame(spec=POSTER_ROUNDS, rounds=modified_rounds),
+            solution=modified_rounds[0].solution,
+        )
+
     difficulty_hint: Optional[int] = None
     if user:
         preferences = await load_user_preferences(user.user_id)
@@ -1518,6 +1580,7 @@ async def _assemble_daily_puzzle(
     games = GamesPayload(
         anidle=anidle_bundle,
         poster_zoomed=poster_bundle,
+        poster_modified=modified_bundle,
         redacted_synopsis=synopsis_bundle,
         character_silhouette=character_bundle,
         guess_the_opening=guess_bundle,
@@ -1539,7 +1602,7 @@ async def _assemble_daily_puzzle(
         puzzle_id=f"daily:{day.isoformat()}",
         rules_version=CURRENT_RULES_VERSION,
         reset_at=datetime.combine(day + timedelta(days=1), time.min, tzinfo=timezone.utc),
-        available_modes=["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"] + (["guess_the_opening"] if guess_opening_enabled else []),
+        available_modes=["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"] + (["guess_the_opening"] if guess_opening_enabled else []) + (["poster_modified"] if modified_bundle else []),
         games=games,
         guess_the_opening_enabled=guess_opening_enabled,
     )
@@ -1611,6 +1674,8 @@ async def publish_daily_puzzle(
         day, user=None, include_guess_opening=include_guess_opening, cache=cache
     )
     modes = ["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"]
+    if generated.games.poster_modified is not None:
+        modes.append("poster_modified")
     if generated.guess_the_opening_enabled:
         modes.append("guess_the_opening")
     reset_at = datetime.combine(day + timedelta(days=1), time.min, tzinfo=timezone.utc)
@@ -1644,6 +1709,29 @@ async def publish_daily_puzzle(
         if published is None:
             raise RuntimeError("Daily puzzle publication did not persist")
         return _daily_response(published)
+
+
+def daily_round_max_points(content: dict[str, Any], modes: Sequence[str]) -> dict[str, List[int]]:
+    """Lightweight score projection, using only the stored daily snapshot."""
+    maxima: dict[str, List[int]] = {}
+    games = content.get("games") or {}
+    for mode in modes:
+        if mode not in {"poster_zoomed", "poster_modified", "guess_the_opening"}:
+            maxima[mode] = [3000] if mode == "anidle" else [1000, 1000, 1000]
+            continue
+        rounds = ((games.get(mode) or {}).get("puzzle") or {}).get("rounds") or []
+        points = []
+        for entry in rounds:
+            meta = entry.get("meta") or {}
+            release = str(meta.get("season") or "").upper()
+            has_year = bool(meta.get("year") or re.search(r"\b\d{4}\b", release))
+            has_season = release.split(" ")[0] in {"WINTER", "SPRING", "SUMMER", "FALL"}
+            base = 1000 if mode == "guess_the_opening" else 600
+            options = meta.get("seasonOptions") or []
+            has_number_bonus = len(options) > 1 and meta.get("seasonNumber") in options
+            points.append(base + (100 if has_year else 0) + (100 if has_year and has_season else 0) + (200 if has_number_bonus else 0))
+        maxima[mode] = points or [1000, 1000, 1000]
+    return maxima
 
 
 def _daily_response(row: DailyPuzzleSet) -> DailyPuzzleResponse:

@@ -48,7 +48,7 @@ async def search_anime(title: str) -> List[Dict[str, Any]]:
 
 
 async def fetch_anime(slug: str) -> Dict[str, Any]:
-    includes = "animethemes.song.artists,animethemes.animethemeentries.videos.audio"
+    includes = "resources,animethemes.song.artists,animethemes.animethemeentries.videos.audio"
     return await _request(f"/anime/{slug}", params={"include": includes})
 
 
@@ -157,10 +157,26 @@ def _extract_nested_opening_clip(anime: Dict[str, Any]) -> Optional[OpeningClip]
     return None
 
 
-async def find_opening_clip(titles: Sequence[str]) -> Optional[OpeningClip]:
+def _matches_anilist(payload: Dict[str, Any], anilist_id: int) -> bool:
+    anime = payload.get("anime")
+    if isinstance(anime, dict):
+        resources = anime.get("resources") or []
+    else:
+        resources = [item.get("attributes", {}) for item in _resolve_relationship(
+            payload.get("data") or {}, "resources", _index_included(payload)
+        )]
+    return any(
+        str(resource.get("site", "")).casefold() == "anilist"
+        and str(resource.get("external_id")) == str(anilist_id)
+        for resource in resources
+    )
+
+
+async def find_opening_clip(titles: Sequence[str], *, anilist_id: Optional[int] = None) -> Optional[OpeningClip]:
     """Try to locate an opening clip given multiple title variants."""
 
     seen: set[str] = set()
+    visited_slugs: set[str] = set()
     for title in titles:
         if not title:
             continue
@@ -178,11 +194,17 @@ async def find_opening_clip(titles: Sequence[str]) -> Optional[OpeningClip]:
                 item["attributes"].get("name") != title,
             )
         )
-        slug = search_results[0]["attributes"].get("slug") or search_results[0].get("id")
-        if not slug:
-            continue
-        anime_payload = await fetch_anime(slug)
-        clip = extract_opening_clip(anime_payload)
-        if clip:
-            return clip
+        for result in search_results[:5]:
+            slug = result["attributes"].get("slug") or result.get("id")
+            if not slug or str(slug) in visited_slugs:
+                continue
+            visited_slugs.add(str(slug))
+            anime_payload = await fetch_anime(slug)
+            # A title search can return season one for a season-two query.
+            # Never award a season bonus against a different season's clip.
+            if anilist_id is not None and not _matches_anilist(anime_payload, anilist_id):
+                continue
+            clip = extract_opening_clip(anime_payload)
+            if clip:
+                return clip
     return None

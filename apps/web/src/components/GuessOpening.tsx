@@ -24,6 +24,13 @@ import {
   ROUND_POINTS,
 } from "./rounds/scoring";
 import { useRoundGame, type RoundGameState } from "./rounds/useRoundGame";
+import {
+  matchesSeriesTitle,
+  releaseYear,
+  seasonBonusLines,
+  SeasonBonusFields,
+  seasonRoundMax,
+} from "./rounds/SeasonBonus";
 
 export const VIDEO_HINT_COST = 300;
 export const GENRE_HINT_COST = 150;
@@ -31,9 +38,7 @@ export const YEAR_HINT_COST = 150;
 
 /** The release year: from the round meta, or older payloads' "FALL 2019". */
 function openingYear(round: GuessOpeningRound): number | null {
-  if (round.meta.year) return round.meta.year;
-  const match = round.meta.season?.match(/\d{4}/);
-  return match ? Number(match[0]) : null;
+  return releaseYear(round.meta);
 }
 
 interface Props {
@@ -51,6 +56,9 @@ export default function GuessOpening({
 }: Props) {
   const game = useRoundGame({
     roundCount: payload.length,
+    roundMaxPoints: payload.map((round) =>
+      seasonRoundMax(ROUND_POINTS, round.meta),
+    ),
     initialProgress,
     onProgressChange,
     puzzleKey: payload.map((round) => round.mediaId).join(":"),
@@ -86,6 +94,9 @@ export default function GuessOpening({
             answer: round.answer,
             coverImage: round.solution.coverImage,
             points: game.records[index]?.outcome?.points ?? 0,
+            max:
+              game.records[index]?.outcome?.max ??
+              seasonRoundMax(ROUND_POINTS, round.meta),
           }))}
         />
       ) : (
@@ -119,6 +130,11 @@ function OpeningRound({
   const record = game.records[index];
   const fieldRef = useRef<TitleGuessFieldHandle | null>(null);
   const [title, setTitle] = useState(String(record.answers.title ?? ""));
+  const [bonus, setBonus] = useState({
+    year: String(record.answers.releaseYear ?? ""),
+    season: String(record.answers.releaseSeason ?? ""),
+    seasonNumber: String(record.answers.seasonNumber ?? ""),
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const videoShown = Boolean(record.answers.video);
@@ -146,12 +162,18 @@ function OpeningRound({
       setBusy(true);
       setError(null);
       try {
-        const correct = guess
-          ? (await verifyGuess(round.mediaId, guess, selection?.suggestionId))
-              .animeMatch
-          : false;
+        const correct =
+          matchesSeriesTitle(guess, round.meta) ||
+          (await verifyGuess(round.mediaId, guess, selection?.suggestionId))
+            .animeMatch;
         game.submitRound(index, {
-          answers: { ...record.answers, title: guess },
+          answers: {
+            ...record.answers,
+            title: guess,
+            releaseYear: bonus.year,
+            releaseSeason: bonus.season,
+            seasonNumber: bonus.seasonNumber,
+          },
           guesses: guess ? [guess] : [],
           outcome: buildOutcome(
             [
@@ -162,8 +184,10 @@ function OpeningRound({
                 correct ? "correct" : "wrong",
                 ROUND_POINTS,
               ),
+              ...seasonBonusLines(round.meta, bonus, correct),
             ],
             hintCost,
+            seasonRoundMax(ROUND_POINTS, round.meta),
           ),
         });
       } catch (caught) {
@@ -176,7 +200,7 @@ function OpeningRound({
         setBusy(false);
       }
     },
-    [busy, game, hintCost, index, record.answers, round, title],
+    [busy, bonus, game, hintCost, index, record.answers, round, title],
   );
 
   const song = [
@@ -223,6 +247,7 @@ function OpeningRound({
         label={`Round ${index + 1} opening clip`}
       />
       <HintShop
+        max={seasonRoundMax(ROUND_POINTS, round.meta)}
         spent={hintCost}
         disabled={busy}
         onBuy={(id) => game.takeHint(index, { [id]: true })}
@@ -273,7 +298,7 @@ function OpeningRound({
         >
           Which anime is this opening from?
         </label>
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div>
           <TitleGuessField
             ref={fieldRef}
             id={`opening-title-${index}`}
@@ -286,14 +311,23 @@ function OpeningRound({
             ariaLabel="Opening anime title"
             suggestionsLabel="Opening title suggestions"
           />
-          <button
-            type="submit"
-            disabled={busy}
-            className="button button-primary shrink-0 disabled:opacity-60"
-          >
-            {busy ? "Checking…" : "Lock in answer"}
-          </button>
         </div>
+      </div>
+      <SeasonBonusFields
+        id={`opening-${index}`}
+        meta={round.meta}
+        value={bonus}
+        onChange={setBonus}
+        disabled={busy}
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={busy}
+          className="button button-primary disabled:opacity-60"
+        >
+          {busy ? "Checking…" : "Lock in answer"}
+        </button>
         <p className="text-sm text-muted">One answer per round.</p>
       </div>
       {error ? (

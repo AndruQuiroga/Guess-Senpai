@@ -53,18 +53,33 @@ export default function HowToPlayPage() {
           </div>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
-              Three rounds progressively zoom the poster out—from a tight crop
-              to the full key art.
+              Three different anime, with Easy, Medium and Hard determined by
+              popularity. Each starts with a cropped poster.
             </li>
             <li>
-              Each new round unlocks additional context like genres, format, and
-              release metadata.
+              Optional clues zoom out or reveal genres for a points cost. The
+              full poster appears after submitting.
             </li>
             <li>
-              Submit both the anime title and its release season or year to
-              secure the clear.
+              The title earns 600 points. With the correct anime: a release year
+              one off earns 50, exact year 100, exact year and
+              Winter/Spring/Summer/Fall 200 total. Numbered season adds another
+              200 when available.
             </li>
           </ul>
+        </PanelSection>
+
+        <PanelSection innerClassName="space-y-6">
+          <h2 className="text-2xl font-display font-semibold text-paper">
+            Poster Modified
+          </h2>
+          <p className="text-base leading-relaxed text-muted">
+            A separate daily mode with black-and-white, mosaic and shuffled-tile
+            posters: one of each in a shuffled daily order. Difficulty follows
+            anime popularity, independently of the effect. Each round uses a
+            different anime, with the same 600 title points and optional bonuses
+            as Poster Zoomed. Buy a clearer image or genres for a points cost.
+          </p>
         </PanelSection>
 
         <PanelSection innerClassName="space-y-6">
@@ -125,7 +140,12 @@ export default function HowToPlayPage() {
               This optional mode appears when playable opening clips are
               available.
             </li>
-            <li>Use the available clip and clues to identify its anime.</li>
+            <li>
+              Name the anime for 1,000 points. With the correct anime: release
+              year one off earns 50, exact year 100, exact year and release
+              season 200 total. Numbered season adds another 200 when available,
+              for up to 1,400 per round.
+            </li>
           </ul>
         </PanelSection>
 
@@ -139,13 +159,14 @@ export default function HowToPlayPage() {
           </h2>
           <ul className="list-disc space-y-3 pl-6 text-base leading-relaxed text-muted marker:text-signal-text">
             <li>
-              Each daily mode is worth up to 3,000 points, so the maximum is
-              3,000 × the modes available today.
+              Most daily modes are worth up to 3,000 points. Guess the Opening
+              can earn up to 4,200 with bonuses. The maximum reflects the
+              metadata available for your rounds; older saved scores are kept.
             </li>
             <li>
-              Round modes have Easy, Medium and Hard rounds worth up to 1,000
-              each. Every round takes one answer; hints you choose to take come
-              off that round.
+              Every round takes one answer; hints you choose to take come off
+              that round. Bonus fields are optional and earn points only with a
+              correct anime answer.
             </li>
             <li>
               Anidle: solving on guess 1 earns 3,000, and each extra guess costs
