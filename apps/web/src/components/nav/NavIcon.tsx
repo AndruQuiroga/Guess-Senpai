@@ -4,6 +4,7 @@ export type NavIconName =
   | "today"
   | "anidle"
   | "poster-zoomed"
+  | "poster-modified"
   | "character-silhouette"
   | "redacted-synopsis"
   | "guess-the-opening"
@@ -14,6 +15,12 @@ export type NavIconName =
   | "game";
 
 const PATHS: Record<NavIconName, ReactNode> = {
+  "poster-modified": (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="1" />
+      <path d="M4 12h16M12 4v16M4 4l16 16" />
+    </>
+  ),
   today: (
     <>
       <rect x="3.5" y="5" width="17" height="15" rx="2" />

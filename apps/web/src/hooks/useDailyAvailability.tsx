@@ -42,6 +42,7 @@ interface DailyAvailabilityState {
     rules_version: string;
     reset_at: string;
     available_modes: string[];
+    round_max_points?: Record<string, number[]>;
   } | null;
 }
 
@@ -172,14 +173,16 @@ export function useDailyAvailability(): DailyAvailabilityContextValue {
  * availability enables it (hidden while availability is pending or failed).
  */
 export function useRuntimeGamesDirectory(): GameDirectoryEntry[] {
-  const { guessTheOpeningEnabled } = useDailyAvailability();
+  const { guessTheOpeningEnabled, daily } = useDailyAvailability();
   return useMemo(
     () =>
       getPlayableGames(
         buildRuntimeGamesDirectory({
           guessTheOpeningEnabled,
+          posterModifiedEnabled:
+            daily?.available_modes.includes("poster_modified") ?? false,
         }),
       ),
-    [guessTheOpeningEnabled],
+    [guessTheOpeningEnabled, daily],
   );
 }

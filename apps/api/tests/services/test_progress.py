@@ -172,3 +172,21 @@ def test_anidle_attempt_limit_round_trips_for_exhaustion() -> None:
         assert entry.model_dump(by_alias=True, exclude_none=True)["attemptLimit"] == 2
 
     asyncio.run(_scenario())
+
+
+def test_season_bonus_progress_survives_account_storage() -> None:
+    async def scenario() -> None:
+        payload = DailyProgressPayload.model_validate({
+            "date": "2026-10-13", "progress": {
+                "guess_the_opening": {"maxPoints": 4200, "rounds": [{"round": 1, "completed": True, "points": 1400,
+                    "answers": {"releaseYear": "2020", "releaseSeason": "SPRING", "seasonNumber": "2"},
+                    "result": {"points": 1400, "max": 1400, "lines": []}}]},
+                "poster_modified": {"maxPoints": 3000, "rounds": [{"round": 1, "points": 1000, "completed": True}]},
+            },
+        })
+        await progress.store_daily_progress(303, payload)
+        stored = (await progress.load_daily_progress(303, payload.date)).model_dump(by_alias=True)
+        assert stored["progress"]["guess_the_opening"]["maxPoints"] == 4200
+        assert stored["progress"]["guess_the_opening"]["rounds"][0]["answers"]["seasonNumber"] == "2"
+        assert stored["progress"]["poster_modified"]["rounds"][0]["points"] == 1000
+    asyncio.run(scenario())

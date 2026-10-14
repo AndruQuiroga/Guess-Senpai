@@ -319,3 +319,18 @@ See [Review corrections](REVIEW_CORRECTIONS.md) for fixes to progress/account
 isolation, truthful status, recovery, rollover, real-route matte styling, and
 mobile Anidle layout. Desktop Today and 390 × 844 Anidle were inspected using
 synthetic local data. Full live-media and remaining-mode visual QA is pending.
+
+## Poster and Opening bonus follow-up (2026-10-13)
+
+Poster Zoomed, the separate Poster Modified mode, and Opening now place optional
+release/numbered-season guesses between the anime answer and submission. Known
+multi-season series offer valid numbered choices; movies, specials, sole-season
+shows and ambiguous metadata omit that question and its points. Bonuses require
+the correct anime. Poster modifications use one of each effect in shuffled daily
+order, while popularity determines round difficulty.
+
+Local synthetic browser QA covered desktop 1440px and mobile 390px layouts, all
+three poster effects, buying clarity, bonus scoring and reload recovery. Fixed
+the cramped mid-width poster layout. Public upstream smoke separately verified
+real poster data and matching second-season opening identity. Full production
+visual QA remains pending; no production data was changed.

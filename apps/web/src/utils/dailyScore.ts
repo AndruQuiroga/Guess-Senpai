@@ -29,6 +29,37 @@ export const DEFAULT_ANIDLE_ATTEMPTS = 8;
 export const MISS_PENALTY = 0.25;
 export const MIN_SOLVED_EFFICIENCY = 0.25;
 
+function gameMaximum(
+  gameKey: GameKey,
+  progress?: GameProgress | null,
+  roundMaxima?: number[],
+): number {
+  let configured = finiteNumber(progress?.maxPoints);
+  if (configured === null && roundMaxima?.length) {
+    configured = roundMaxima.reduce((sum, maximum, index) => {
+      const saved = progress?.rounds?.find(
+        (round) => round?.round === index + 1,
+      );
+      const savedMax = saved?.completed
+        ? finiteNumber(saved.result?.max)
+        : null;
+      return sum + (savedMax ?? finiteNumber(maximum) ?? ROUND_POINTS);
+    }, 0);
+  }
+  if (
+    configured === null ||
+    !["poster_zoomed", "poster_modified", "guess_the_opening"].includes(gameKey)
+  )
+    return POINTS_PER_GAME;
+  return Math.max(
+    0,
+    Math.min(
+      gameKey === "guess_the_opening" ? 4200 : POINTS_PER_GAME,
+      Math.round(configured),
+    ),
+  );
+}
+
 function count(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
@@ -104,7 +135,10 @@ export function scoreGame(
         (sum, round) => sum + (round.points ?? 0),
         0,
       );
-      return Math.min(POINTS_PER_GAME, Math.max(0, Math.round(earned)));
+      return Math.min(
+        gameMaximum(gameKey, progress),
+        Math.max(0, Math.round(earned)),
+      );
     }
   }
   if (getGameOutcome(progress) !== "solved") return 0;
@@ -126,16 +160,22 @@ export interface DailyScore {
 export function computeDailyScore(
   gameKeys: readonly GameKey[],
   progress?: DailyProgress | null,
+  roundMaxima?: Partial<Record<GameKey, number[]>>,
 ): DailyScore {
   const unique = Array.from(new Set(gameKeys));
   const perGame: Partial<Record<GameKey, number>> = {};
   let total = 0;
+  let max = 0;
   for (const key of unique) {
     const points = scoreGame(key, progress?.[key]);
     perGame[key] = points;
     total += points;
+    max += Math.max(
+      points,
+      gameMaximum(key, progress?.[key], roundMaxima?.[key]),
+    );
   }
-  return { total, max: unique.length * POINTS_PER_GAME, perGame };
+  return { total, max, perGame };
 }
 
 const numberFormat = new Intl.NumberFormat("en-US");

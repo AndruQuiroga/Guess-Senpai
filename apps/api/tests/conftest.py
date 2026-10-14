@@ -50,6 +50,7 @@ def isolate_anilist(monkeypatch: pytest.MonkeyPatch):
     level helper) themselves; pacing state starts fresh for every test.
     """
     from app.services import anilist
+    from app.services import animethemes
     from app.services import cache as cache_module
 
     anilist.reset_rate_state()
@@ -61,5 +62,8 @@ def isolate_anilist(monkeypatch: pytest.MonkeyPatch):
             raise anilist.AniListError("AniList network access is disabled in tests")
 
         monkeypatch.setattr(anilist, "_send", offline_send)
+        async def offline_themes(*args, **kwargs):
+            raise animethemes.AnimeThemesError("AnimeThemes network access is disabled in tests")
+        monkeypatch.setattr(animethemes, "_request", offline_themes)
     yield
     anilist.reset_rate_state()

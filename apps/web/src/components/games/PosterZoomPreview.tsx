@@ -218,7 +218,9 @@ export function PosterZoomPreview({
                     {state === "cleared"
                       ? "Release info unlocked."
                       : state === "active"
-                        ? "Work through the zoom levels to reveal the title and release."
+                        ? round?.meta.modification
+                          ? "Identify the altered poster; a clearer image is an optional clue."
+                          : "Work through the zoom levels to reveal the title and release."
                         : "Clear earlier rounds to unlock this poster."}
                   </p>
                 )}

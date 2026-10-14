@@ -310,13 +310,7 @@ def test_anidle_new_rules_and_legacy_payload_are_distinct() -> None:
 @pytest.mark.asyncio
 async def test_daily_puzzle_builds_distinct_bundles(monkeypatch: pytest.MonkeyPatch) -> None:
     day = date(2024, 1, 5)
-    popular = [
-        make_media(101, "Alpha"),
-        make_media(202, "Beta"),
-        make_media(303, "Gamma"),
-        make_media(404, "Delta"),
-        *[make_media(800 + i, f"Extra {i}") for i in range(12)],
-    ]
+    popular = [_media_with_character(800 + i, f"Extra {i}", 1000 - i) for i in range(48)]
     media_by_id = {media.id: media for media in popular}
 
     async def fake_load_popular_pool(day_value, cache, settings):
@@ -382,7 +376,9 @@ async def test_daily_puzzle_poster_rounds_scale_difficulty(
         make_media(702, "Synopsis Pick"),
         make_media(703, "Character Pick"),
     ]
-    pool = poster_media + additional_media
+    pool = poster_media + additional_media + [
+        _media_with_character(800 + i, f"Extra {i}", 900 - i) for i in range(48)
+    ]
     media_by_id = {media.id: media for media in pool}
 
     async def fake_load_popular_pool(day_value, cache, settings):
@@ -426,12 +422,7 @@ async def test_daily_puzzle_poster_rounds_scale_difficulty(
 @pytest.mark.asyncio
 async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch) -> None:
     day = date(2024, 1, 6)
-    popular = [
-        make_media(111, "A"),
-        make_media(222, "B"),
-        make_media(333, "C"),
-        make_media(444, "D"),
-    ]
+    popular = [_media_with_character(800 + i, f"Extra {i}", 1000 - i) for i in range(48)]
     media_by_id = {media.id: media for media in popular}
 
     async def fake_load_popular_pool(day_value, cache, settings):
@@ -484,10 +475,12 @@ async def test_recent_media_records_all_selected(monkeypatch: pytest.MonkeyPatch
 
     bundle_ids = [
         result.games.anidle.mediaId,
-        result.games.redacted_synopsis.mediaId,
-        result.games.character_silhouette.mediaId,
+        *[r.mediaId for r in result.games.redacted_synopsis.puzzle.rounds],
+        *[entry.mediaId for r in result.games.character_silhouette.puzzle.rounds for entry in r.entries],
     ]
     bundle_ids.extend(poster_ids)
+    if result.games.poster_modified:
+        bundle_ids.extend(r.mediaId for r in result.games.poster_modified.puzzle.rounds)
     if result.games.guess_the_opening:
         rounds = result.games.guess_the_opening.puzzle.rounds
         assert len(rounds) == 3
@@ -521,6 +514,16 @@ def test_popularity_tiers_split_the_ranking_in_thirds() -> None:
     assert {media.id for media in picked} == {3, 4, 5}
 
 
+def test_exhausted_pool_never_reuses_excluded_anime() -> None:
+    pool = [make_media(i, f"Show {i}") for i in range(3)]
+    tiers = engine._popularity_tiers(pool)
+    assert engine._tier_candidates(pool, tiers, 1, {0, 1, 2}) == []
+    with pytest.raises(ValueError, match="No unused anime"):
+        engine._choose_tiered("day", "poster", pool, tiers, 1, {0, 1, 2})
+    with pytest.raises(ValueError, match="No unused anime"):
+        engine._choose_media_from_pool("day", "game", pool, {0}, attempted_ids={1, 2})
+
+
 def test_tiered_poster_crops_never_show_the_whole_poster() -> None:
     media = make_media(5, "Poster")
     for difficulty, scales in engine.POSTER_ZOOM_SCALES.items():
@@ -532,9 +535,9 @@ def test_tiered_poster_crops_never_show_the_whole_poster() -> None:
 
 
 @pytest.mark.asyncio
-async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
-    day = date(2024, 2, 1)
-    popular = [_media_with_character(900 + i, f"Show {i}", popularity=100_000 - i * 1000) for i in range(45)]
+@pytest.mark.parametrize("day", [date(2024, 2, n) for n in (1, 2, 9, 18, 28)])
+async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: pytest.MonkeyPatch, day: date) -> None:
+    popular = [_media_with_character(900 + i, f"Show {i}", popularity=100_000 - i * 1000) for i in range(90)]
     for media in popular[::2]:
         media.status = "RELEASING"
     # Airing shows still count toward the other modes, so only openings skip them.
@@ -581,8 +584,15 @@ async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: py
     assert all(media_by_id[r.mediaId].status != "RELEASING" for r in openings)
 
     every_round = (
-        [r.mediaId for r in poster] + [r.mediaId for r in synopsis] + card_media + [r.mediaId for r in openings]
+        [result.games.anidle.mediaId]
+        + [r.mediaId for r in poster] + [r.mediaId for r in synopsis] + card_media + [r.mediaId for r in openings]
     )
+    modified = result.games.poster_modified.puzzle.rounds
+    assert [r.difficulty for r in modified] == [1, 2, 3]
+    assert all(r.mediaId in tiers[r.difficulty] for r in modified)
+    assert {r.meta.modification for r in modified} == {"black_white", "mosaic", "shuffled"}
+    every_round.extend(r.mediaId for r in modified)
+    assert len(every_round) == 25
     assert len(every_round) == len(set(every_round))
 
 
@@ -603,7 +613,7 @@ async def test_opening_rounds_carry_buyable_genre_and_year(monkeypatch: pytest.M
     media = make_media(42, "Clip Show")
     media.genres = ["Action", "Drama", "Mystery", "Sci-Fi", "Thriller"]
 
-    async def fake_clip(_variants):
+    async def fake_clip(_variants, *, anilist_id=None):
         return animethemes.OpeningClip(
             title="Clip Show",
             audio_url=None,

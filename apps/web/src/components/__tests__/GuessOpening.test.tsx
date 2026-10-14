@@ -122,4 +122,48 @@ describe("GuessOpening rounds", () => {
     render(<GuessOpening payload={[legacy]} onProgressChange={vi.fn()} />);
     expect(screen.getByText(/0:00 \/ 0:30/)).toBeInTheDocument();
   });
+
+  it("earns release and numbered-season bonuses in the same submission", async () => {
+    const progress = vi.fn();
+    const bonusRounds = rounds.map((round) => ({
+      ...round,
+      meta: {
+        ...round.meta,
+        season: "SPRING 2019",
+        seasonNumber: 2,
+        seasonOptions: [1, 2],
+      },
+    }));
+    render(<GuessOpening payload={bonusRounds} onProgressChange={progress} />);
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Opening anime title" }),
+      { target: { value: "First" } },
+    );
+    fireEvent.change(screen.getByLabelText("Release year"), {
+      target: { value: "2019" },
+    });
+    fireEvent.change(screen.getByLabelText("Release season"), {
+      target: { value: "SPRING" },
+    });
+    fireEvent.change(screen.getByLabelText("Numbered season (+200)"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Lock in answer" }));
+    expect(await screen.findByText("+1,400")).toBeInTheDocument();
+    expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({
+      maxPoints: 4200,
+      rounds: [
+        expect.objectContaining({
+          points: 1400,
+          answers: expect.objectContaining({
+            releaseYear: "2019",
+            releaseSeason: "SPRING",
+            seasonNumber: "2",
+          }),
+        }),
+        expect.anything(),
+        expect.anything(),
+      ],
+    });
+  });
 });

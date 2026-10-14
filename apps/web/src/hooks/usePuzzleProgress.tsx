@@ -543,6 +543,11 @@ function normalizeGameProgressEntry(value: unknown): GameProgress | null {
   if (attemptLimit !== undefined) {
     normalized.attemptLimit = attemptLimit;
   }
+  const maxPoints = coercePositiveInteger(
+    recordEntries["maxPoints"] ?? recordEntries["max_points"],
+    0,
+  );
+  if (maxPoints !== undefined) normalized.maxPoints = maxPoints;
 
   const hintsRevealed = coercePositiveInteger(
     recordEntries["hintsRevealed"] ?? recordEntries["hints_revealed"],

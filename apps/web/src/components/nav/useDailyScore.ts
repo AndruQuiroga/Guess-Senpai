@@ -25,6 +25,6 @@ export function useDailyScore(): DailyScore | null {
     const keys = games
       .map((game) => game.gameKey)
       .filter((key): key is GameKey => Boolean(key));
-    return computeDailyScore(keys, progress);
-  }, [games, progress]);
+    return computeDailyScore(keys, progress, daily?.round_max_points);
+  }, [games, progress, daily?.round_max_points]);
 }

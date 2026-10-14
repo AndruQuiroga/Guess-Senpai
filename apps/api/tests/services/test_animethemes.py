@@ -33,3 +33,15 @@ def test_historical_json_api_still_supported():
         {"type": "videos", "id": "3", "attributes": {"link": "https://example.test/legacy.webm"}},
     ]}
     assert animethemes.extract_opening_clip(payload).video_url == "https://example.test/legacy.webm"
+
+
+@pytest.mark.asyncio
+async def test_season_clip_requires_the_exact_anilist_resource(monkeypatch):
+    async def request(path, *, params=None):
+        if path == "/search/":
+            return {"search": {"anime": [{"id": 1, "slug": "first", "name": "Show"}, {"id": 2, "slug": "second", "name": "Show Season 2"}]}}
+        return {"anime": {"resources": [{"site": "AniList", "external_id": 2 if path.endswith("second") else 1}], "animethemes": [{"type": "OP", "animethemeentries": [{"videos": [{"link": f"https://example.test/{path.rsplit('/', 1)[-1]}.webm"}]}]}]}}
+    monkeypatch.setattr(animethemes, "_request", request)
+    clip = await animethemes.find_opening_clip(["Show"], anilist_id=2)
+    assert clip.video_url == "https://example.test/second.webm"
+    assert await animethemes.find_opening_clip(["Show"], anilist_id=99) is None

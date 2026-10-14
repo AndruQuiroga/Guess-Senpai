@@ -31,6 +31,10 @@ export interface AnidleGame {
 }
 
 export interface PosterZoomMeta {
+  seasonOptions?: number[];
+  modification?: "black_white" | "mosaic" | "shuffled" | null;
+  seasonNumber?: number | null;
+  seriesTitles?: string[];
   genres: string[];
   year?: number | null;
   season?: string | null;
@@ -142,6 +146,9 @@ export interface OpeningClip {
 }
 
 export interface GuessOpeningMeta {
+  seasonOptions?: number[];
+  seasonNumber?: number | null;
+  seriesTitles?: string[];
   songTitle?: string | null;
   artist?: string | null;
   sequence?: number | null;
@@ -221,6 +228,7 @@ export interface GuessOpeningPuzzleBundle {
 export interface GamesPayload {
   anidle: AnidlePuzzleBundle;
   poster_zoomed: PosterZoomPuzzleBundle;
+  poster_modified?: PosterZoomPuzzleBundle | null;
   redacted_synopsis: RedactedSynopsisPuzzleBundle;
   character_silhouette: CharacterSilhouettePuzzleBundle;
   guess_the_opening?: GuessOpeningPuzzleBundle | null;

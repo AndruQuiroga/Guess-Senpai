@@ -1,0 +1,28 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="640"
+  height="360"
+  viewBox="0 0 640 360"
+>
+  <rect width="640" height="360" fill="#171819" />
+  <g stroke="#171819" stroke-width="5">
+    <path
+      fill="#F4F0E7"
+      d="M200 40h80v90h-80zM280 130h80v90h-80zM360 220h80v90h-80z"
+    />
+    <path
+      fill="#737472"
+      d="M280 40h80v90h-80zM360 130h80v90h-80zM200 220h80v90h-80z"
+    />
+    <path
+      fill="#FF7658"
+      d="M360 40h80v90h-80zM200 130h80v90h-80zM280 220h80v90h-80z"
+    />
+  </g>
+  <path
+    d="m239 90 43 57 38-28 44 68-56 46-59-59-31 32"
+    fill="none"
+    stroke="#242628"
+    stroke-width="18"
+  />
+</svg>

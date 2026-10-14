@@ -512,6 +512,7 @@ export function RoundResult({
 }
 
 export interface SummaryRow {
+  max?: number;
   label: string;
   answer: string;
   coverImage?: string | null;
@@ -529,7 +530,7 @@ export function GameSummary({
   nextSlug?: string | null;
 }) {
   const total = rows.reduce((sum, row) => sum + row.points, 0);
-  const max = rows.length * ROUND_POINTS;
+  const max = rows.reduce((sum, row) => sum + (row.max ?? ROUND_POINTS), 0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     headingRef.current?.focus();
@@ -582,7 +583,7 @@ export function GameSummary({
                 {formatPoints(row.points)}
                 <span className="text-muted">
                   {" "}
-                  / {formatPoints(ROUND_POINTS)}
+                  / {formatPoints(row.max ?? ROUND_POINTS)}
                 </span>
               </p>
             </div>

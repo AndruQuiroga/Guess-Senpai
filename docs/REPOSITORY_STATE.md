@@ -249,7 +249,7 @@ create PRs and the Portainer polling switch are one-time manual steps; see
 
 Poster Zoomed, Redacted Synopsis, Character Silhouette and Guess the Opening now
 play an Easy, Medium and Hard round, each a different anime from the matching
-third of a 400-entry popularity ranking (sequels excluded). Each round takes one
+third of the popularity ranking (sequels excluded). Each round takes one
 submission and shows a results screen; every round is worth up to 1,000 points
 and optional hints are deducted from it. Shared pieces live in
 `apps/web/src/components/rounds` (`useRoundGame`, `RoundUI`, `scoring`).
@@ -260,10 +260,32 @@ function that did not exist). Anidle returned to a one-column-per-attribute
 table and limits studios to main animation studios. The profile difficulty
 preference no longer changes any game (it used to skip to a later round).
 
+### Daily anime uniqueness follow-up — 2026-10-13
+
+New daily generation never falls back to reusing an excluded anime ID when a
+popularity tier or the full pool runs out. The same daily exclusion set covers
+Anidle, all poster/synopsis rounds, all twelve character cards, and all opening
+rounds: a complete five-mode set uses 22 distinct anime IDs. Character cards
+draw from popular shows across all three rounds, with difficulty set by the art
+treatment. Each character round requires four different anime; the legacy
+single-anime character fallback is no longer used for daily generation.
+
+Insufficient content fails generation before a snapshot is stored. Guess the
+Opening remains optional and is omitted when three unused playable anime cannot
+be found. Existing published snapshots remain unchanged. This uniqueness rule
+applies within a daily set; it does not permanently exclude anime from later
+dates or treat every related franchise entry as the same AniList media ID.
+
+Validation after integrating the AniList caching changes from main: 97 backend
+tests passed, four opt-in tests skipped in a disposable container. Regressions
+cover all 22 selections across five date seeds, pool
+exhaustion, missing character imagery with no stored snapshot, and an optional
+opening pool with only two unused anime. No production backfill was performed.
+
 ### AniList request budget — 2026-10-13
 
 AniList allows 30–90 requests per minute per IP and caps `perPage` at 50, so
-the "400-entry" ranking above is really 200 entries (four pages of 50). On the
+the popularity ranking contains 200 entries (four pages of 50). On the
 `claude/anilist-efficiency` branch the popularity pool query returns full
 details records (characters, studios, links) and seeds the per-anime cache, so
 a cold daily set costs four AniList requests and further days generated the
@@ -289,6 +311,49 @@ evaluation and processed poster imagery. Request-count tests use fake upstream
 responses: four calls for a cold daily set, none for fourteen further archive
 dates on the same warm cache. Production deployment/backfill was not performed
 as part of this review.
+
+### Poster Modified and season bonuses — 2026-10-13
+
+New sets can include a separate `poster_modified` / `/games/poster-modified`
+mode alongside Poster Zoomed. It stores exactly one black-and-white, mosaic,
+and shuffled-tile effect in a date-seeded random order. Its three anime come
+strictly from the Easy/Medium/Hard popularity thirds; the effect is independent
+of difficulty. If a tier has no unused series, the optional mode is omitted.
+Two paid clarity steps progressively restore the image. Modified variants have
+separate cache keys and reuse the existing poster-source cache.
+
+Poster Zoomed, Poster Modified and Guess the Opening share optional bonuses:
+50 for a release year one off, 100 for exact year, or 200 total for exact year
+and release season. Numbered season earns a separate 200. All bonuses require
+a correct anime/series answer. Posters retain 600 title points (up to 1,000
+with bonuses); Opening retains 1,000 (up to 1,400). Unknown metadata does not
+offer that question or contribute to the round maximum. Progress stores the
+actual maximum as `maxPoints`, including completed legacy outcomes; no SQL
+migration is needed. Availability projects each round's maximum from the stored
+snapshot without upstream calls, so Today and navigation include bonuses before
+the game is played. Daily totals and summaries preserve legacy round maxima.
+
+Posters and openings may now draw later seasons. Existing AniList prequel/sequel
+links group related entries for daily exclusion; a complete six-mode set uses
+25 distinct anime IDs with no known prequel/sequel group repeated, including
+the twelve character cards. Numbered seasons use explicit title labels or
+conservative season-one metadata. Ambiguous parts/cours and unnumbered sequels
+remain unknown instead of counting prequel records. Numbered-season choices
+appear only for known multi-season series, using released seasons already in
+the pool; movies, specials and sole-season shows omit that bonus. This uses already-cached
+data and adds no AniList queries. Opening lookup requires the matching AniList
+resource on AnimeThemes, with a new cache version, so a season-two question
+cannot silently use season one's clip.
+
+Existing published sets are immutable and do not gain Poster Modified. Runtime
+discovery reads `available_modes`, and old archive dates keep their original
+mode list. No production publication, backfill or release was performed here.
+
+Validation for this follow-up: 116 backend tests passed (5 opt-in skipped),
+153 frontend tests passed, TypeScript passed, and the production web builder
+completed. Three public upstream smoke tests passed separately. Synthetic local
+browser QA covered desktop/mobile poster layouts, all effects, bonus scoring,
+reload recovery and the content-aware season selector.
 
 ## Navigation for future work
 

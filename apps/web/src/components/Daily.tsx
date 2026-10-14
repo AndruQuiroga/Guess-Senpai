@@ -107,6 +107,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
     () => ({
       anidle: anidleBundle,
       poster_zoomed: posterBundle,
+      poster_modified: data.games.poster_modified ?? null,
       character_silhouette: silhouetteBundle,
       redacted_synopsis: synopsisBundle,
       guess_the_opening:
@@ -121,6 +122,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       synopsisBundle,
       guessOpeningBundle,
       includeGuessTheOpening,
+      data.games.poster_modified,
     ],
   );
 
@@ -136,6 +138,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
     };
     append(anidleBundle?.solution ?? null);
     append(posterBundle?.solution ?? null);
+    append(data.games.poster_modified?.solution ?? null);
     append(silhouetteBundle?.solution ?? null);
     append(synopsisBundle?.solution ?? null);
     if (includeGuessTheOpening) {
@@ -149,6 +152,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
     synopsisBundle,
     includeGuessTheOpening,
     guessOpeningBundle,
+    data.games.poster_modified,
   ]);
 
   const solutionUrls = useMemo(
@@ -232,10 +236,10 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       const exhausted = getGameOutcome(progressForGame) === "exhausted";
       const inProgress = Boolean(
         progressForGame &&
-          !progressForGame.completed &&
-          !exhausted &&
-          ((progressForGame.round ?? 0) > 0 ||
-            (progressForGame.guesses?.length ?? 0) > 0),
+        !progressForGame.completed &&
+        !exhausted &&
+        ((progressForGame.round ?? 0) > 0 ||
+          (progressForGame.guesses?.length ?? 0) > 0),
       );
 
       let status: GameProgressStatus = "not-started";
@@ -285,6 +289,12 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       poster_zoomed: (
         <PosterZoomPreview bundle={posterBundle} progress={posterProgress} />
       ),
+      poster_modified: data.games.poster_modified ? (
+        <PosterZoomPreview
+          bundle={data.games.poster_modified}
+          progress={progress.poster_modified}
+        />
+      ) : null,
       character_silhouette: (
         <CharacterSilhouettePreview bundle={silhouetteBundle} />
       ),
@@ -302,6 +312,8 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
       includeGuessTheOpening,
       guessOpeningBundle,
       posterProgress,
+      data.games.poster_modified,
+      progress.poster_modified,
     ],
   );
 
@@ -321,6 +333,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
     return {
       ...buildShareEvent(data.date, progress, {
         includeGuessTheOpening,
+        includePosterModified: Boolean(data.games.poster_modified),
         aniListUrls: allCompleted ? solutionUrls : undefined,
       }),
       puzzleId: data.puzzle_id,
@@ -334,6 +347,7 @@ function DailyContent({ data }: { data: DailyPuzzleResponse }) {
     includeGuessTheOpening,
     progress,
     solutionUrls,
+    data.games.poster_modified,
   ]);
 
   const shareCardPayload = useMemo<ShareCardRequestPayload>(() => {

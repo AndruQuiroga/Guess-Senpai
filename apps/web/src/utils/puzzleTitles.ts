@@ -1,6 +1,7 @@
 const PUZZLE_TITLE_MAP: Record<string, string> = {
   anidle: "Anidle",
   "poster-zoomed": "Poster Zoomed",
+  "poster-modified": "Poster Modified",
   "character-silhouette": "Guess the Character",
   "redacted-synopsis": "Redacted Synopsis",
   "guess-the-opening": "Guess the Opening",
