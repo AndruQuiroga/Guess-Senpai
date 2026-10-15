@@ -120,3 +120,73 @@ async def test_republish_regenerates_round_content_from_an_older_version(local_g
     assert upgraded.rules_version == engine.CURRENT_RULES_VERSION
     async with get_session_factory()() as session:
         assert "marker" not in (await session.get(DailyPuzzleSet, day)).content
+
+
+@pytest.mark.asyncio
+async def test_reseed_replaces_a_current_set_with_a_differently_seeded_one(local_generation, monkeypatch):  # noqa: F811
+    today = datetime.now(timezone.utc).date()
+    await engine.publish_daily_puzzle(today)
+    seeds = []
+    assemble = engine._assemble_daily_puzzle
+
+    async def recording(*args, **kwargs):
+        seeds.append(kwargs.get("seed_salt"))
+        return await assemble(*args, **kwargs)
+
+    monkeypatch.setattr(engine, "_assemble_daily_puzzle", recording)
+    # A plain publish keeps the current set; a reseed regenerates it.
+    await engine.publish_daily_puzzle(today)
+    assert seeds == []
+    await backfill.reseed(today, "again")
+    assert seeds == ["again"]
+    async with get_session_factory()() as session:
+        row = await session.get(DailyPuzzleSet, today)
+        assert row.rules_version == engine.CURRENT_RULES_VERSION
+
+
+async def _used_ids(day):
+    media_ids: set[int] = set()
+    character_ids: set[int] = set()
+    async with get_session_factory()() as session:
+        row = await session.get(DailyPuzzleSet, day)
+    engine._collect_used_ids(row.content, media_ids, character_ids)
+    return media_ids, character_ids
+
+
+@pytest.mark.asyncio
+async def test_nearby_days_do_not_repeat_anime_or_characters(local_generation):  # noqa: F811
+    from test_puzzles_engine import _media_with_character
+
+    local_generation.extend(_media_with_character(3000 + i, f"Extra {i}", 900 - i) for i in range(120))
+    today = datetime.now(timezone.utc).date()
+    await backfill.backfill(3, today=today, pause_seconds=0, retry_wait_seconds=0)
+
+    days = [today - timedelta(days=offset) for offset in (3, 2, 1)]
+    used = [await _used_ids(day) for day in days]
+    for index, (media_ids, character_ids) in enumerate(used):
+        assert media_ids and character_ids
+        for other_media, other_characters in used[index + 1 :]:
+            assert not media_ids & other_media
+            assert not character_ids & other_characters
+
+
+@pytest.mark.asyncio
+async def test_small_pool_still_publishes_nearby_days_by_reusing_anime(local_generation):  # noqa: F811
+    # 48 anime cannot fill two fresh days; freshness yields instead of failing.
+    today = datetime.now(timezone.utc).date()
+    published = await backfill.backfill(2, today=today, pause_seconds=0, retry_wait_seconds=0)
+    assert len(published) == 2
+
+
+def test_tier_candidates_prefer_anime_not_used_recently() -> None:
+    from test_puzzles_engine import make_media
+
+    pool = [make_media(i, f"Show {i}") for i in range(6)]
+    tiers = engine._popularity_tiers(pool)
+    easy = tiers[1]
+    fresh = engine._tier_candidates(pool, tiers, 1, set(), avoid_ids=easy)
+    assert {media.id for media in fresh}.isdisjoint(easy)
+    # With everything recent, the round still draws from its own tier.
+    everything = {media.id for media in pool}
+    fallback = engine._tier_candidates(pool, tiers, 1, set(), avoid_ids=everything)
+    assert {media.id for media in fallback} == easy

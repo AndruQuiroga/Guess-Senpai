@@ -282,6 +282,23 @@ cover all 22 selections across five date seeds, pool
 exhaustion, missing character imagery with no stored snapshot, and an optional
 opening pool with only two unused anime. No production backfill was performed.
 
+### Cross-day freshness — 2026-10-14
+
+Generation now also avoids anime (whole franchises) and characters used in any
+set published within six days either side (`FRESHNESS_WINDOW_DAYS`), so a show
+or character does not return within a week. This is a preference, unlike the
+within-day rule: a round first widens to neighbouring popularity tiers and only
+reuses a recent anime when nothing fresh is left. Character cards pick a seeded
+main character instead of always the first; Hard cards may also pick a
+supporting character. The popularity pool is twenty pages (the top 1000 anime,
+twenty AniList requests per cold day, fetched concurrently after page one with
+up to 60s of rate-limit patience). Only the first six pages must load; a
+shorter ranking is cached for 15 minutes and then refetched. Difficulty tiers
+are fixed shares of the ranking (Easy top 20%, Medium next 30%, Hard bottom
+50%) rather than thirds, so Easy stays to well-known shows. Poster Modified now
+widens to neighbouring tiers like the other modes instead of being omitted.
+Already published sets are unchanged.
+
 ### AniList request budget — 2026-10-13
 
 AniList allows 30–90 requests per minute per IP and caps `perPage` at 50, so

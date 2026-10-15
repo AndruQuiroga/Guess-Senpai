@@ -653,22 +653,37 @@ async def fetch_popular_page(page: int, per_page: int) -> Dict[str, Any]:
     return data["Page"]
 
 
-async def fetch_popular_pool(per_page: int = MAX_PER_PAGE, pages: int = 2) -> List[Media]:
+async def fetch_popular_pool(
+    per_page: int = MAX_PER_PAGE, pages: int = 2, *, required_pages: Optional[int] = None
+) -> List[Media]:
     """Most popular anime, `pages` pages deep, each item a full details record.
 
     AniList caps `perPage` at 50 (a request for 100 silently returns 50 with
     50-item page offsets), so larger values are clamped to the same result.
+    After the first page the rest are requested together. Pages past
+    `required_pages` (default: all) may fail, e.g. on the rate limit; the
+    ranking then ends at the first missing page.
     """
     per_page = max(1, min(per_page, MAX_PER_PAGE))
-    media: List[Media] = []
-    current_page = 1
-    while current_page <= pages:
-        page_payload = await fetch_popular_page(current_page, per_page)
-        media.extend(Media.model_validate(m) for m in page_payload["media"])
-        if not page_payload["pageInfo"]["hasNextPage"]:
-            break
-        current_page += 1
-    return media
+    first = await fetch_popular_page(1, per_page)
+    payloads = [first]
+    if first["pageInfo"]["hasNextPage"] and pages > 1:
+        total = first["pageInfo"].get("total") or pages * per_page
+        last_page = min(pages, max(1, -(-int(total) // per_page)))
+        required = last_page if required_pages is None else max(1, min(required_pages, last_page))
+        results = await asyncio.gather(
+            *(fetch_popular_page(page, per_page) for page in range(2, last_page + 1)),
+            return_exceptions=True,
+        )
+        for page, result in enumerate(results, start=2):
+            if isinstance(result, BaseException):
+                if page <= required:
+                    raise result
+                break
+            payloads.append(result)
+            if not result["pageInfo"]["hasNextPage"]:
+                break
+    return [Media.model_validate(m) for payload in payloads for m in payload["media"]]
 
 
 def _clamp_per_page(value: int, default: int) -> int:

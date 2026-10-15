@@ -22,7 +22,7 @@ from app.services.anilist import Media
 from app.services.anidle_evaluator import AnidleEvaluationService
 from app.services.cache import InMemoryCache
 
-POOL_SIZE = 4 * anilist.MAX_PER_PAGE
+POOL_SIZE = engine.POPULAR_POOL_PAGES * anilist.MAX_PER_PAGE
 
 
 def full_media(media_id: int, rank: int) -> Dict[str, Any]:

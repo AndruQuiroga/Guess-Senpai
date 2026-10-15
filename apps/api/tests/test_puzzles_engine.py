@@ -503,15 +503,16 @@ def _media_with_character(media_id: int, title: str, popularity: int) -> Media:
     return media
 
 
-def test_popularity_tiers_split_the_ranking_in_thirds() -> None:
-    ranking = [_media_with_character(i, f"M{i}", popularity=1000 - i) for i in range(9)]
+def test_popularity_tiers_split_the_ranking_by_share() -> None:
+    ranking = [_media_with_character(i, f"M{i}", popularity=1000 - i) for i in range(10)]
     tiers = engine._popularity_tiers(ranking)
-    assert tiers[1] == {0, 1, 2}
-    assert tiers[2] == {3, 4, 5}
-    assert tiers[3] == {6, 7, 8}
+    # Easy is the top fifth, Medium the next 30%, Hard the bottom half.
+    assert tiers[1] == {0, 1}
+    assert tiers[2] == {2, 3, 4}
+    assert tiers[3] == {5, 6, 7, 8, 9}
     # An exhausted tier widens to its neighbour instead of failing.
-    picked = engine._tier_candidates(ranking, tiers, 3, excluded_ids={6, 7, 8})
-    assert {media.id for media in picked} == {3, 4, 5}
+    picked = engine._tier_candidates(ranking, tiers, 3, excluded_ids={5, 6, 7, 8, 9})
+    assert {media.id for media in picked} == {2, 3, 4}
 
 
 def test_exhausted_pool_never_reuses_excluded_anime() -> None:
@@ -537,7 +538,7 @@ def test_tiered_poster_crops_never_show_the_whole_poster() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("day", [date(2024, 2, n) for n in (1, 2, 9, 18, 28)])
 async def test_daily_rounds_use_a_different_anime_per_difficulty(monkeypatch: pytest.MonkeyPatch, day: date) -> None:
-    popular = [_media_with_character(900 + i, f"Show {i}", popularity=100_000 - i * 1000) for i in range(90)]
+    popular = [_media_with_character(900 + i, f"Show {i}", popularity=100_000 - i * 500) for i in range(150)]
     for media in popular[::2]:
         media.status = "RELEASING"
     # Airing shows still count toward the other modes, so only openings skip them.
@@ -652,3 +653,37 @@ def test_opening_prefers_a_creditless_video_without_lyrics() -> None:
     assert clip is not None
     assert clip.video_url == "https://v.example/OP1-NCBD1080.webm"
     assert clip.audio_url == "https://a.example/op.ogg"
+
+
+def test_featured_character_can_include_the_supporting_cast() -> None:
+    media = make_media(1, "Ensemble")
+    main = make_character_edge(1)
+    supporting = make_character_edge(2)
+    supporting.role = "SUPPORTING"
+    media.characters = MediaCharacters(edges=[main, supporting])
+    # Without a seed the legacy pick is the first main character.
+    assert engine._featured_character_edge(media, set()) is main
+    mains_only = {engine._featured_character_edge(media, set(), f"s{i}").node.id for i in range(20)}
+    assert mains_only == {main.node.id}
+    with_supporting = {
+        engine._featured_character_edge(media, set(), f"s{i}", include_supporting=True).node.id
+        for i in range(20)
+    }
+    assert with_supporting == {main.node.id, supporting.node.id}
+
+
+@pytest.mark.asyncio
+async def test_popular_pool_keeps_required_pages_when_deeper_pages_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import anilist as anilist_service
+
+    async def page(number: int, per_page: int):
+        if number > 3:
+            raise anilist_service.AniListRateLimited(30)
+        media = [make_media(number * 100 + i, f"P{number}-{i}").model_dump(mode="json") for i in range(per_page)]
+        return {"pageInfo": {"total": 10 * per_page, "currentPage": number, "hasNextPage": True}, "media": media}
+
+    monkeypatch.setattr(anilist_service, "fetch_popular_page", page)
+    pool = await anilist_service.fetch_popular_pool(per_page=2, pages=6, required_pages=2)
+    assert [m.id for m in pool] == [100, 101, 200, 201, 300, 301]
+    with pytest.raises(anilist_service.AniListRateLimited):
+        await anilist_service.fetch_popular_pool(per_page=2, pages=6, required_pages=5)
