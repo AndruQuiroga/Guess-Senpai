@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import { UnlimitedAnidlePage } from "../puzzle-pages/UnlimitedAnidlePage";
 import {
   PRACTICE_GAME_KEY,
+  PRACTICE_SOURCE_KEY,
   PRACTICE_TALLY_KEY,
 } from "../../utils/practiceAnidle";
 import type { GameProgress } from "../../types/progress";
@@ -15,6 +16,15 @@ vi.mock("next/navigation", () => ({
 
 const board = vi.hoisted(() => ({
   progress: undefined as unknown,
+}));
+
+const accountState = vi.hoisted(() => ({ authenticated: false }));
+
+vi.mock("../../hooks/useAccount", () => ({
+  useAccount: () => ({
+    account: { authenticated: accountState.authenticated },
+    loading: false,
+  }),
 }));
 
 // The board itself is covered elsewhere; this stub drives the page callbacks.
@@ -102,6 +112,7 @@ describe("UnlimitedAnidlePage", () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    accountState.authenticated = false;
     fetchMock.mockReset();
     fetchMock
       .mockResolvedValueOnce(practiceResponse(11))
@@ -231,5 +242,80 @@ describe("UnlimitedAnidlePage", () => {
     await waitFor(() =>
       expect(screen.getByText("Board for 44")).toBeInTheDocument(),
     );
+  });
+
+  it("disables the list source and offers sign-in when signed out", async () => {
+    render(<UnlimitedAnidlePage />);
+    await screen.findByText("Board for 11");
+    expect(
+      screen.getByRole("radio", { name: "Popular anime" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "My AniList list" })).toBeDisabled();
+    expect(
+      screen.getByRole("link", { name: "Sign in with AniList" }),
+    ).toHaveAttribute("href", "/login");
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("source=");
+  });
+
+  it("switches to the AniList list, remembers it and sends the session cookie", async () => {
+    accountState.authenticated = true;
+    const user = userEvent.setup();
+    render(<UnlimitedAnidlePage />);
+    await screen.findByText("Board for 11");
+
+    await user.click(screen.getByRole("radio", { name: "My AniList list" }));
+    expect(await screen.findByText("Board for 22")).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(String(url)).toContain("source=list");
+    expect(init).toMatchObject({ credentials: "include" });
+    expect(
+      screen.getByRole("radio", { name: "My AniList list" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(window.localStorage.getItem(PRACTICE_SOURCE_KEY)).toBe('"list"');
+
+    // The next puzzle keeps drawing from the list.
+    await user.click(screen.getByRole("button", { name: "Skip this puzzle" }));
+    expect(await screen.findByText("Board for 33")).toBeInTheDocument();
+    expect(String(fetchMock.mock.calls[2][0])).toContain("source=list");
+  });
+
+  it("asks a signed-out player with a saved list choice to sign in", async () => {
+    window.localStorage.setItem(PRACTICE_SOURCE_KEY, JSON.stringify("list"));
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "Authentication required" }),
+      })
+      .mockResolvedValueOnce(practiceResponse(55));
+    const user = userEvent.setup();
+    render(<UnlimitedAnidlePage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Sign in with AniList to practise from your list.",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Play popular anime instead" }),
+    );
+    expect(await screen.findByText("Board for 55")).toBeInTheDocument();
+    expect(String(fetchMock.mock.calls[1][0])).not.toContain("source=");
+  });
+
+  it("shows the server's reason when the list has nothing to play", async () => {
+    accountState.authenticated = true;
+    window.localStorage.setItem(PRACTICE_SOURCE_KEY, JSON.stringify("list"));
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        detail: "Your AniList list has no watched anime yet.",
+      }),
+    });
+    render(<UnlimitedAnidlePage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "no watched anime yet",
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 });
