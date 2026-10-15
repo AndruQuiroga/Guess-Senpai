@@ -2,6 +2,7 @@
 
     python -m app.puzzles.backfill --days 14
     python -m app.puzzles.backfill --days 14 --republish-legacy
+    python -m app.puzzles.backfill --reseed 2026-10-14
 
 Only days without a published set are generated; current-format sets are never
 touched. With --republish-legacy, sets stored in an older format (today
@@ -99,6 +100,14 @@ async def backfill(
     return published
 
 
+async def reseed(day: date, salt: str) -> None:
+    """Regenerate one published day with a salted seed, so it draws new anime."""
+    with anilist.rate_limit_patience(120.0):
+        await engine.publish_daily_puzzle(
+            day, include_guess_opening=settings.animethemes_enabled, reseed=salt
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--days", type=int, default=14, help="How many past days to fill (default 14)")
@@ -107,8 +116,20 @@ def main() -> None:
         action="store_true",
         help="Also regenerate older-format sets in the window (today included) in the current format",
     )
+    parser.add_argument(
+        "--reseed",
+        type=date.fromisoformat,
+        metavar="YYYY-MM-DD",
+        help="Regenerate only this day with a fresh seed (it draws different anime)",
+    )
+    parser.add_argument("--salt", help="Seed salt for --reseed (default: the current UTC time)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    if args.reseed:
+        salt = args.salt or datetime.now(timezone.utc).strftime("reseed-%Y%m%dT%H%M%S")
+        asyncio.run(reseed(args.reseed, salt))
+        print(f"Reseeded {args.reseed.isoformat()} with salt {salt}")
+        return
     published = asyncio.run(backfill(max(0, args.days), republish_legacy=args.republish_legacy))
     print(f"Published {len(published)} day(s): {', '.join(day.isoformat() for day in published) or 'none'}")
 

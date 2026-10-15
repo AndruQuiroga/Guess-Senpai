@@ -11,7 +11,7 @@ import random
 import re
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import AbstractSet, Any, List, Optional, Sequence, Tuple
 
 import httpx
 from sqlalchemy import select
@@ -110,9 +110,25 @@ CHARACTERS_PER_ROUND = 4
 # "3" and earlier are regenerated wholesale by the backfill.
 CURRENT_RULES_VERSION = "4"
 
-# Popularity ranking depth in AniList pages (50 each, its maximum); Hard draws
-# from the bottom third.
-POPULAR_POOL_PAGES = 4
+# Popularity ranking depth in AniList pages (50 each, its maximum): the top
+# 1000 anime. A day uses ~25 anime, so the pool is deep enough for weeks of
+# sets without repeats (see FRESHNESS_WINDOW_DAYS). Only the first
+# POPULAR_POOL_REQUIRED_PAGES must load; a shorter ranking is cached briefly
+# and fetched again.
+POPULAR_POOL_PAGES = 20
+POPULAR_POOL_REQUIRED_PAGES = 6
+SHORT_POOL_TTL_SECONDS = 900
+
+# Share of the popularity ranking in each difficulty tier: Easy is the top
+# fifth, Medium the next 30%, Hard the remaining half. Fixed shares (not
+# thirds) keep Easy to well-known shows as the ranking gets deeper.
+TIER_SHARES: Tuple[float, float, float] = (0.2, 0.3, 0.5)
+
+# Anime (and their franchises) and characters published within this many days
+# either side of a date are avoided when generating it, so a show or character
+# does not come back within the same week. It is a preference: when every
+# candidate for a round was used recently, a recent one is still drawn.
+FRESHNESS_WINDOW_DAYS = 6
 
 if hasattr(Image, "Resampling"):
     POSTER_RESAMPLE = Image.Resampling.LANCZOS  # type: ignore[attr-defined]
@@ -1034,14 +1050,19 @@ async def _load_popular_pool(day: date, cache: CacheBackend, settings: Settings)
     cache_key = f"anilist:popular:v3:{fetched_on.isoformat()}"
     ttl = settings.anilist_cache_ttl_seconds
 
-    async def creator() -> List[dict]:
-        media = await anilist.fetch_popular_pool(pages=POPULAR_POOL_PAGES)
-        raw = [m.model_dump(mode="json") for m in media]
-        for item in raw:
+    raw_media = await cache.get(cache_key)
+    if raw_media is None:
+        # Twenty pages may outrun an interactive request's rate-limit budget,
+        # so the fetch may wait up to a minute for its slots.
+        with anilist.rate_limit_patience(60.0):
+            media = await anilist.fetch_popular_pool(
+                pages=POPULAR_POOL_PAGES, required_pages=POPULAR_POOL_REQUIRED_PAGES
+            )
+        raw_media = [m.model_dump(mode="json") for m in media]
+        for item in raw_media:
             await cache.set(_media_cache_key(item["id"]), item, ttl)
-        return raw
-
-    raw_media = await cache.remember(cache_key, ttl, creator)
+        complete = len(raw_media) >= POPULAR_POOL_PAGES * anilist.MAX_PER_PAGE
+        await cache.set(cache_key, raw_media, ttl if complete else min(ttl, SHORT_POOL_TTL_SECONDS))
     return [Media.model_validate(item) for item in raw_media]
 
 
@@ -1218,6 +1239,7 @@ def _choose_media_from_pool(
     *,
     attempt: int = 0,
     attempted_ids: Optional[set[int]] = None,
+    avoid_ids: AbstractSet[int] = frozenset(),
 ) -> Media:
     if not pool:
         raise ValueError("Candidate pool is empty")
@@ -1230,6 +1252,7 @@ def _choose_media_from_pool(
     ]
     if not filtered:
         raise ValueError("No unused anime remain in the candidate pool")
+    filtered = [media for media in filtered if media.id not in avoid_ids] or filtered
 
     seed = f"{base_seed}:{game_key}:{attempt}"
     return _select_media(seed, filtered)
@@ -1242,13 +1265,17 @@ def _is_sequel(media: Media) -> bool:
 
 
 def _popularity_tiers(ranking: Sequence[Media]) -> dict[int, set[int]]:
-    """Split the popularity ranking into thirds: 1 = most popular (Easy)."""
+    """Split the popularity ranking by TIER_SHARES: 1 = most popular (Easy)."""
     ordered = sorted(ranking, key=lambda media: (-(media.popularity or 0), media.id))
-    size = max(1, math.ceil(len(ordered) / 3))
-    return {
-        tier: {media.id for media in ordered[(tier - 1) * size : tier * size]}
-        for tier in ROUND_DIFFICULTIES
-    }
+    tiers: dict[int, set[int]] = {}
+    start = 0
+    share_total = 0.0
+    for tier, share in zip(ROUND_DIFFICULTIES, TIER_SHARES):
+        share_total += share
+        end = len(ordered) if tier == ROUND_DIFFICULTIES[-1] else max(start + 1, math.ceil(len(ordered) * share_total))
+        tiers[tier] = {media.id for media in ordered[start:end]}
+        start = end
+    return tiers
 
 
 def _tier_candidates(
@@ -1256,9 +1283,18 @@ def _tier_candidates(
     tiers: dict[int, set[int]],
     difficulty: int,
     excluded_ids: set[int],
+    avoid_ids: AbstractSet[int] = frozenset(),
 ) -> List[Media]:
-    """Pool members in the round's tier, widening to neighbours when it runs dry."""
+    """Pool members in the round's tier, widening to neighbours when it runs dry.
+
+    Anime in `avoid_ids` (used on nearby days) are skipped while any tier
+    still has a fresh candidate; only then are they drawn again.
+    """
     order = {1: (1, 2, 3), 2: (2, 1, 3), 3: (3, 2, 1)}.get(difficulty, (difficulty,))
+    if avoid_ids:
+        fresh = _tier_candidates(pool, tiers, difficulty, set(excluded_ids) | set(avoid_ids))
+        if fresh:
+            return fresh
     for tier in order:
         members = [
             media for media in pool if media.id in tiers.get(tier, set()) and media.id not in excluded_ids
@@ -1277,10 +1313,11 @@ def _choose_tiered(
     excluded_ids: set[int],
     *,
     attempt: int = 0,
+    avoid_ids: AbstractSet[int] = frozenset(),
 ) -> Media:
     if not pool:
         raise ValueError("Candidate pool is empty")
-    candidates = _tier_candidates(pool, tiers, difficulty, excluded_ids)
+    candidates = _tier_candidates(pool, tiers, difficulty, excluded_ids, avoid_ids)
     if not candidates:
         raise ValueError("No unused anime remain in the candidate pool")
     return _select_media(f"{base_seed}:{label}:d{difficulty}:{attempt}", candidates)
@@ -1301,8 +1338,19 @@ def _build_synopsis_round(media: Media, *, order: int, difficulty: int) -> Optio
     )
 
 
-def _featured_character_edge(media: Media, excluded_ids: set[int]) -> Optional[MediaCharacterEdge]:
-    """A main character with real artwork, falling back to any pictured one."""
+def _featured_character_edge(
+    media: Media,
+    excluded_ids: AbstractSet[int],
+    seed: Optional[str] = None,
+    *,
+    include_supporting: bool = False,
+) -> Optional[MediaCharacterEdge]:
+    """A main character with real artwork, falling back to any pictured one.
+
+    Without a seed it is the first such character (legacy verification relies
+    on that); with one, the pick is spread across the show's main cast, plus
+    its supporting cast when `include_supporting` is set.
+    """
     edges = [
         edge
         for edge in (media.characters.edges if media.characters else [])
@@ -1314,8 +1362,12 @@ def _featured_character_edge(media: Media, excluded_ids: set[int]) -> Optional[M
     ]
     if not edges:
         return None
-    mains = [edge for edge in edges if (edge.role or "").upper() == "MAIN"]
-    return (mains or edges)[0]
+    roles = {"MAIN", "SUPPORTING"} if include_supporting else {"MAIN"}
+    choices = [edge for edge in edges if (edge.role or "").upper() in roles] or edges
+    if seed is None:
+        return choices[0]
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    return choices[int(digest[:8], 16) % len(choices)]
 
 
 def _character_entry(media: Media, edge: MediaCharacterEdge, difficulty: int) -> CharacterGuessEntry:
@@ -1354,6 +1406,9 @@ async def _assemble_daily_puzzle(
     user: Optional[UserContext],
     include_guess_opening: bool,
     cache: CacheBackend,
+    seed_salt: str = "",
+    avoid_media_ids: AbstractSet[int] = frozenset(),
+    avoid_character_ids: AbstractSet[int] = frozenset(),
 ) -> DailyPuzzleResponse:
     popular_pool = await _load_popular_pool(day, cache, settings)
     user_lists: Optional[MediaListCollection] = None
@@ -1365,6 +1420,9 @@ async def _assemble_daily_puzzle(
 
     pool = _build_candidate_pool(popular_pool, user_lists, recent_ids)
     base_seed = day.isoformat()
+    if seed_salt:
+        # An operator reseed (`backfill --reseed`) draws a different set.
+        base_seed = f"{base_seed}:{seed_salt}"
     if user:
         base_seed = f"{base_seed}:{user.user_id}"
 
@@ -1375,7 +1433,12 @@ async def _assemble_daily_puzzle(
     def family_ids(media_id: int) -> set[int]:
         return families.get(media_id, {media_id})
 
-    anidle_candidate = _choose_media_from_pool(base_seed, "anidle", pool, selected_ids)
+    # Whole franchises of anime shown on nearby days.
+    avoid: set[int] = set()
+    for media_id in avoid_media_ids:
+        avoid.update(family_ids(media_id))
+
+    anidle_candidate = _choose_media_from_pool(base_seed, "anidle", pool, selected_ids, avoid_ids=avoid)
     anidle_media = await _load_media_details(anidle_candidate.id, cache, settings)
     selected_ids.update(family_ids(anidle_media.id))
     if anidle_media.id not in recorded_ids:
@@ -1401,7 +1464,9 @@ async def _assemble_daily_puzzle(
 
     poster_rounds: List[PosterZoomRound] = []
     for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
-        candidate = _choose_tiered(base_seed, "poster_zoomed", pool, poster_tiers, difficulty, selected_ids)
+        candidate = _choose_tiered(
+            base_seed, "poster_zoomed", pool, poster_tiers, difficulty, selected_ids, avoid_ids=avoid
+        )
         poster_media = await _load_media_details(candidate.id, cache, settings)
         remember(poster_media)
         poster_round = _build_poster_round(media=poster_media, order=order, difficulty=difficulty)
@@ -1422,7 +1487,8 @@ async def _assemble_daily_puzzle(
             if not _tier_candidates(round_pool, tiers, difficulty, selected_ids):
                 break
             candidate = _choose_tiered(
-                base_seed, "redacted_synopsis", round_pool, tiers, difficulty, selected_ids, attempt=attempt
+                base_seed, "redacted_synopsis", round_pool, tiers, difficulty, selected_ids,
+                attempt=attempt, avoid_ids=avoid,
             )
             synopsis_media = await _load_media_details(candidate.id, cache, settings)
             synopsis_round = _build_synopsis_round(synopsis_media, order=order, difficulty=difficulty)
@@ -1458,11 +1524,23 @@ async def _assemble_daily_puzzle(
                 # Every character round uses popular shows; the round difficulty
                 # comes from how the art is hidden (black and white, close-up,
                 # mosaic), not from obscure characters.
-                base_seed, f"character_silhouette:{order}", round_pool, tiers, 1, excluded, attempt=attempt
+                base_seed, f"character_silhouette:{order}", round_pool, tiers, 1, excluded,
+                attempt=attempt, avoid_ids=avoid,
             )
             tried_for_characters.update(family_ids(candidate.id))
             character_media = await _load_media_details(candidate.id, cache, settings)
-            edge = _featured_character_edge(character_media, set())
+            edge_seed = f"{base_seed}:character:{character_media.id}"
+            # Hard cards may show a supporting character of a popular show.
+            supporting = difficulty == ROUND_DIFFICULTIES[-1]
+            edge = _featured_character_edge(
+                character_media, avoid_character_ids, edge_seed, include_supporting=supporting
+            )
+            if edge is None and candidate.id in avoid:
+                # Already reusing a recent show (nothing fresh is left), so a
+                # recent character is acceptable too.
+                edge = _featured_character_edge(
+                    character_media, set(), edge_seed, include_supporting=supporting
+                )
             if edge is not None:
                 entries.append(_character_entry(character_media, edge, difficulty))
                 character_media_by_id[character_media.id] = character_media
@@ -1523,6 +1601,7 @@ async def _assemble_daily_puzzle(
                         difficulty,
                         selected_ids | selected_for_opening | tried_ids,
                         attempt=attempt,
+                        avoid_ids=avoid,
                     )
                     tried_ids.update(family_ids(candidate.id))
                     opening_media = await _load_media_details(candidate.id, cache, settings)
@@ -1557,11 +1636,7 @@ async def _assemble_daily_puzzle(
     modified_rounds: List[PosterZoomRound] = []
     modified_ids: set[int] = set()
     for order, difficulty in enumerate(ROUND_DIFFICULTIES, start=1):
-        candidates = [
-            media for media in pool
-            if media.id in poster_tiers[difficulty]
-            and media.id not in selected_ids | modified_ids
-        ]
+        candidates = _tier_candidates(pool, poster_tiers, difficulty, selected_ids | modified_ids, avoid)
         if not candidates:
             break
         candidate = _select_media(f"{base_seed}:poster_modified:d{difficulty}", candidates)
@@ -1642,6 +1717,7 @@ async def publish_daily_puzzle(
     *,
     include_guess_opening: bool = False,
     replace_legacy: bool = False,
+    reseed: Optional[str] = None,
 ) -> DailyPuzzleResponse:
     """Generate and store the set for `day` unless one is already published.
 
@@ -1649,21 +1725,30 @@ async def publish_daily_puzzle(
     backfill (`python -m app.puzzles.backfill`). A current-format set is never
     replaced. With `replace_legacy`, a set stored under an older rules version
     is regenerated in the current format (an explicit, operator-run upgrade).
+    With `reseed`, the day is regenerated whatever its version, seeded by the
+    date plus that salt so it draws different anime.
     """
     if day > datetime.now(timezone.utc).date():
         raise ValueError("Daily puzzles cannot be published for a future UTC date")
     session_factory = get_session_factory()
     async with session_factory() as session:
         published = await session.get(DailyPuzzleSet, day)
-        if published is not None and (
+        if published is not None and not reseed and (
             not replace_legacy or published.rules_version == CURRENT_RULES_VERSION
         ):
             return _daily_response(published)
         replacing = published is not None
 
     cache = await _get_cache()
+    recent_media_ids, recent_character_ids = await _nearby_published_ids(day)
     generated = await _assemble_daily_puzzle(
-        day, user=None, include_guess_opening=include_guess_opening, cache=cache
+        day,
+        user=None,
+        include_guess_opening=include_guess_opening,
+        cache=cache,
+        seed_salt=reseed or "",
+        avoid_media_ids=recent_media_ids,
+        avoid_character_ids=recent_character_ids,
     )
     modes = ["anidle", "poster_zoomed", "redacted_synopsis", "character_silhouette"]
     if generated.games.poster_modified is not None:
@@ -1675,7 +1760,7 @@ async def publish_daily_puzzle(
     async with session_factory() as session:
         if replacing:
             row = await session.get(DailyPuzzleSet, day)
-            if row is not None and row.rules_version != CURRENT_RULES_VERSION:
+            if row is not None and (reseed or row.rules_version != CURRENT_RULES_VERSION):
                 row.reset_at = reset_at
                 row.rules_version = CURRENT_RULES_VERSION
                 row.content = content
@@ -1701,6 +1786,43 @@ async def publish_daily_puzzle(
         if published is None:
             raise RuntimeError("Daily puzzle publication did not persist")
         return _daily_response(published)
+
+
+def _collect_used_ids(node: Any, media_ids: set[int], character_ids: set[int]) -> None:
+    """Every `mediaId` and character card id in a stored daily snapshot."""
+    if isinstance(node, dict):
+        media_id = node.get("mediaId")
+        if isinstance(media_id, int):
+            media_ids.add(media_id)
+        character = node.get("character")
+        if isinstance(character, dict) and isinstance(character.get("id"), int):
+            character_ids.add(character["id"])
+        for value in node.values():
+            _collect_used_ids(value, media_ids, character_ids)
+    elif isinstance(node, list):
+        for value in node:
+            _collect_used_ids(value, media_ids, character_ids)
+
+
+async def _nearby_published_ids(day: date) -> Tuple[set[int], set[int]]:
+    """Anime and character ids in sets published within the freshness window of `day`."""
+    media_ids: set[int] = set()
+    character_ids: set[int] = set()
+    if FRESHNESS_WINDOW_DAYS <= 0:
+        return media_ids, character_ids
+    window = timedelta(days=FRESHNESS_WINDOW_DAYS)
+    session_factory = get_session_factory()
+    async with session_factory() as session:
+        rows = await session.execute(
+            select(DailyPuzzleSet.content).where(
+                DailyPuzzleSet.puzzle_date >= day - window,
+                DailyPuzzleSet.puzzle_date <= day + window,
+                DailyPuzzleSet.puzzle_date != day,
+            )
+        )
+        for (content,) in rows:
+            _collect_used_ids(content, media_ids, character_ids)
+    return media_ids, character_ids
 
 
 def daily_round_max_points(content: dict[str, Any], modes: Sequence[str]) -> dict[str, List[int]]:
