@@ -229,7 +229,7 @@ async def get_daily_availability() -> DailyAvailabilityResponse:
         published=published is not None,
         available_modes=modes,
         guess_the_opening_enabled="guess_the_opening" in modes,
-        puzzle_id=f"daily:{day.isoformat()}",
+        puzzle_id=puzzle_engine.daily_puzzle_id(day, published.content if published else None),
         rules_version=published.rules_version if published else "1",
     )
 
@@ -242,7 +242,11 @@ async def put_progress(request: Request, payload: DailyProgressPayload) -> Daily
     if payload.puzzle_id:
         async with get_session_factory()() as db_session:
             published = await db_session.get(DailyPuzzleSet, payload.date)
-        if not published or payload.puzzle_id != f"daily:{payload.date.isoformat()}" or payload.rules_version != published.rules_version:
+        if (
+            not published
+            or payload.puzzle_id != puzzle_engine.daily_puzzle_id(payload.date, published.content)
+            or payload.rules_version != published.rules_version
+        ):
             raise HTTPException(status_code=409, detail="Progress does not match a published puzzle")
     if not session:
         return payload

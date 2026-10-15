@@ -1757,6 +1757,11 @@ async def publish_daily_puzzle(
         modes.append("guess_the_opening")
     reset_at = datetime.combine(day + timedelta(days=1), time.min, tzinfo=timezone.utc)
     content = generated.model_dump(mode="json", exclude={"puzzle_id", "rules_version", "reset_at", "available_modes", "mode_puzzle_ids"})
+    if reseed:
+        # A reseeded day gets a new puzzle identity, so progress saved against
+        # the replaced set (on the server and in every browser) no longer
+        # attaches to it and everyone starts the new set fresh.
+        content[REVISION_KEY] = reseed
     async with session_factory() as session:
         if replacing:
             row = await session.get(DailyPuzzleSet, day)
@@ -1825,6 +1830,15 @@ async def _nearby_published_ids(day: date) -> Tuple[set[int], set[int]]:
     return media_ids, character_ids
 
 
+REVISION_KEY = "revision"
+
+
+def daily_puzzle_id(day: date, content: Optional[dict[str, Any]] = None) -> str:
+    """The stored set's identity: the date, plus the reseed salt if it was reseeded."""
+    revision = (content or {}).get(REVISION_KEY)
+    return f"daily:{day.isoformat()}:{revision}" if revision else f"daily:{day.isoformat()}"
+
+
 def daily_round_max_points(content: dict[str, Any], modes: Sequence[str]) -> dict[str, List[int]]:
     """Lightweight score projection, using only the stored daily snapshot."""
     maxima: dict[str, List[int]] = {}
@@ -1850,14 +1864,16 @@ def daily_round_max_points(content: dict[str, Any], modes: Sequence[str]) -> dic
 
 def _daily_response(row: DailyPuzzleSet) -> DailyPuzzleResponse:
     content = dict(row.content)
+    puzzle_id = daily_puzzle_id(row.puzzle_date, content)
+    content.pop(REVISION_KEY, None)
     modes = list(row.available_modes)
     response = DailyPuzzleResponse.model_validate({
         **content,
-        "puzzle_id": f"daily:{row.puzzle_date.isoformat()}",
+        "puzzle_id": puzzle_id,
         "rules_version": row.rules_version,
         "reset_at": row.reset_at,
         "available_modes": modes,
-        "mode_puzzle_ids": {mode: f"daily:{row.puzzle_date.isoformat()}:{mode}:v{row.rules_version}" for mode in modes},
+        "mode_puzzle_ids": {mode: f"{puzzle_id}:{mode}:v{row.rules_version}" for mode in modes},
     })
     # The guess budget and hint cadence are tuning, not puzzle content: serve
     # the current values even for sets published under older defaults.

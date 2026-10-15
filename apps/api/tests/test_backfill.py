@@ -190,3 +190,34 @@ def test_tier_candidates_prefer_anime_not_used_recently() -> None:
     everything = {media.id for media in pool}
     fallback = engine._tier_candidates(pool, tiers, 1, set(), avoid_ids=everything)
     assert {media.id for media in fallback} == easy
+
+
+@pytest.mark.asyncio
+async def test_reseed_gives_the_day_a_new_identity_so_progress_resets(local_generation):  # noqa: F811
+    from app.puzzles.models import DailyProgressPayload
+    from app.services.progress import load_daily_progress, merge_daily_progress
+    from app.db.models import User
+
+    today = datetime.now(timezone.utc).date()
+    original = await engine.publish_daily_puzzle(today)
+    assert original.puzzle_id == f"daily:{today.isoformat()}"
+    async with get_session_factory()() as session:
+        session.add(User(id=77, username="player", access_token="t", access_token_expires_at=datetime.now(timezone.utc)))
+        await session.commit()
+    await merge_daily_progress(
+        77,
+        DailyProgressPayload(
+            date=today,
+            puzzle_id=original.puzzle_id,
+            rules_version=original.rules_version,
+            progress={"anidle": {"completed": True, "guesses": ["X"], "round": 1}},
+        ),
+    )
+
+    await backfill.reseed(today, "fresh")
+    reseeded = await engine.get_daily_puzzle(today)
+    assert reseeded.puzzle_id == f"daily:{today.isoformat()}:fresh"
+    assert all(pid.startswith(reseeded.puzzle_id + ":") for pid in reseeded.mode_puzzle_ids.values())
+    # Progress saved against the replaced set does not attach to the new one.
+    stale = await load_daily_progress(77, today, reseeded.puzzle_id, reseeded.rules_version)
+    assert stale.progress == {}
