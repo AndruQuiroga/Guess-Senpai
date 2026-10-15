@@ -14,9 +14,23 @@ from app.puzzles.models import DailyPuzzleResponse, ensure_utc
 from app.routers import puzzles as puzzles_router
 from app.routers.puzzles import AnidleGuessEvaluationPayload
 from app.services import anidle_evaluator, anidle_practice
-from app.services.anilist import CoverImage
+from app.services.anilist import (
+    AniListError,
+    CoverImage,
+    MediaList,
+    MediaListCollection,
+    MediaListEntry,
+)
 from test_daily_snapshots import local_generation  # noqa: F401  (fixture)
 from test_puzzles_engine import make_media
+
+
+def blank_request() -> Request:
+    return Request(scope={"type": "http", "headers": [], "app": None})
+
+
+async def get_practice(exclude=None, source="popular"):
+    return await puzzles_router.get_anidle_practice(blank_request(), exclude=exclude, source=source)
 
 
 @pytest.fixture
@@ -44,7 +58,7 @@ def practice_pool(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_practice_returns_v2_game_from_the_pool_without_publishing(practice_pool):
-    response = await puzzles_router.get_anidle_practice(exclude=None)
+    response = await get_practice(exclude=None)
 
     assert response.practice_id.startswith("practice:")
     assert response.rules_version == "2"
@@ -61,7 +75,7 @@ async def test_practice_returns_v2_game_from_the_pool_without_publishing(practic
 
 @pytest.mark.asyncio
 async def test_practice_ids_are_opaque_and_unique(practice_pool):
-    ids = {(await puzzles_router.get_anidle_practice(exclude=None)).practice_id for _ in range(5)}
+    ids = {(await get_practice(exclude=None)).practice_id for _ in range(5)}
     assert len(ids) == 5
     assert all(str(media.id) not in practice_id for media in practice_pool for practice_id in ids)
 
@@ -71,10 +85,10 @@ async def test_practice_avoids_excluded_ids_and_falls_back_when_all_excluded(pra
     keep = practice_pool[0].id
     others = [media.id for media in practice_pool if media.id != keep]
     for _ in range(10):
-        response = await puzzles_router.get_anidle_practice(exclude=others)
+        response = await get_practice(exclude=others)
         assert response.anidle.mediaId == keep
     everyone = [media.id for media in practice_pool]
-    response = await puzzles_router.get_anidle_practice(exclude=everyone)
+    response = await get_practice(exclude=everyone)
     assert response.anidle.mediaId in everyone
 
 
@@ -89,13 +103,13 @@ async def test_practice_empty_pool_is_503(monkeypatch):
     monkeypatch.setattr(engine, "_load_popular_pool", empty)
     monkeypatch.setattr(engine, "_get_cache", cache)
     with pytest.raises(HTTPException) as failure:
-        await puzzles_router.get_anidle_practice(exclude=None)
+        await get_practice(exclude=None)
     assert failure.value.status_code == 503
 
 
 @pytest.mark.asyncio
 async def test_practice_game_is_evaluated_by_the_existing_endpoint(practice_pool, monkeypatch):
-    practice = await puzzles_router.get_anidle_practice(exclude=None)
+    practice = await get_practice(exclude=None)
     target = next(media for media in practice_pool if media.id == practice.anidle.mediaId)
     guess = next(media for media in practice_pool if media.id != target.id)
     guess.episodes = 24
@@ -165,6 +179,114 @@ async def test_unresolved_guess_has_unknown_new_fields(practice_pool, monkeypatc
     assert response.format == []
     assert response.cover_image is None
     assert response.matched is False
+
+
+def list_collection(entries_by_status: dict[str, list]) -> MediaListCollection:
+    return MediaListCollection(
+        lists=[
+            MediaList(
+                name=status.title(),
+                status=status,
+                entries=[MediaListEntry(status=status, media=media) for media in entries],
+            )
+            for status, entries in entries_by_status.items()
+        ]
+    )
+
+
+@pytest.fixture
+def signed_in(monkeypatch):
+    user = engine.UserContext(user_id=42, username="senpai", access_token="token")
+
+    async def resolve(request):
+        return user
+
+    monkeypatch.setattr(puzzles_router, "_resolve_user_context", resolve)
+    return user
+
+
+@pytest.fixture
+def list_practice(practice_pool, signed_in, monkeypatch):
+    """The player's list: watched shows from the pool, plus ones to never draw."""
+    adult = make_media(3100, "Adult")
+    adult.isAdult = True
+    planned = make_media(3101, "Planned")
+    lists = list_collection(
+        {
+            "COMPLETED": [practice_pool[0], adult],
+            "CURRENT": [practice_pool[1]],
+            "DROPPED": [practice_pool[0]],  # duplicate entry
+            "PLANNING": [planned],
+        }
+    )
+    calls = []
+
+    async def fetch_lists(cache, user):
+        calls.append(user.user_id)
+        return lists
+
+    async def no_popular(*args):
+        raise AssertionError("List practice must not read the popular pool")
+
+    monkeypatch.setattr(engine, "_fetch_user_lists", fetch_lists)
+    monkeypatch.setattr(engine, "_load_popular_pool", no_popular)
+    return {"watched": {practice_pool[0].id, practice_pool[1].id}, "calls": calls}
+
+
+@pytest.mark.asyncio
+async def test_list_practice_draws_only_watched_anime(list_practice):
+    for _ in range(20):
+        response = await get_practice(source="list")
+        assert response.source == "list"
+        assert response.anidle.mediaId in list_practice["watched"]
+    assert set(list_practice["calls"]) == {42}
+
+
+@pytest.mark.asyncio
+async def test_list_practice_still_avoids_recent_answers(list_practice):
+    first, second = sorted(list_practice["watched"])
+    for _ in range(10):
+        response = await get_practice(exclude=[first], source="list")
+        assert response.anidle.mediaId == second
+
+
+@pytest.mark.asyncio
+async def test_popular_practice_reports_its_source(practice_pool):
+    assert (await get_practice()).source == "popular"
+
+
+@pytest.mark.asyncio
+async def test_list_practice_requires_sign_in(practice_pool, monkeypatch):
+    async def anonymous(request):
+        return None
+
+    monkeypatch.setattr(puzzles_router, "_resolve_user_context", anonymous)
+    with pytest.raises(HTTPException) as failure:
+        await get_practice(source="list")
+    assert failure.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_list_without_watched_anime_is_404(practice_pool, signed_in, monkeypatch):
+    async def only_planned(cache, user):
+        return list_collection({"PLANNING": [practice_pool[0]]})
+
+    monkeypatch.setattr(engine, "_fetch_user_lists", only_planned)
+    with pytest.raises(HTTPException) as failure:
+        await get_practice(source="list")
+    assert failure.value.status_code == 404
+    assert "no watched anime" in failure.value.detail
+
+
+@pytest.mark.asyncio
+async def test_unreadable_list_is_502(practice_pool, signed_in, monkeypatch):
+    async def broken(cache, user):
+        raise AniListError("Invalid token")
+
+    monkeypatch.setattr(engine, "_fetch_user_lists", broken)
+    with pytest.raises(HTTPException) as failure:
+        await get_practice(source="list")
+    assert failure.value.status_code == 502
 
 
 def test_practice_id_helper_prefix():

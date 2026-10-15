@@ -213,6 +213,8 @@ class AnidlePracticeResponse(BaseModel):
 
     practice_id: str
     rules_version: str = "2"
+    # "popular" (shared popularity pool) or "list" (the player's AniList list).
+    source: str = "popular"
     anidle: AnidlePuzzleBundle
 
 

@@ -36,7 +36,7 @@ from ..services.progress import (
     store_streak,
 )
 from ..services.session import SessionData, get_session_manager
-from ..services.anilist import Media, MediaTitlePair, search_media
+from ..services.anilist import AniListError, Media, MediaTitlePair, search_media
 from ..services.anidle_evaluator import (
     AnidleEvaluationService,
     AnidleGuessEvaluationPayload,
@@ -480,14 +480,32 @@ async def verify_guess(payload: GuessVerificationPayload) -> GuessVerificationRe
     summary="Fetch a fresh Unlimited Anidle practice game",
 )
 async def get_anidle_practice(
+    request: Request,
     exclude: Optional[List[int]] = Query(
         default=None,
         max_length=anidle_practice.MAX_EXCLUDED_IDS,
         description="Recently played media ids to avoid repeating",
     ),
+    source: anidle_practice.PracticeSource = Query(
+        default="popular",
+        description="'popular' for the shared pool, 'list' for the signed-in player's AniList list",
+    ),
 ) -> AnidlePracticeResponse:
+    user_ctx: Optional[UserContext] = None
+    if source == "list":
+        user_ctx = await _resolve_user_context(request)
+        if user_ctx is None:
+            raise HTTPException(status_code=401, detail="Sign in with AniList to practise from your list")
     try:
-        return await anidle_practice.build_practice_game(exclude)
+        return await anidle_practice.build_practice_game(exclude, user=user_ctx)
+    except anidle_practice.EmptyPracticeList as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Your AniList list has no watched anime yet. Mark some as watching or completed.",
+        ) from exc
+    except AniListError as exc:
+        detail = "Couldn't read your AniList list right now" if user_ctx else "AniList is unavailable right now"
+        raise HTTPException(status_code=502, detail=detail) from exc
     except (ValueError, LookupError) as exc:
         raise HTTPException(status_code=503, detail="No practice puzzle available right now") from exc
 

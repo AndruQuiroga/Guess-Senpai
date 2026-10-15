@@ -28,7 +28,7 @@ Docker Compose defines web, API, Redis, and PostgreSQL services.
 | Area                                      | Evidence in code                                                                                                                            | Boundary                                                                                                                                |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Anidle                                    | `components/anidle/*` (useAnidleGame, GuessGrid, HintStrip, AttemptMeter, ResultCard), evaluator, API evaluation and batch endpoints, tests | v2 rules: 8 accepted guesses, hints after 2/4/6 misses; unmatched, repeated and failed guesses are free; legacy snapshots keep v1 rules |
-| Unlimited Anidle                          | `GET /puzzles/anidle/practice`, `services/anidle_practice.py`, `/games/anidle/unlimited`                                                    | Practice only: random v2 game, local tally, never touches daily progress, streak or score                                               |
+| Unlimited Anidle                          | `GET /puzzles/anidle/practice`, `services/anidle_practice.py`, `/games/anidle/unlimited`                                                    | Practice only: random v2 game, local tally, never touches daily progress, streak or score. `source=list` (signed in) draws from the player's watched AniList entries |
 | Poster Zoomed                             | Multi-round components, image processing endpoint, tests                                                                                    | Requires external media; real image quality and release guessing need runtime validation                                                |
 | Redacted Synopsis                         | Redaction engine, component and tests                                                                                                       | Depends on upstream descriptions                                                                                                        |
 | Character Silhouette                      | Character pools, rounds/cards, name search, tests                                                                                           | Filters character imagery; content availability can affect generated rounds                                                             |
@@ -376,6 +376,18 @@ version is regenerated in full. Deploy, then run
 `python -m app.puzzles.backfill --days <N> --republish-legacy` to rebuild today
 and the archive window; progress against v3 sets is left behind with them.
 No production backfill was performed here.
+
+### Personal list practice (2026-10-14)
+
+Unlimited Anidle has a "Pick from" toggle: Popular anime (default) or My
+AniList list. `GET /puzzles/anidle/practice?source=list` needs a session
+(401 otherwise) and draws from the player's COMPLETED, CURRENT, REPEATING,
+PAUSED and DROPPED entries, never PLANNING or adult titles. It returns 404
+when no entries qualify and 502 when the list cannot be read. Lists are
+cached per user for an hour (`_fetch_user_lists`). The choice is stored in
+the browser. Daily sets stay shared; the engine's other user-context branches
+remain unused. Signed-in list play has not been checked against live AniList
+OAuth.
 
 ## Navigation for future work
 

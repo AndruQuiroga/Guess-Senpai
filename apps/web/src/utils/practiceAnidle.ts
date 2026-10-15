@@ -10,11 +10,16 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 export const PRACTICE_GAME_KEY = "guesssenpai:practice:anidle:game:v1";
 export const PRACTICE_TALLY_KEY = "guesssenpai:practice:anidle:tally:v1";
+export const PRACTICE_SOURCE_KEY = "guesssenpai:practice:anidle:source:v1";
 /** How many recent answers a new puzzle avoids repeating. */
 export const RECENT_LIMIT = 10;
 
+/** Where answers come from: the shared popular pool or the player's AniList list. */
+export type PracticeSource = "popular" | "list";
+
 export interface PracticeGame {
   practiceId: string;
+  source: PracticeSource;
   mediaId: number;
   puzzle: AnidleGame;
   coverImage: string | null;
@@ -43,6 +48,7 @@ export const EMPTY_TALLY: PracticeTally = {
 
 interface PracticeApiResponse {
   practice_id: string;
+  source?: PracticeSource;
   anidle: {
     mediaId: number;
     puzzle: AnidleGame;
@@ -50,20 +56,43 @@ interface PracticeApiResponse {
   };
 }
 
+/** Thrown when list practice needs an AniList sign-in. */
+export class PracticeSignInRequired extends Error {}
+
+async function practiceError(response: Response): Promise<Error> {
+  if (response.status === 401) {
+    return new PracticeSignInRequired(
+      "Sign in with AniList to practise from your list.",
+    );
+  }
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body?.detail === "string" && body.detail) {
+      return new Error(body.detail);
+    }
+  } catch {
+    // Fall through to the generic message.
+  }
+  return new Error(`Couldn't load a practice puzzle (${response.status})`);
+}
+
 export async function fetchPracticeGame(
   exclude: number[] = [],
+  source: PracticeSource = "popular",
 ): Promise<PracticeGame> {
   const params = new URLSearchParams();
   exclude.slice(0, RECENT_LIMIT).forEach((id) => {
     params.append("exclude", String(id));
   });
+  if (source === "list") params.set("source", "list");
   const query = params.toString();
   const response = await fetch(
     `${API_BASE}/puzzles/anidle/practice${query ? `?${query}` : ""}`,
-    { cache: "no-store" },
+    // The list source reads the signed-in session cookie.
+    { cache: "no-store", credentials: "include" },
   );
   if (!response.ok) {
-    throw new Error(`Couldn't load a practice puzzle (${response.status})`);
+    throw await practiceError(response);
   }
   const data = (await response.json()) as PracticeApiResponse;
   if (!data?.practice_id || !data.anidle?.puzzle) {
@@ -71,6 +100,7 @@ export async function fetchPracticeGame(
   }
   return {
     practiceId: data.practice_id,
+    source: data.source === "list" ? "list" : "popular",
     mediaId: data.anidle.mediaId,
     puzzle: data.anidle.puzzle,
     coverImage: data.anidle.solution?.coverImage ?? null,
@@ -131,6 +161,7 @@ export function parseSession(raw: unknown): PracticeSession | null {
   }
   return {
     practiceId: record.practiceId,
+    source: record.source === "list" ? "list" : "popular",
     mediaId: record.mediaId,
     puzzle,
     coverImage:
@@ -166,6 +197,10 @@ export const loadPracticeTally = (): PracticeTally =>
   parseTally(readJson(PRACTICE_TALLY_KEY));
 export const savePracticeTally = (tally: PracticeTally): void =>
   writeJson(PRACTICE_TALLY_KEY, tally);
+export const loadPracticeSource = (): PracticeSource =>
+  readJson(PRACTICE_SOURCE_KEY) === "list" ? "list" : "popular";
+export const savePracticeSource = (source: PracticeSource): void =>
+  writeJson(PRACTICE_SOURCE_KEY, source);
 export const loadPracticeSession = (): PracticeSession | null =>
   parseSession(readJson(PRACTICE_GAME_KEY));
 export const savePracticeSession = (session: PracticeSession): void =>

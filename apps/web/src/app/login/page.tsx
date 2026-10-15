@@ -20,8 +20,9 @@ export default function LoginPage() {
             Connect AniList
           </h1>
           <p className="text-base leading-relaxed">
-            Link your AniList account to personalise puzzle selection and sync
-            supported progress across devices.
+            Link your AniList account to sync progress and streaks across
+            devices, and to practise Unlimited Anidle with anime from your own
+            list.
           </p>
         </header>
         <div className="space-y-3">
